@@ -415,11 +415,22 @@ function cleanChromiumLocks(dir) {
     const files = fs.readdirSync(dir);
     for (const file of files) {
       const fullPath = path.join(dir, file);
-      if (fs.statSync(fullPath).isDirectory()) {
-        cleanChromiumLocks(fullPath);
-      } else if (file === 'SingletonLock') {
-        fs.unlinkSync(fullPath);
-        console.log(`🗑️ Removed stale Chromium lock file: ${fullPath}`);
+      try {
+        const stat = fs.lstatSync(fullPath);
+        if (stat.isDirectory()) {
+          cleanChromiumLocks(fullPath);
+        } else if (file === 'SingletonLock' || file === 'SingletonCookie' || stat.isSymbolicLink()) {
+          fs.unlinkSync(fullPath);
+          console.log(`🗑️ Removed stale Chromium lock/symlink: ${fullPath}`);
+        }
+      } catch (fileErr) {
+        // If lstat fails (e.g. broken symlink), try direct delete if it matches lock names
+        if (file === 'SingletonLock' || file === 'SingletonCookie') {
+          try {
+            fs.unlinkSync(fullPath);
+            console.log(`🗑️ Force-removed lock file: ${fullPath}`);
+          } catch (e) {}
+        }
       }
     }
   } catch (e) {
