@@ -408,6 +408,26 @@ if (browserPath) {
 const SESSION_DIR = IS_CLOUD ? '/data/.wwebjs_auth' : './.wwebjs_auth';
 try { fs.mkdirSync(SESSION_DIR, { recursive: true }); } catch {}
 
+// Clean any stale Chromium process locks from crash/restart
+function cleanChromiumLocks(dir) {
+  if (!fs.existsSync(dir)) return;
+  try {
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const fullPath = path.join(dir, file);
+      if (fs.statSync(fullPath).isDirectory()) {
+        cleanChromiumLocks(fullPath);
+      } else if (file === 'SingletonLock') {
+        fs.unlinkSync(fullPath);
+        console.log(`🗑️ Removed stale Chromium lock file: ${fullPath}`);
+      }
+    }
+  } catch (e) {
+    console.error('Error cleaning lock files:', e);
+  }
+}
+cleanChromiumLocks(SESSION_DIR);
+
 // Initialize WhatsApp client
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
