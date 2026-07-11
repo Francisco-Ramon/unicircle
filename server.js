@@ -86,6 +86,62 @@ app.post('/api/reset-session', async (_req, res) => {
   }
 });
 
+// Send message — allows manual owner reply from the web dashboard
+app.post('/api/send-message', async (req, res) => {
+  const { conversationId, message } = req.body;
+  if (!conversationId || !message) {
+    return res.status(400).json({ ok: false, error: 'conversationId and message are required' });
+  }
+
+  try {
+    // 1. Fetch conversation details to get the title (which has the phone number)
+    const { data: convo, error: convoErr } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', conversationId)
+      .maybeSingle();
+
+    if (convoErr || !convo) {
+      return res.status(404).json({ ok: false, error: 'Conversation not found' });
+    }
+
+    // 2. Extract phone number
+    const match = convo.title.match(/\((\d+)\)/);
+    const phone = match ? match[1] : convo.title.replace('WhatsApp: ', '').trim();
+
+    if (!phone || !/^\d+$/.test(phone)) {
+      return res.status(400).json({ ok: false, error: 'Invalid phone number format in conversation title' });
+    }
+
+    // 3. Send message via WhatsApp
+    const formattedPhone = `${phone}@c.us`;
+    console.log(`✉️ Sending manual reply to ${formattedPhone}: "${message}"`);
+    await client.sendMessage(formattedPhone, message);
+
+    // 4. Save to database
+    const { error: msgErr } = await supabase.from('chat_messages').insert({
+      user_id: convo.user_id,
+      conversation_id: conversationId,
+      role: 'assistant',
+      content: message,
+      channel: 'whatsapp',
+      metadata: { whatsapp_phone: phone, manual: true }
+    });
+
+    if (msgErr) throw msgErr;
+
+    // 5. Update last message timestamps
+    await supabase.from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', conversationId);
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Failed to send message:', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 const API_PORT = process.env.PORT || 3001;
 app.listen(API_PORT, () => {
   console.log(`🌐 WhatsApp API server listening on http://localhost:${API_PORT}`);

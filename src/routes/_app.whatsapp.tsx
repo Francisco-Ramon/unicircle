@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader, Card } from "@/components/ui/page";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, RefreshCw, Phone, Clock, ChevronRight, ArrowLeft, User } from "lucide-react";
+import { MessageCircle, RefreshCw, Phone, Clock, ChevronRight, ArrowLeft, User, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp")({
@@ -50,6 +50,38 @@ export default function WhatsAppPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [msgLoading, setMsgLoading] = useState(false);
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selected) return;
+
+    setSending(true);
+    try {
+      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/send-message", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId: selected.id,
+          message: replyText.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send message");
+
+      setReplyText("");
+      toast.success("Message sent!");
+      await loadMessages(selected);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const loadConversations = useCallback(async () => {
     setLoading(true);
@@ -181,6 +213,25 @@ export default function WhatsAppPage() {
             <div className="text-sm text-muted-foreground text-center py-8">No messages yet.</div>
           )}
         </div>
+
+        {/* Input box */}
+        <form onSubmit={handleSendMessage} className="mt-4 pt-3 border-t border-border flex gap-2">
+          <input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Type a message to reply..."
+            className="flex-1 bg-input/40 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition text-foreground"
+            disabled={sending}
+          />
+          <button
+            type="submit"
+            disabled={sending || !replyText.trim()}
+            className="gradient-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-medium shadow-glow disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-95 transition flex items-center gap-1.5 shrink-0"
+          >
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Send
+          </button>
+        </form>
       </div>
     );
   }
