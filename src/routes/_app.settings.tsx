@@ -18,6 +18,7 @@ type WaStatus = {
     status: string;
   };
   pendingQr?: string | null;
+  pairingCode?: string | null;
 };
 
 async function callWhatsAppFn(action: string, extra: Record<string, unknown> = {}) {
@@ -237,6 +238,10 @@ function SettingsPage() {
   const [waCode, setWaCode] = useState<string | null>(null);
   const [waCodeExpires, setWaCodeExpires] = useState<number | null>(null);
   const [waGenerating, setWaGenerating] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [linkMethod, setLinkMethod] = useState<"qr" | "code">("qr");
 
   useEffect(() => {
     refreshStatus();
@@ -300,12 +305,13 @@ function SettingsPage() {
         setWaStatus({
           linked: false,
           connection: null,
-          pendingQr: data.pendingQr || null
+          pendingQr: data.pendingQr || null,
+          pairingCode: data.pairingCode || null
         });
       }
     } catch (e: any) {
       // Server not running — show waiting state
-      setWaStatus({ linked: false, connection: null, pendingQr: null });
+      setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null });
     } finally {
       setWaLoading(false);
     }
@@ -328,6 +334,30 @@ function SettingsPage() {
       await refreshWaStatus();
     } catch (e: any) {
       toast.error(e.message);
+    }
+  }
+
+  async function handleRequestPairingCode() {
+    if (!waPhone.trim()) {
+      toast.error("Please enter a phone number");
+      return;
+    }
+    setRequestingCode(true);
+    setPairingCode(null);
+    try {
+      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/request-pairing-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: waPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate pairing code");
+      setPairingCode(data.pairingCode);
+      toast.success("Pairing code generated!");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setRequestingCode(false);
     }
   }
 
@@ -623,27 +653,89 @@ function SettingsPage() {
                 Connect your WhatsApp so Mr. Cisco can read your incoming WhatsApp messages and reply based on your style.
               </p>
 
-              {waStatus?.pendingQr ? (
-                <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
-                  <span className="text-xs font-medium text-primary">Scan this QR code with WhatsApp:</span>
-                  <div className="p-3 bg-white rounded-lg shadow-sm border border-border">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waStatus.pendingQr)}`}
-                      alt="WhatsApp QR Code"
-                      className="w-[180px] h-[180px]"
-                    />
+              {/* Linking Methods Tabs */}
+              <div className="flex border-b border-border mb-4">
+                <button
+                  type="button"
+                  onClick={() => setLinkMethod("qr")}
+                  className={`flex-1 pb-2 text-xs font-semibold border-b-2 transition ${
+                    linkMethod === "qr"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Scan QR Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMethod("code")}
+                  className={`flex-1 pb-2 text-xs font-semibold border-b-2 transition ${
+                    linkMethod === "code"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Use Pairing Code
+                </button>
+              </div>
+
+              {linkMethod === "qr" ? (
+                waStatus?.pendingQr ? (
+                  <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+                    <span className="text-xs font-medium text-primary">Scan this QR code with WhatsApp:</span>
+                    <div className="p-3 bg-white rounded-lg shadow-sm border border-border">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waStatus.pendingQr)}`}
+                        alt="WhatsApp QR Code"
+                        className="w-[180px] h-[180px]"
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground text-center">
+                      Go to Linked Devices in WhatsApp on your phone and scan. This screen will update automatically.
+                    </span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground text-center">
-                    Go to Linked Devices in WhatsApp on your phone and scan. This screen will update automatically.
-                  </span>
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-dashed border-border bg-card/40 space-y-3">
+                    <RefreshCw className="h-6 w-6 text-primary animate-spin" />
+                    <span className="text-xs font-medium text-muted-foreground">Waiting for WhatsApp client to start...</span>
+                    <span className="text-[10px] text-muted-foreground/60 text-center max-w-xs">
+                      Make sure your local server is running to generate the QR code.
+                    </span>
+                  </div>
+                )
               ) : (
-                <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-dashed border-border bg-card/40 space-y-3">
-                  <RefreshCw className="h-6 w-6 text-primary animate-spin" />
-                  <span className="text-xs font-medium text-muted-foreground">Waiting for WhatsApp client to start...</span>
-                  <span className="text-[10px] text-muted-foreground/60 text-center max-w-xs">
-                    Make sure your local server is running to generate the QR code.
-                  </span>
+                <div className="space-y-4 p-4 rounded-xl border border-border bg-card/20">
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    Enter your phone number (with country code, e.g. <span className="font-mono">254713288681</span>) to generate a pairing code you can type in WhatsApp.
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={waPhone}
+                      onChange={(e) => setWaPhone(e.target.value)}
+                      placeholder="e.g. 254713288681"
+                      className="flex-1 bg-sidebar border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-primary/50 text-foreground"
+                    />
+                    <button
+                      onClick={handleRequestPairingCode}
+                      disabled={requestingCode}
+                      className="text-xs px-4 py-1.5 rounded-lg gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      {requestingCode ? "Requesting..." : "Get Code"}
+                    </button>
+                  </div>
+
+                  {(pairingCode || waStatus?.pairingCode) && (
+                    <div className="flex flex-col items-center justify-center p-4 rounded-lg border border-primary/40 bg-primary/5 space-y-2 mt-2">
+                      <span className="text-xs text-muted-foreground">Enter this code in WhatsApp:</span>
+                      <div className="text-2xl font-mono tracking-widest text-primary font-bold bg-card px-4 py-2 rounded border border-border select-all">
+                        {pairingCode || waStatus?.pairingCode}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground text-center">
+                        Go to WhatsApp → Linked Devices → Link a Device → Link with phone number instead → Enter code
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

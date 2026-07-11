@@ -30,16 +30,36 @@ app.use(cors());
 app.use(express.json());
 
 // In-memory state the WhatsApp events will update
-let waState = { ready: false, phone: null, name: null, pendingQr: null };
+// In-memory state the WhatsApp events will update
+let waState = { ready: false, phone: null, name: null, pendingQr: null, pairingCode: null };
 
 app.get('/api/whatsapp-status', (_req, res) => {
   if (waState.ready) {
     return res.json({ linked: true, phone: waState.phone, name: waState.name });
   }
-  if (waState.pendingQr) {
-    return res.json({ linked: false, pendingQr: waState.pendingQr });
+  return res.json({ 
+    linked: false, 
+    pendingQr: waState.pendingQr, 
+    pairingCode: waState.pairingCode 
+  });
+});
+
+app.post('/api/request-pairing-code', async (req, res) => {
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) {
+    return res.status(400).json({ ok: false, error: 'Phone number is required' });
   }
-  return res.json({ linked: false, pendingQr: null });
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  console.log(`📱 Requesting pairing code for phone number: ${cleanPhone}`);
+  try {
+    const code = await client.requestPairingCode(cleanPhone);
+    waState.pairingCode = code;
+    console.log(`🔑 Pairing Code generated: ${code}`);
+    res.json({ ok: true, pairingCode: code });
+  } catch (e) {
+    console.error('Failed to request pairing code:', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // Reset session — clears corrupted auth and restarts client
@@ -47,7 +67,7 @@ app.post('/api/reset-session', async (_req, res) => {
   console.log('🔄 Reset session requested — clearing auth data...');
   try {
     await client.destroy().catch(() => {});
-    waState = { ready: false, phone: null, name: null, pendingQr: null };
+    waState = { ready: false, phone: null, name: null, pendingQr: null, pairingCode: null };
     // Remove old session files
     if (fs.existsSync(SESSION_DIR)) {
       fs.rmSync(SESSION_DIR, { recursive: true, force: true });
