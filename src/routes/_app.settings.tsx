@@ -705,12 +705,12 @@ function SettingsPage() {
                 )}
                 <div className="flex items-center justify-between border-t border-border pt-3 mt-3">
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-semibold text-xs text-foreground">AI Auto-reply (Global)</span>
-                    <span className="text-[10px] text-muted-foreground">Turn bot responses ON or OFF for all chats</span>
+                    <span className="font-semibold text-xs text-foreground">Manual Mode (Global)</span>
+                    <span className="text-[10px] text-muted-foreground">Force manual replies for all chats (disables bot auto-responses)</span>
                   </div>
                   <Switch
-                    checked={globalAutoReply}
-                    onCheckedChange={handleToggleGlobalAutoReply}
+                    checked={!globalAutoReply}
+                    onCheckedChange={(checked) => handleToggleGlobalAutoReply(!checked)}
                   />
                 </div>
               </div>

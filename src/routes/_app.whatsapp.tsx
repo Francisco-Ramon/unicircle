@@ -240,12 +240,12 @@ export default function WhatsAppPage() {
           <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-2 bg-card border border-border px-3 py-1.5 rounded-lg shadow-sm">
               <Label htmlFor="auto-reply-toggle" className="text-[11px] font-medium cursor-pointer text-muted-foreground select-none">
-                AI Auto-reply
+                Manual Mode
               </Label>
               <Switch
                 id="auto-reply-toggle"
-                checked={autoReply}
-                onCheckedChange={handleToggleAutoReply}
+                checked={!autoReply}
+                onCheckedChange={(checked) => handleToggleAutoReply(!checked)}
               />
             </div>
             <button
@@ -278,7 +278,7 @@ export default function WhatsAppPage() {
                   )}
                   {isAI && (
                     <div className="text-[10px] font-semibold text-primary-foreground/60 mb-1">
-                      Mr. Cisco
+                      {msg.metadata?.manual ? "You (Manual)" : "Mr. Cisco (AI)"}
                     </div>
                   )}
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
