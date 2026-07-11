@@ -49,12 +49,15 @@ function extractAiText(message: any): string {
 }
 
 async function callTextOnlyFallback(_apiKey: string, text: string): Promise<string> {
+  const groq = Deno.env.get("GROQ_API_KEY");
   const gemini = Deno.env.get("GEMINI_API_KEY");
-  const url = gemini
+  const url = groq
+    ? "https://api.groq.com/openai/v1/chat/completions"
+    : gemini
     ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const key = gemini ?? Deno.env.get("LOVABLE_API_KEY") ?? "";
-  const model = gemini ? "gemini-2.5-flash-lite" : "google/gemini-2.5-flash-lite";
+  const key = groq ?? gemini ?? Deno.env.get("LOVABLE_API_KEY") ?? "";
+  const model = groq ? "llama-3.3-70b-versatile" : gemini ? "gemini-2.5-flash-lite" : "google/gemini-2.5-flash-lite";
   const resp = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -130,11 +133,13 @@ Deno.serve(async (req) => {
   const SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? "";
   const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+  const AI_KEY = GROQ_API_KEY || GEMINI_API_KEY || LOVABLE_API_KEY;
 
   if (!TOKEN) return new Response("Bot token missing", { status: 500 });
-  if (!LOVABLE_API_KEY && !GEMINI_API_KEY) return new Response("AI key missing", { status: 500 });
+  if (!AI_KEY) return new Response("AI key missing", { status: 500 });
 
   // Telegram webhook secret check
   if (SECRET) {
@@ -318,7 +323,7 @@ Deno.serve(async (req) => {
     const all = (history ?? []).map((m: any) => ({ role: m.role, content: m.content }));
     const recent = all.slice(-20);
 
-    const reply = await callAgent(recent, LOVABLE_API_KEY, supabase, userId);
+    const reply = await callAgent(recent, AI_KEY, supabase, userId);
 
     const finalReply = reply || "I'm here. What would you like me to help with?";
 

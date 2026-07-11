@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_app/")({
 
 function Dashboard() {
   return (
-    <div className="h-[calc(100vh-3rem)]">
+    <div className="h-[calc(100dvh-7rem)] md:h-[calc(100vh-3rem)]">
       <ChatPanel />
     </div>
   );

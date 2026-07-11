@@ -281,7 +281,7 @@ function SettingsPage() {
   async function refreshWaStatus() {
     setWaLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/whatsapp-status');
+      const res = await fetch('https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status');
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
 

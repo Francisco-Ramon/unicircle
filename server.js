@@ -42,6 +42,30 @@ app.get('/api/whatsapp-status', (_req, res) => {
   return res.json({ linked: false, pendingQr: null });
 });
 
+// Reset session — clears corrupted auth and restarts client
+app.post('/api/reset-session', async (_req, res) => {
+  console.log('🔄 Reset session requested — clearing auth data...');
+  try {
+    await client.destroy().catch(() => {});
+    waState = { ready: false, phone: null, name: null, pendingQr: null };
+    // Remove old session files
+    if (fs.existsSync(SESSION_DIR)) {
+      fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+      fs.mkdirSync(SESSION_DIR, { recursive: true });
+      console.log('🗑️  Old session cleared');
+    }
+    // Re-initialize after a short delay
+    setTimeout(() => {
+      console.log('🚀 Re-initializing WhatsApp client...');
+      client.initialize();
+    }, 2000);
+    res.json({ ok: true, message: 'Session cleared. New QR will appear in ~10 seconds.' });
+  } catch (e) {
+    console.error('Reset failed:', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 const API_PORT = process.env.PORT || 3001;
 app.listen(API_PORT, () => {
   console.log(`🌐 WhatsApp API server listening on http://localhost:${API_PORT}`);

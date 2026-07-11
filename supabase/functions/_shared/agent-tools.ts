@@ -244,9 +244,17 @@ export async function executeAgentTool(name: string, args: any, supabase: any, u
   }
 }
 
-// Pick the AI endpoint: prefer the user's free Gemini API key when set,
-// otherwise fall back to the Lovable AI gateway.
-function aiEndpoint(): { url: string; key: string; model: string; provider: "gemini" | "lovable" } {
+// Pick the AI endpoint: prefer Groq, then Gemini, then Lovable gateway.
+function aiEndpoint(): { url: string; key: string; model: string; provider: "groq" | "gemini" | "lovable" } {
+  const groq = Deno.env.get("GROQ_API_KEY");
+  if (groq) {
+    return {
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      key: groq,
+      model: "llama-3.3-70b-versatile",
+      provider: "groq",
+    };
+  }
   const gemini = Deno.env.get("GEMINI_API_KEY");
   if (gemini) {
     return {

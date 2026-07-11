@@ -33,3 +33,5 @@ dist-ssr
 .env
 .wwebjs_auth/
 whatsapp-qr.png
+
+.vercel

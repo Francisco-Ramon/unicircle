@@ -95,7 +95,7 @@ export default function WhatsAppPage() {
   useEffect(() => {
     loadConversations();
     // Check if server is running
-    fetch("http://localhost:3001/api/whatsapp-status")
+    fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status")
       .then(r => r.json())
       .then(d => setWaConnected(d.linked))
       .catch(() => setWaConnected(false));
@@ -117,7 +117,7 @@ export default function WhatsAppPage() {
     const name = extractName(selected.title);
 
     return (
-      <div className="flex flex-col h-[calc(100vh-5rem)]">
+      <div className="flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-5rem)]">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button

@@ -64,13 +64,17 @@ async function embedQuery(text: string, apiKey: string): Promise<number[] | null
   } catch { return null; }
 }
 
-async function summarizeOldMessages(messages: any[], apiKey: string): Promise<string> {
+async function summarizeOldMessages(messages: any[], apiKey: string, useGroq: boolean): Promise<string> {
   const text = messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const url = useGroq
+    ? "https://api.groq.com/openai/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = useGroq ? "llama-3.3-70b-versatile" : "google/gemini-2.5-flash";
+  const resp = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: "Summarize the following conversation in 4-6 bullet points capturing key facts, decisions, and unresolved threads. Be terse." },
         { role: "user", content: text },
@@ -82,12 +86,16 @@ async function summarizeOldMessages(messages: any[], apiKey: string): Promise<st
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-async function generateTitle(firstUserMessage: string, apiKey: string): Promise<string> {
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+async function generateTitle(firstUserMessage: string, apiKey: string, useGroq: boolean): Promise<string> {
+  const url = useGroq
+    ? "https://api.groq.com/openai/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = useGroq ? "llama-3.3-70b-versatile" : "google/gemini-2.5-flash";
+  const resp = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: "Generate a 3-6 word title for this chat. Plain text, no quotes, no punctuation at end." },
         { role: "user", content: firstUserMessage.slice(0, 500) },
@@ -112,11 +120,14 @@ Deno.serve(async (req) => {
 
   try {
     const { messages: clientMessages, conversation_id } = await req.json();
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const useGroq = !!GROQ_API_KEY;
+    const AI_KEY = GROQ_API_KEY ?? LOVABLE_API_KEY ?? "";
+    if (!AI_KEY) throw new Error("No AI API key configured (GROQ_API_KEY or LOVABLE_API_KEY)");
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -184,7 +195,7 @@ Deno.serve(async (req) => {
     if (allMsgs.length > KEEP + 5) {
       const older = allMsgs.slice(0, allMsgs.length - KEEP);
       // Only re-summarize if there are notably more old msgs than last summary covered
-      const newSummary = await summarizeOldMessages(older, LOVABLE_API_KEY);
+      const newSummary = await summarizeOldMessages(older, AI_KEY, useGroq);
       if (newSummary) {
         summary = newSummary;
         await supabase.from("conversations").update({ summary }).eq("id", conversation_id);
@@ -240,7 +251,7 @@ Deno.serve(async (req) => {
     let toolEvents: any[] = [];
     try {
       const result = await runAgentLoop({
-        apiKey: LOVABLE_API_KEY,
+        apiKey: AI_KEY,
         systemPrompt: sysParts.join("\n"),
         messages: recent,
         supabase,
@@ -267,7 +278,7 @@ Deno.serve(async (req) => {
     const updates: any = { last_message_at: new Date().toISOString() };
     if (!conversation.title_generated) {
       try {
-        const newTitle = await generateTitle(userMsg.content, LOVABLE_API_KEY);
+        const newTitle = await generateTitle(userMsg.content, AI_KEY, useGroq);
         updates.title = newTitle;
         updates.title_generated = true;
       } catch (e) {

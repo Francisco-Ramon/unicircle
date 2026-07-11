@@ -106,7 +106,8 @@ Deno.serve(async (req) => {
   const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ?? "";
+  const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
+  const LOVABLE_API_KEY = GROQ_API_KEY || Deno.env.get("LOVABLE_API_KEY") || Deno.env.get("GEMINI_API_KEY") || "";
 
   // ---------- GET: Meta webhook verification ----------
   if (req.method === "GET") {
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 }); // ack so Meta stops retrying
   }
   if (!LOVABLE_API_KEY) {
-    console.error("No AI key (LOVABLE_API_KEY or GEMINI_API_KEY) configured");
+    console.error("No AI key (GROQ_API_KEY, LOVABLE_API_KEY, or GEMINI_API_KEY) configured");
     return new Response("ok", { status: 200 });
   }
 
