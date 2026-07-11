@@ -639,6 +639,22 @@ async function handleMessage(msg) {
       metadata: { whatsapp_phone: fromPhone, whatsapp_name: contactName }
     });
 
+    // Check if auto-reply is disabled for this conversation
+    const { data: autoReplyPref } = await supabase
+      .from("preferences")
+      .select("value")
+      .eq("user_id", userId)
+      .eq("key", `wa_auto_reply_disabled:${conversationId}`)
+      .maybeSingle();
+
+    if (autoReplyPref && (autoReplyPref.value === true || autoReplyPref.value?.disabled === true)) {
+      console.log(`🤖 Auto-reply is disabled for conversation ${conversationId} (${contactName || fromPhone}). Skipping AI response.`);
+      await supabase.from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", conversationId);
+      return;
+    }
+
     // 4. Load full conversation history (up to 100 messages for long conversations)
     const { data: history } = await supabase
       .from("chat_messages")

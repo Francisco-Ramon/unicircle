@@ -4,6 +4,8 @@ import { PageHeader, Card } from "@/components/ui/page";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageCircle, RefreshCw, Phone, Clock, ChevronRight, ArrowLeft, User, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_app/whatsapp")({
   component: WhatsAppPage,
@@ -52,6 +54,69 @@ export default function WhatsAppPage() {
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [autoReply, setAutoReply] = useState(true);
+
+  const loadAutoReplyState = useCallback(async (convId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("preferences")
+        .select("value")
+        .eq("user_id", user.id)
+        .eq("key", `wa_auto_reply_disabled:${convId}`)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data && (data.value === true || (data.value && typeof data.value === 'object' && (data.value as any).disabled === true))) {
+        setAutoReply(false);
+      } else {
+        setAutoReply(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to load auto-reply preference:", err);
+    }
+  }, []);
+
+  const handleToggleAutoReply = async () => {
+    if (!selected) return;
+    const newAutoReply = !autoReply;
+    setAutoReply(newAutoReply);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const key = `wa_auto_reply_disabled:${selected.id}`;
+      if (!newAutoReply) {
+        const { error } = await supabase
+          .from("preferences")
+          .upsert({
+            user_id: user.id,
+            key,
+            value: { disabled: true },
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id,key" });
+
+        if (error) throw error;
+        toast.success("Auto-reply turned OFF for this chat");
+      } else {
+        const { error } = await supabase
+          .from("preferences")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("key", key);
+
+        if (error) throw error;
+        toast.success("Auto-reply turned ON for this chat");
+      }
+    } catch (err: any) {
+      toast.error("Failed to update auto-reply: " + err.message);
+      setAutoReply(autoReply);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,8 +199,11 @@ export default function WhatsAppPage() {
   }, [loadConversations]);
 
   useEffect(() => {
-    if (selected) loadMessages(selected);
-  }, [selected, loadMessages]);
+    if (selected) {
+      loadMessages(selected);
+      loadAutoReplyState(selected.id);
+    }
+  }, [selected, loadMessages, loadAutoReplyState]);
 
   // Auto-refresh messages every 5s when a conversation is open
   useEffect(() => {
@@ -169,12 +237,24 @@ export default function WhatsAppPage() {
               </div>
             )}
           </div>
-          <button
-            onClick={() => loadMessages(selected)}
-            className="ml-auto p-2 rounded-lg hover:bg-card border border-transparent hover:border-border transition"
-          >
-            <RefreshCw className={`w-4 h-4 ${msgLoading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-card border border-border px-3 py-1.5 rounded-lg shadow-sm">
+              <Label htmlFor="auto-reply-toggle" className="text-[11px] font-medium cursor-pointer text-muted-foreground select-none">
+                AI Auto-reply
+              </Label>
+              <Switch
+                id="auto-reply-toggle"
+                checked={autoReply}
+                onCheckedChange={handleToggleAutoReply}
+              />
+            </div>
+            <button
+              onClick={() => loadMessages(selected)}
+              className="p-2 rounded-lg hover:bg-card border border-transparent hover:border-border transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${msgLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
