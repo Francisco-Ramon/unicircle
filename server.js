@@ -1,16 +1,28 @@
-// server.js - QR code based WhatsApp connection with Gemini
+// server.js - QR code based WhatsApp connection with multilingual AI
 import dotenv from 'dotenv';
 import whatsappWebPkg from 'whatsapp-web.js';
 import qrcodeTerminal from 'qrcode-terminal';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
+import path from 'path';
 import QRCode from 'qrcode';
 import express from 'express';
 import cors from 'cors';
 
 dotenv.config();
 
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
 const { Client, LocalAuth } = whatsappWebPkg;
+
+// Detect if running on cloud (Railway, Render, Fly, etc.)
+const IS_CLOUD = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RENDER || process.env.FLY_APP_NAME || process.env.IS_CLOUD);
+console.log(`🏗️  Running in ${IS_CLOUD ? 'CLOUD' : 'LOCAL'} mode`);
 
 // ── Express HTTP API (so the frontend can check status directly) ──
 const app = express();
@@ -194,6 +206,32 @@ async function learnUserStyle(userId) {
   return "";
 }
 
+// Detect the primary language of an incoming message
+function detectLanguage(text) {
+  const lower = text.toLowerCase();
+
+  // Swahili indicators
+  const swahiliWords = ['habari', 'karibu', 'asante', 'sijui', 'sawa', 'ndiyo', 'hapana', 'tafadhali', 'samahani', 'pole', 'mambo', 'vipi', 'poa', 'safi', 'shida', 'msaada', 'kesho', 'leo', 'jana', 'rafiki', 'kazi', 'pesa', 'bei', 'bidhaa', 'ninahitaji', 'naweza', 'ninakuja', 'nitawasiliana', 'nitarudi', 'nitakufikia', 'tuma', 'wasiliana', 'naomba', 'niambie', 'nataka', 'tumia', 'unaweza', 'wapi', 'lini', 'nani', 'nini', 'mimi', 'wewe', 'yeye', 'sisi', 'ninyi', 'wao', 'hii', 'hiyo', 'hizi', 'hizo'];
+  const swahiliCount = swahiliWords.filter(w => lower.includes(w)).length;
+  if (swahiliCount >= 1) return 'Swahili';
+
+  // Arabic indicators
+  if (/[\u0600-\u06FF]/.test(text)) return 'Arabic';
+
+  // French indicators
+  const frenchWords = ['bonjour', 'merci', 'oui', 'non', 'comment', 'votre', 'vous', 'nous', 'salut', 'bien', 'bonsoir', 'pourquoi', 'quand', 'quel', 'quelle', 'est-ce', 'd\'accord', 'pardon', 's\'il vous plaît'];
+  const frenchCount = frenchWords.filter(w => lower.includes(w)).length;
+  if (frenchCount >= 1) return 'French';
+
+  // Spanish indicators
+  const spanishWords = ['hola', 'gracias', 'buenas', 'sí', 'buenos', 'días', 'tardes', 'cómo', 'qué', 'cuándo', 'dónde', 'quiero', 'necesito', 'puedo', 'puede', 'tienes', 'estoy', 'está'];
+  const spanishCount = spanishWords.filter(w => lower.includes(w)).length;
+  if (spanishCount >= 1) return 'Spanish';
+
+  // Default to English
+  return 'English';
+}
+
 // Detect email-related questions
 function needsEmailContext(text) {
   const lower = text.toLowerCase();
@@ -291,10 +329,24 @@ async function getDocumentContext(userId, text) {
 
 // Helper to find standard Chrome/Edge installations on Windows
 function getBrowserPath() {
+  // On cloud (Linux), use system Chromium installed via Dockerfile
+  if (IS_CLOUD) {
+    const cloudPaths = [
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable'
+    ];
+    for (const p of cloudPaths) {
+      if (fs.existsSync(p)) return p;
+    }
+    return undefined;
+  }
+
+  // On Windows, find local Chrome or Edge
   const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const chromePathX86 = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
   const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-
   if (fs.existsSync(chromePath)) return chromePath;
   if (fs.existsSync(chromePathX86)) return chromePathX86;
   if (fs.existsSync(edgePath)) return edgePath;
@@ -303,18 +355,30 @@ function getBrowserPath() {
 
 const browserPath = getBrowserPath();
 if (browserPath) {
-  console.log(`🔎 Found local browser for Puppeteer: ${browserPath}`);
+  console.log(`🔎 Found browser for Puppeteer: ${browserPath}`);
 } else {
-  console.log(`⚠️ Warning: No local Chrome or Edge installation found. Puppeteer will fall back to default.`);
+  console.log(`⚠️ Warning: No Chrome/Chromium found. Puppeteer will use its bundled version.`);
 }
+
+// Session directory (persisted via Railway volume mount at /data)
+const SESSION_DIR = IS_CLOUD ? '/data/.wwebjs_auth' : './.wwebjs_auth';
+try { fs.mkdirSync(SESSION_DIR, { recursive: true }); } catch {}
 
 // Initialize WhatsApp client
 const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
   puppeteer: {
     headless: true,
-    executablePath: browserPath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    executablePath: browserPath || undefined,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process'
+    ]
   }
 });
 
@@ -369,7 +433,11 @@ client.on('ready', async () => {
 });
 
 
+// Deduplication set to prevent double-processing
+const processedMsgIds = new Set();
+
 async function handleMessage(msg) {
+
   console.log(`\n📩 Message received from: ${msg.from} | fromMe: ${msg.fromMe} | isGroup: ${msg.isGroup} | body: ${msg.body}`);
   if (msg.fromMe || msg.isGroup) return;
 
@@ -457,6 +525,10 @@ async function handleMessage(msg) {
       ? await getEmailContext(userId, contactName, fromPhone)
       : "";
 
+    // Detect the language the customer used
+    const detectedLanguage = detectLanguage(msg.body);
+    console.log(`🌍 Detected language: ${detectedLanguage} for message: "${msg.body}"`);
+
     const systemPrompt = `You are Mr. Cisco — ${ownerName}'s personal AI executive assistant.
 You manage ${ownerName}'s WhatsApp messages, emails, tasks, calendar, and business communications on their behalf.
 
@@ -464,6 +536,15 @@ WHO YOU ARE:
 - You speak on behalf of ${ownerName} in a natural, direct, and professional way.
 - When introducing yourself for the first time, say something like: "Hi, I'm Mr. Cisco, ${ownerName}'s assistant."
 - You can help contacts with: scheduling, follow-ups, document requests, email confirmations, task updates, and general business queries.
+
+LANGUAGE RULE (MOST IMPORTANT):
+- The customer is writing in ${detectedLanguage}.
+- You MUST reply ENTIRELY in ${detectedLanguage}. No exceptions.
+- If the language is Swahili, reply fully in natural Swahili.
+- If the language is Arabic, reply in Arabic script.
+- If the language is French, reply in French.
+- If the language switches, switch your reply language to match immediately.
+- Never mix languages in the same reply.
 
 REPLY RULES (CRITICAL):
 - Be concise: 1–3 short sentences. Never write essays.
@@ -508,10 +589,11 @@ ${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
   }
 }
 
-// Deduplication set to prevent double-processing
-const processedMsgIds = new Set();
-
 // Use only the 'message' event — message_create fires for sent messages too
 client.on('message', handleMessage);
+
+client.on('disconnected', (reason) => {
+  console.log('Client was logged out or disconnected', reason);
+});
 
 client.initialize();

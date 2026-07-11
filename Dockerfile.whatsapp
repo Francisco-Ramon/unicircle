@@ -1,0 +1,35 @@
+FROM node:20-slim
+
+# Install Chrome and dependencies for Puppeteer
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-sandbox \
+    fonts-freefont-ttf \
+    fonts-noto \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tell Puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies needed for the bot
+RUN npm install --omit=dev 2>/dev/null || npm install
+
+# Copy the bot server and .env
+COPY server.js ./
+COPY .env* ./
+
+# Expose the status API port
+EXPOSE 3001
+
+# Start the WhatsApp bot
+CMD ["node", "server.js"]
