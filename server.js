@@ -639,6 +639,22 @@ async function handleMessage(msg) {
       metadata: { whatsapp_phone: fromPhone, whatsapp_name: contactName }
     });
 
+    // Check if auto-reply is disabled globally
+    const { data: globalPref } = await supabase
+      .from("preferences")
+      .select("value")
+      .eq("user_id", userId)
+      .eq("key", "wa_global_auto_reply_disabled")
+      .maybeSingle();
+
+    if (globalPref && (globalPref.value === true || globalPref.value?.disabled === true)) {
+      console.log(`🤖 Auto-reply is disabled GLOBALLY. Skipping AI response for ${conversationId} (${contactName || fromPhone}).`);
+      await supabase.from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", conversationId);
+      return;
+    }
+
     // Check if auto-reply is disabled for this conversation
     const { data: autoReplyPref } = await supabase
       .from("preferences")

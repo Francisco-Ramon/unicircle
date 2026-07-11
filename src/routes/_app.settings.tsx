@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Send, Copy, Unlink, RefreshCw, Webhook, Activity, Mail, MessageCircle, User } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type GoogleStatus = { connected: boolean; email?: string; scopes?: string[]; gmail_ok?: boolean; gmail_compose?: boolean; calendar_ok?: boolean };
 
@@ -235,6 +237,67 @@ function SettingsPage() {
   // WhatsApp states
   const [waStatus, setWaStatus] = useState<WaStatus | null>(null);
   const [waLoading, setWaLoading] = useState(true);
+  const [globalAutoReply, setGlobalAutoReply] = useState(true);
+
+  async function loadGlobalAutoReplyState() {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      const { data, error } = await supabase
+        .from("preferences")
+        .select("value")
+        .eq("user_id", authUser.id)
+        .eq("key", "wa_global_auto_reply_disabled")
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data && (data.value === true || (data.value && typeof data.value === 'object' && (data.value as any).disabled === true))) {
+        setGlobalAutoReply(false);
+      } else {
+        setGlobalAutoReply(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to load global auto-reply preference:", err);
+    }
+  }
+
+  async function handleToggleGlobalAutoReply(checked: boolean) {
+    setGlobalAutoReply(checked);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      const key = "wa_global_auto_reply_disabled";
+      if (!checked) {
+        const { error } = await supabase
+          .from("preferences")
+          .upsert({
+            user_id: authUser.id,
+            key,
+            value: { disabled: true },
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id,key" });
+
+        if (error) throw error;
+        toast.success("AI Auto-reply disabled GLOBALLY");
+      } else {
+        const { error } = await supabase
+          .from("preferences")
+          .delete()
+          .eq("user_id", authUser.id)
+          .eq("key", key);
+
+        if (error) throw error;
+        toast.success("AI Auto-reply enabled GLOBALLY");
+      }
+    } catch (err: any) {
+      toast.error("Failed to update preference: " + err.message);
+      setGlobalAutoReply(!checked);
+    }
+  }
+
   const [waCode, setWaCode] = useState<string | null>(null);
   const [waCodeExpires, setWaCodeExpires] = useState<number | null>(null);
   const [waGenerating, setWaGenerating] = useState(false);
@@ -246,6 +309,7 @@ function SettingsPage() {
   useEffect(() => {
     refreshStatus();
     refreshWaStatus();
+    loadGlobalAutoReplyState();
   }, []);
 
   useEffect(() => {
@@ -639,6 +703,16 @@ function SettingsPage() {
                     <span>{new Date(waStatus.connection.last_message_at).toLocaleString()}</span>
                   </div>
                 )}
+                <div className="flex items-center justify-between border-t border-border pt-3 mt-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-semibold text-xs text-foreground">AI Auto-reply (Global)</span>
+                    <span className="text-[10px] text-muted-foreground">Turn bot responses ON or OFF for all chats</span>
+                  </div>
+                  <Switch
+                    checked={globalAutoReply}
+                    onCheckedChange={handleToggleGlobalAutoReply}
+                  />
+                </div>
               </div>
               <button
                 onClick={handleWaUnlink}
