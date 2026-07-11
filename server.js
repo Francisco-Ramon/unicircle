@@ -1,0 +1,517 @@
+// server.js - QR code based WhatsApp connection with Gemini
+import dotenv from 'dotenv';
+import whatsappWebPkg from 'whatsapp-web.js';
+import qrcodeTerminal from 'qrcode-terminal';
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import QRCode from 'qrcode';
+import express from 'express';
+import cors from 'cors';
+
+dotenv.config();
+
+const { Client, LocalAuth } = whatsappWebPkg;
+
+// ── Express HTTP API (so the frontend can check status directly) ──
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// In-memory state the WhatsApp events will update
+let waState = { ready: false, phone: null, name: null, pendingQr: null };
+
+app.get('/api/whatsapp-status', (_req, res) => {
+  if (waState.ready) {
+    return res.json({ linked: true, phone: waState.phone, name: waState.name });
+  }
+  if (waState.pendingQr) {
+    return res.json({ linked: false, pendingQr: waState.pendingQr });
+  }
+  return res.json({ linked: false, pendingQr: null });
+});
+
+const API_PORT = process.env.PORT || 3001;
+app.listen(API_PORT, () => {
+  console.log(`🌐 WhatsApp API server listening on http://localhost:${API_PORT}`);
+});
+
+// Initialize Supabase admin client using Service Role Key to manage user integrations
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured in your .env file!");
+  process.exit(1);
+}
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  }
+);
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+// Helper to get AI response via Groq
+async function getAIResponse(message, systemPrompt) {
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  messages.push({ role: 'user', content: message });
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 300,
+        temperature: 0.7
+      })
+    });
+    if (!res.ok) {
+      console.error('Groq error:', await res.text());
+      return 'Sorry, I could not generate a response right now.';
+    }
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || "I didn't catch that.";
+  } catch (e) {
+    console.error('Groq connection error:', e);
+    return 'Connection error reaching the AI model.';
+  }
+}
+
+// Helper to check and renew Google Access Token (for Gmail style learning)
+async function getGoogleToken(userId) {
+  try {
+    const { data: row } = await supabase
+      .from("google_connections")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (!row) return null;
+
+    const expiresAt = new Date(row.expiry).getTime();
+    if (expiresAt - 60000 > Date.now()) {
+      return row.access_token;
+    }
+    if (!row.refresh_token) return null;
+
+    // Refresh token request
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        refresh_token: row.refresh_token,
+        grant_type: "refresh_token",
+      }),
+    });
+    if (!r.ok) return null;
+    const tok = await r.json();
+    const newExpiry = new Date(Date.now() + (tok.expires_in ?? 3600) * 1000).toISOString();
+    await supabase.from("google_connections").update({
+      access_token: tok.access_token,
+      expiry: newExpiry,
+    }).eq("user_id", userId);
+    return tok.access_token;
+  } catch (e) {
+    console.error("Google token fetch/refresh failed:", e);
+    return null;
+  }
+}
+
+// Helper to learn user style from sent messages
+async function learnUserStyle(userId) {
+  try {
+    const { data: pref } = await supabase
+      .from("preferences")
+      .select("value")
+      .eq("user_id", userId)
+      .eq("key", "whatsapp_learned_style")
+      .maybeSingle();
+
+    if (pref?.value?.style) {
+      return pref.value.style;
+    }
+
+    const token = await getGoogleToken(userId);
+    if (!token) return "";
+
+    const gmailRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?q=from:me&maxResults=5", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!gmailRes.ok) return "";
+    const gmailData = await gmailRes.json();
+    const messages = gmailData.messages || [];
+    const emailBodies = [];
+
+    for (const msg of messages) {
+      const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (detailRes.ok) {
+        const detailData = await detailRes.json();
+        let body = "";
+        const payload = detailData.payload;
+        if (payload) {
+          if (payload.body?.data) {
+            body = Buffer.from(payload.body.data, 'base64').toString('utf8');
+          } else if (payload.parts) {
+            const plain = payload.parts.find(p => p.mimeType === "text/plain");
+            if (plain?.body?.data) {
+              body = Buffer.from(plain.body.data, 'base64').toString('utf8');
+            }
+          }
+        }
+        if (body) emailBodies.push(body.slice(0, 1000));
+      }
+    }
+
+    if (emailBodies.length > 0) {
+      const analysisPrompt = `Analyze the writing style of these emails sent by the user to clients. Identify their tone, typical greetings, signatures, average sentence count, and level of detail. Summarize these rules in 3 short bullet points to guide an assistant who will reply in their style:\n\n${emailBodies.join("\n\n---\n\n")}`;
+      const styleReply = await getAIResponse(analysisPrompt);
+      if (styleReply) {
+        await supabase.from("preferences").upsert({
+          user_id: userId,
+          key: "whatsapp_learned_style",
+          value: { style: styleReply, updated_at: new Date().toISOString() }
+        }, { onConflict: "user_id,key" });
+        return styleReply;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to learn writing style:", err);
+  }
+  return "";
+}
+
+// Detect email-related questions
+function needsEmailContext(text) {
+  const lower = text.toLowerCase();
+  const triggers = ["check the email", "did you check", "check your email", "email i sent", "sent you an email", "i emailed", "did you see my email", "did you get my email", "see the email", "read the email", "my email", "the email i"];
+  return triggers.some((t) => lower.includes(t));
+}
+
+// Fetch recent emails from a contact by name or phone
+async function getEmailContext(userId, contactName, contactPhone) {
+  try {
+    const token = await getGoogleToken(userId);
+    if (!token) return "";
+
+    // Search Gmail for emails from this contact
+    const query = encodeURIComponent(`from:${contactName || contactPhone}`);
+    const gmailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=3`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!gmailRes.ok) return "";
+    const gmailData = await gmailRes.json();
+    const messages = gmailData.messages || [];
+    if (messages.length === 0) return "";
+
+    const emailBodies = [];
+    for (const msg of messages) {
+      const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!detailRes.ok) continue;
+      const detail = await detailRes.json();
+      const headers = detail.payload?.headers || [];
+      const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
+      const from = headers.find(h => h.name === 'From')?.value || '';
+      let body = '';
+      const payload = detail.payload;
+      if (payload?.body?.data) {
+        body = Buffer.from(payload.body.data, 'base64').toString('utf8');
+      } else if (payload?.parts) {
+        const plain = payload.parts.find(p => p.mimeType === 'text/plain');
+        if (plain?.body?.data) body = Buffer.from(plain.body.data, 'base64').toString('utf8');
+      }
+      if (body || subject) {
+        emailBodies.push(`Subject: ${subject}\nFrom: ${from}\n${body.slice(0, 800)}`);
+      }
+    }
+    if (emailBodies.length === 0) return "";
+    return `\n\n[RECENT EMAILS FROM THIS CONTACT]\n${emailBodies.join('\n\n---\n\n')}`;
+  } catch (e) {
+    console.error('Email context fetch failed:', e);
+    return "";
+  }
+}
+
+// Detect document RAG query triggers
+function needsDocumentContext(text) {
+  const lower = text.toLowerCase();
+  const triggers = ["document", "file", "pdf", "uploaded", "attached", "what does", "summarize this", "summarize the", "according to", "in the", "from the", "pricing", "services", "hours", "info", "details", "contact"];
+  return triggers.some((t) => lower.includes(t));
+}
+
+// Fetch relevant document context
+async function getDocumentContext(userId, text) {
+  try {
+    if (!needsDocumentContext(text)) return "";
+
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("id, filename")
+      .eq("user_id", userId)
+      .eq("status", "ready");
+
+    if (docs && docs.length > 0) {
+      const docIds = docs.map((d) => d.id);
+      const { data: chunks } = await supabase
+        .from("document_chunks")
+        .select("document_id, content")
+        .in("document_id", docIds)
+        .limit(20);
+
+      if (chunks && chunks.length > 0) {
+        const byDoc = new Map();
+        for (const d of docs) byDoc.set(d.id, d.filename);
+        const parts = [];
+        for (const c of chunks) {
+          parts.push(`[Document: ${byDoc.get(c.document_id)}]\n${c.content}`);
+        }
+        return "\n\n[RELEVANT BUSINESS DOCUMENTS / INFORMATION]\n" + parts.join("\n\n");
+      }
+    }
+  } catch (e) {
+    console.error("Document retrieval failed:", e);
+  }
+  return "";
+}
+
+// Helper to find standard Chrome/Edge installations on Windows
+function getBrowserPath() {
+  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  const chromePathX86 = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
+  const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+  if (fs.existsSync(chromePath)) return chromePath;
+  if (fs.existsSync(chromePathX86)) return chromePathX86;
+  if (fs.existsSync(edgePath)) return edgePath;
+  return undefined;
+}
+
+const browserPath = getBrowserPath();
+if (browserPath) {
+  console.log(`🔎 Found local browser for Puppeteer: ${browserPath}`);
+} else {
+  console.log(`⚠️ Warning: No local Chrome or Edge installation found. Puppeteer will fall back to default.`);
+}
+
+// Initialize WhatsApp client
+const client = new Client({
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    executablePath: browserPath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  }
+});
+
+client.on('qr', async (qr) => {
+  console.log('\n================================================================');
+  console.log('⚡ SCAN THIS QR CODE WITH YOUR WHATSAPP APP LINKED DEVICES ⚡');
+  console.log('================================================================\n');
+  qrcodeTerminal.generate(qr, { small: true });
+
+  // Update in-memory state for Express API
+  waState = { ready: false, phone: null, name: null, pendingQr: qr };
+  console.log('📡 QR code available via http://localhost:' + API_PORT + '/api/whatsapp-status');
+});
+
+client.on('ready', async () => {
+  const myPhone = client.info.wid.user;
+  console.log('\n================================================================');
+  console.log(`✅ WhatsApp Client is ready! Logged in as: ${myPhone}`);
+  console.log('================================================================\n');
+
+  // Update in-memory state for Express API
+  waState = { ready: true, phone: myPhone, name: 'Francisco', pendingQr: null };
+
+  try {
+    const { data: profiles } = await supabase.from("profiles").select("id, display_name").limit(1);
+    if (profiles && profiles.length > 0) {
+      const userId = profiles[0].id;
+      const name = profiles[0].display_name || "Francisco";
+      waState.name = name;
+
+      // Auto-upsert connection status
+      const { data: existing } = await supabase
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("whatsapp_phone", myPhone)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("whatsapp_connections").insert({
+          user_id: userId,
+          whatsapp_phone: myPhone,
+          whatsapp_name: name,
+          status: "active"
+        });
+        console.log(`🔗 Auto-linked phone ${myPhone} in database for user ${userId}.`);
+      }
+    }
+  } catch (e) {
+    console.error("Failed to sync connection status on ready:", e);
+  }
+});
+
+
+async function handleMessage(msg) {
+  console.log(`\n📩 Message received from: ${msg.from} | fromMe: ${msg.fromMe} | isGroup: ${msg.isGroup} | body: ${msg.body}`);
+  if (msg.fromMe || msg.isGroup) return;
+
+  // Deduplicate: skip if we already processed this message ID
+  if (processedMsgIds.has(msg.id?.id)) return;
+  processedMsgIds.add(msg.id?.id);
+  setTimeout(() => processedMsgIds.delete(msg.id?.id), 60000); // clean up after 1 min
+
+  const fromPhone = msg.from.replace('@c.us', '').replace('@lid', ''); // normalize phone
+  const myPhone = client.info.wid.user; // company phone number
+  console.log(`💬 Processing message from ${fromPhone} to ${myPhone}: "${msg.body}"`);
+
+  try {
+    // 1. Find connection matching our company number in DB
+    const { data: connection } = await supabase
+      .from("whatsapp_connections")
+      .select("*")
+      .eq("whatsapp_phone", myPhone)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!connection) {
+      console.log(`⚠️ Warning: WhatsApp number ${myPhone} is not linked to any active connection in the dashboard.`);
+      return;
+    }
+
+    const userId = connection.user_id;
+
+    // Get owner's name from profile for personalized responses
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", userId)
+      .maybeSingle();
+    const ownerName = profile?.display_name || connection.whatsapp_name || "the owner";
+
+    // 2. Retrieve or create thread conversation for this customer
+    const contact = await msg.getContact();
+    const contactName = contact.pushname || contact.name || null;
+    const title = contactName ? `WhatsApp: ${contactName} (${fromPhone})` : `WhatsApp: ${fromPhone}`;
+
+    let { data: convo } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("title", title)
+      .maybeSingle();
+
+    let conversationId;
+    if (convo) {
+      conversationId = convo.id;
+    } else {
+      const { data: newConvo, error: convoErr } = await supabase
+        .from("conversations")
+        .insert({ user_id: userId, title, title_generated: true })
+        .select("id").single();
+      if (convoErr) throw convoErr;
+      conversationId = newConvo.id;
+    }
+
+    // 3. Save incoming customer message
+    await supabase.from("chat_messages").insert({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: "user",
+      content: msg.body,
+      channel: "whatsapp",
+      metadata: { whatsapp_phone: fromPhone, whatsapp_name: contactName }
+    });
+
+    // 4. Load full conversation history (up to 100 messages for long conversations)
+    const { data: history } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .limit(100);
+
+    const recent = (history ?? []).map(m => `${m.role}: ${m.content}`).join('\n');
+
+    // 5. Gather writing style, document context, and email context
+    const style = await learnUserStyle(userId);
+    const docContext = await getDocumentContext(userId, msg.body);
+    const emailContext = needsEmailContext(msg.body)
+      ? await getEmailContext(userId, contactName, fromPhone)
+      : "";
+
+    const systemPrompt = `You are Mr. Cisco — ${ownerName}'s personal AI executive assistant.
+You manage ${ownerName}'s WhatsApp messages, emails, tasks, calendar, and business communications on their behalf.
+
+WHO YOU ARE:
+- You speak on behalf of ${ownerName} in a natural, direct, and professional way.
+- When introducing yourself for the first time, say something like: "Hi, I'm Mr. Cisco, ${ownerName}'s assistant."
+- You can help contacts with: scheduling, follow-ups, document requests, email confirmations, task updates, and general business queries.
+
+REPLY RULES (CRITICAL):
+- Be concise: 1–3 short sentences. Never write essays.
+- Sound human — not like a bot or corporate email.
+- NEVER say "Best regards", "Sincerely", "Customer Service", or "Kind regards".
+- NEVER say you are an AI or mention any app name in replies.
+- NEVER use formal letter structure.
+- If asked about an email — check the email context below and reference it directly.
+- If you don't know something — say ${ownerName} will get back to them shortly.
+
+${style ? `${ownerName.toUpperCase()}'S COMMUNICATION STYLE (mirror this):\n${style}` : ''}
+${emailContext ? `EMAIL CONTEXT (recent emails from this contact — use to answer their question):\n${emailContext}` : ''}
+${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
+
+    // 6. Generate reply
+    const reply = await getAIResponse(`${recent}\nassistant:`, systemPrompt);
+    const finalReply = reply || "I didn't catch that — could you rephrase?";
+
+    // 7. Save assistant message and reply to WhatsApp client
+    await supabase.from("chat_messages").insert({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: "assistant",
+      content: finalReply,
+      channel: "whatsapp",
+      metadata: { whatsapp_phone: fromPhone }
+    });
+
+    await supabase.from("conversations")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    await supabase.from("whatsapp_connections")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", connection.id);
+
+    await msg.reply(finalReply);
+    console.log(`📨 Replied to ${contactName || fromPhone}: ${finalReply}`);
+
+  } catch (error) {
+    console.error('Error handling message:', error);
+  }
+}
+
+// Deduplication set to prevent double-processing
+const processedMsgIds = new Set();
+
+// Use only the 'message' event — message_create fires for sent messages too
+client.on('message', handleMessage);
+
+client.initialize();

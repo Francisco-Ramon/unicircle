@@ -1,0 +1,10 @@
+project_id = "hyrmyaggzozcwxjvziwk"
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
