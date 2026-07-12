@@ -60,8 +60,12 @@ function InboxPage() {
       const d = await callGmail("list_unread", { max: 20 });
       setEmails(d?.emails ?? []);
     } catch (e: any) {
-      if (e.message === "not_connected") setConnected(false);
-      else toast.error(e.message ?? "Failed to load emails");
+      const errMsg = e.message ?? "";
+      if (errMsg.includes("not_connected") || errMsg.includes("non-2xx") || errMsg.includes("refresh_failed")) {
+        setConnected(false);
+      } else {
+        toast.error(errMsg || "Failed to load emails");
+      }
     } finally {
       setLoading(false);
     }

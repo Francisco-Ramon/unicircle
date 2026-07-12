@@ -56,10 +56,11 @@ function CalendarPage() {
       setFreeSlots(freeData?.slots ?? []);
       setConnected(true);
     } catch (e: any) {
-      if (e.message === "not_connected" || e.message?.includes("not_connected")) {
+      const errMsg = e.message ?? "";
+      if (errMsg.includes("not_connected") || errMsg.includes("non-2xx") || errMsg.includes("refresh_failed")) {
         setConnected(false);
       } else {
-        toast.error(e.message ?? "Failed to load calendar");
+        toast.error(errMsg || "Failed to load calendar");
         setConnected(false);
       }
     } finally {
