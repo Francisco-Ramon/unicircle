@@ -1,39 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Card } from "@/components/ui/page";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Send, Copy, Unlink, RefreshCw, Webhook, Activity, Mail, MessageCircle, User, Instagram, Facebook } from "lucide-react";
+import { RefreshCw, Copy, Unlink, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
+/* ── Types ── */
 type GoogleStatus = { connected: boolean; email?: string; scopes?: string[]; gmail_ok?: boolean; gmail_compose?: boolean; calendar_ok?: boolean };
-
 type WaStatus = {
   linked: boolean;
-  connection: null | {
-    whatsapp_phone: string;
-    whatsapp_name: string | null;
-    linked_at: string;
-    last_message_at: string | null;
-    status: string;
-  };
+  connection: null | { whatsapp_phone: string; whatsapp_name: string | null; linked_at: string; last_message_at: string | null; status: string; };
   pendingQr?: string | null;
   pairingCode?: string | null;
 };
+type TgStatus = {
+  linked: boolean;
+  connection: null | { telegram_username: string | null; telegram_first_name: string | null; linked_at: string; last_message_at: string | null; status: string; };
+};
 
+/* ── API helpers ── */
 async function callWhatsAppFn(action: string, extra: Record<string, unknown> = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in");
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-link`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
+  const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-link`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify({ action, ...extra }),
   });
   const data = await r.json().catch(() => ({}));
@@ -45,12 +36,7 @@ async function callGoogleFn(fn: "google-oauth-start" | "google-status", body: an
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in");
   const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
@@ -58,192 +44,11 @@ async function callGoogleFn(fn: "google-oauth-start" | "google-status", body: an
   return data;
 }
 
-function GoogleCard() {
-  const [status, setStatus] = useState<GoogleStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-
-  async function refresh() {
-    setLoading(true);
-    try { setStatus(await callGoogleFn("google-status")); }
-    catch (e: any) { toast.error(e.message); }
-    finally { setLoading(false); }
-  }
-
-  useEffect(() => {
-    refresh();
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("google") === "connected") {
-      toast.success("Google connected.");
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (params.get("google_error")) {
-      toast.error(`Google connection failed: ${params.get("google_error")}`);
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
-
-  async function handleConnect() {
-    setBusy(true);
-    try {
-      const { url } = await callGoogleFn("google-oauth-start");
-      window.location.href = url;
-    } catch (e: any) { toast.error(e.message); setBusy(false); }
-  }
-  async function handleDisconnect() {
-    if (!confirm("Disconnect Google? This revokes Gmail and Calendar access.")) return;
-    setBusy(true);
-    try { await callGoogleFn("google-status", { action: "disconnect" }); toast.success("Disconnected."); await refresh(); }
-    catch (e: any) { toast.error(e.message); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <Card className="hover:shadow-[0_0_25px_rgba(239,68,68,0.15)] transition-all duration-300 flex flex-col justify-between">
-      <div>
-        <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-              <Mail className="h-5 w-5 text-red-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground text-sm">Gmail + Calendar</h3>
-              <p className="text-[10px] text-muted-foreground">Google Workspace integration</p>
-            </div>
-          </div>
-          <div>
-            {status?.connected ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Connected
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                Not Connected
-              </span>
-            )}
-          </div>
-        </div>
-
-        {loading && !status ? (
-          <div className="text-sm text-muted-foreground flex items-center gap-2 py-4">
-            <RefreshCw className="h-3 w-3 animate-spin text-primary" /> Loading Google Status...
-          </div>
-        ) : status?.connected ? (
-          <div className="space-y-4">
-            <div className="text-xs space-y-2 bg-black/20 p-3 rounded-lg border border-border/30">
-              <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium text-foreground">{status.email}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Gmail Access</span><span className="text-emerald-400">{status.gmail_ok ? "Active" : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Calendar Access</span><span className="text-emerald-400">{status.calendar_ok ? "Active" : "—"}</span></div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground leading-relaxed">Connect your Google account so Mr. Cisco can read your inbox, summarize emails, draft replies, and read your calendar.</p>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-border/30 flex gap-2 w-full">
-        {status?.connected ? (
-          <>
-            <button onClick={handleConnect} disabled={busy} className="text-xs px-3 py-1.5 rounded-lg bg-card border border-border hover:border-primary/40 transition disabled:opacity-50 text-foreground">Reconnect</button>
-            <button onClick={handleDisconnect} disabled={busy} className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/25 transition flex items-center gap-1"><Unlink className="h-3 w-3" /> Disconnect</button>
-            <button onClick={refresh} disabled={loading} className="text-xs px-3 py-1.5 rounded-lg bg-card border border-border hover:border-primary/40 transition ml-auto flex items-center gap-1 text-muted-foreground hover:text-foreground">
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </button>
-          </>
-        ) : (
-          <button onClick={handleConnect} disabled={busy} className="w-full text-xs px-3 py-2 rounded-lg gradient-primary text-primary-foreground font-semibold shadow-glow hover:opacity-90 transition disabled:opacity-50">{busy ? "Redirecting…" : "Connect Google"}</button>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function ProfileCard() {
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
-      if (data?.display_name) setName(data.display_name);
-      setLoading(false);
-    }
-    load();
-  }, []);
-
-  async function handleSave() {
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    
-    const { error } = await supabase.from("profiles").upsert({ 
-      id: user.id, 
-      display_name: name,
-      updated_at: new Date().toISOString()
-    });
-    
-    if (error) toast.error("Failed to update name");
-    else toast.success("Name updated successfully! Mr. Cisco will now use this name.");
-    setSaving(false);
-  }
-
-  return (
-    <Card>
-      <h3 className="font-semibold mb-3 flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Assistant Preferences</h3>
-      <div className="text-sm space-y-3">
-        <p className="text-muted-foreground leading-relaxed">What should Mr. Cisco call you when introducing himself? (e.g. "I'm Mr. Cisco, Francisco's assistant")</p>
-        <div className="flex gap-2">
-          <input 
-            type="text" 
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={loading || saving}
-            placeholder="Your preferred name"
-            className="flex-1 bg-sidebar border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-primary/50 transition-colors text-foreground"
-          />
-          <button 
-            onClick={handleSave} 
-            disabled={loading || saving || !name.trim()} 
-            className="text-xs px-4 py-1.5 rounded-lg gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save Name"}
-          </button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-export const Route = createFileRoute("/_app/settings")({
-  component: SettingsPage,
-});
-
-type TgStatus = {
-  linked: boolean;
-  connection: null | {
-    telegram_username: string | null;
-    telegram_first_name: string | null;
-    linked_at: string;
-    last_message_at: string | null;
-    status: string;
-  };
-};
-
 async function callTelegramFn(action: string, extra: Record<string, unknown> = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in");
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-link`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
+  const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-link`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
     body: JSON.stringify({ action, ...extra }),
   });
   const data = await r.json().catch(() => ({}));
@@ -251,8 +56,116 @@ async function callTelegramFn(action: string, extra: Record<string, unknown> = {
   return data;
 }
 
+/* ── Brand SVG Icons ── */
+function WhatsAppIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#25D366"/><path d="M34.6 13.3A14.4 14.4 0 0 0 24 9.1C16 9.1 9.5 15.6 9.5 23.5c0 2.5.7 5 1.9 7.2L9.3 38.7l8.2-2.1c2.1 1.1 4.4 1.7 6.5 1.7 8 0 14.5-6.5 14.5-14.4a14.4 14.4 0 0 0-3.9-9.6zm-10.6 22c-2.1 0-4.1-.6-5.9-1.6l-.4-.2-4.3 1.1 1.1-4.2-.3-.4a12 12 0 0 1-1.8-6.3c0-6.6 5.4-12 12-12a11.9 11.9 0 0 1 12 12c0 6.6-5.4 12-12.4 12zm6.6-9c-.4-.2-2.1-1-2.4-1.2-.3-.1-.6-.2-.8.2s-1 1.2-1.2 1.4c-.2.2-.4.3-.8.1s-1.6-.6-3-1.9a11.3 11.3 0 0 1-2.1-2.6c-.2-.4 0-.6.2-.7l.5-.6c.2-.2.2-.3.4-.6 0-.2 0-.4-.1-.6s-.8-2-1.1-2.7c-.3-.7-.6-.6-.8-.6h-.7c-.2 0-.6.1-1 .5s-1.3 1.3-1.3 3 1.3 3.5 1.5 3.7c.2.2 2.6 4 6.3 5.6.9.4 1.6.6 2.1.8.9.3 1.7.3 2.3.2.7-.1 2.1-.9 2.4-1.7.3-.8.3-1.5.2-1.7-.1-.2-.3-.3-.7-.4z" fill="white"/></svg>
+  );
+}
+
+function InstagramIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none"><defs><linearGradient id="ig" x1="5" y1="43" x2="43" y2="5" gradientUnits="userSpaceOnUse"><stop stopColor="#FFC107"/><stop offset=".5" stopColor="#F44336"/><stop offset="1" stopColor="#9C27B0"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#ig)"/><rect x="12" y="12" width="24" height="24" rx="6" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="24" cy="24" r="5.5" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="32" cy="16" r="1.8" fill="white"/></svg>
+  );
+}
+
+function FacebookIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#1877F2"/><path d="M32.5 8.5c-3.3-2.5-7.8-3.2-11.7-1.5C16.5 9 14 13.5 14 18.5v4H10v6h4v14h6v-14h4l1-6h-5v-3.5c0-1.1.1-2.2 1.1-2.8.5-.3 1.2-.3 1.9-.2h3v-5l-2.5-.5z" fill="white" transform="translate(2,3) scale(0.9)"/><path d="M34 13c-1.5-1-3-1.7-5-2l.5 5h3.5l1-5h-5v4c0 1.5.5 2.5 2.3 2.5H34v-5z" fill="white" opacity="0" /></svg>
+  );
+}
+
+function TelegramIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#2AABEE"/><path d="M34.1 14.2L10.7 23c-1.6.6-1.6 1.5-.3 1.9l6 1.9 2.3 7c.3.8.1 1.1.9 1.1.6 0 .9-.3 1.2-.6l2.9-2.8 6 4.4c1.1.6 1.9.3 2.2-.9l3.9-18.5c.4-1.7-.6-2.4-1.7-2z" fill="white" fillOpacity=".95"/><path d="M19.4 26.9l-.5 5.2 5.2-3.8" fill="#B0D4F1" fillOpacity=".4"/></svg>
+  );
+}
+
+function GmailCalIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <div className={`${className} flex items-center gap-0.5`}>
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" fill="#EA4335" fillOpacity=".15" stroke="#EA4335" strokeWidth="1.5"/><path d="M2 6l10 7 10-7" stroke="#EA4335" strokeWidth="1.8" strokeLinecap="round"/></svg>
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" fill="#4285F4" fillOpacity=".15" stroke="#4285F4" strokeWidth="1.5"/><path d="M3 9h18" stroke="#4285F4" strokeWidth="1.5"/><rect x="7" y="12" width="3" height="3" rx="0.5" fill="#4285F4"/></svg>
+    </div>
+  );
+}
+
+/* ── Mini Sparkline Chart (decorative) ── */
+function SparkChart({ color = "#22c55e", seed = 1 }: { color?: string; seed?: number }) {
+  const pts: number[] = [];
+  let v = 30 + (seed * 7) % 20;
+  for (let i = 0; i < 12; i++) {
+    v += ((seed * (i + 1) * 13) % 21) - 10;
+    v = Math.max(5, Math.min(55, v));
+    pts.push(v);
+  }
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${i * 18},${60 - p}`).join(" ");
+  const area = `${path} L${(pts.length - 1) * 18},60 L0,60 Z`;
+  return (
+    <svg className="absolute bottom-0 left-0 w-full h-24 opacity-20 pointer-events-none" viewBox={`0 0 ${(pts.length - 1) * 18} 60`} preserveAspectRatio="none">
+      <defs><linearGradient id={`sg${seed}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.4"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
+      <path d={area} fill={`url(#sg${seed})`}/>
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+/* ── Glass Card ── */
+function GlassCard({ children, className = "", onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) {
+  return (
+    <div onClick={onClick} className={`relative overflow-hidden rounded-2xl border border-white/[0.08] p-5 transition-all duration-300 hover:border-white/[0.15] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] ${className}`}
+      style={{ background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)" }}>
+      {children}
+    </div>
+  );
+}
+
+/* ── Profile Card ── */
+function ProfileCard() {
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      if (data?.display_name) setName(data.display_name);
+      setLoading(false);
+    })();
+  }, []);
+  async function handleSave() {
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, display_name: name, updated_at: new Date().toISOString() });
+    if (error) toast.error("Failed to update name"); else toast.success("Name updated!");
+    setSaving(false);
+  }
+  return (
+    <GlassCard>
+      <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm text-white/90"><User className="h-4 w-4 text-purple-400" /> Assistant Preferences</h3>
+      <p className="text-xs text-white/50 mb-3">What should Mr. Cisco call you?</p>
+      <div className="flex gap-2">
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} disabled={loading || saving} placeholder="Your name"
+          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500/50 transition" />
+        <button onClick={handleSave} disabled={loading || saving || !name.trim()}
+          className="text-xs px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:opacity-90 transition disabled:opacity-40">
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </GlassCard>
+  );
+}
+
+/* ── Route Export ── */
+export const Route = createFileRoute("/_app/settings")({ component: SettingsPage });
+
+/* ── Main Settings Page ── */
 function SettingsPage() {
   const { user } = useAuth();
+
+  // Telegram
   const [tgStatus, setTgStatus] = useState<TgStatus | null>(null);
   const [tgLoading, setTgLoading] = useState(true);
   const [code, setCode] = useState<string | null>(null);
@@ -262,613 +175,329 @@ function SettingsPage() {
   const [checkingWebhook, setCheckingWebhook] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<any>(null);
 
-  // WhatsApp states
+  // WhatsApp
   const [waStatus, setWaStatus] = useState<WaStatus | null>(null);
   const [waLoading, setWaLoading] = useState(true);
   const [globalAutoReply, setGlobalAutoReply] = useState(true);
-
-  async function loadGlobalAutoReplyState() {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const { data, error } = await supabase
-        .from("preferences")
-        .select("value")
-        .eq("user_id", authUser.id)
-        .eq("key", "wa_global_auto_reply_disabled")
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data && (data.value === true || (data.value && typeof data.value === 'object' && (data.value as any).disabled === true))) {
-        setGlobalAutoReply(false);
-      } else {
-        setGlobalAutoReply(true);
-      }
-    } catch (err: any) {
-      console.error("Failed to load global auto-reply preference:", err);
-    }
-  }
-
-  async function handleToggleGlobalAutoReply(checked: boolean) {
-    setGlobalAutoReply(checked);
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const key = "wa_global_auto_reply_disabled";
-      if (!checked) {
-        const { error } = await supabase
-          .from("preferences")
-          .upsert({
-            user_id: authUser.id,
-            key,
-            value: { disabled: true },
-            updated_at: new Date().toISOString()
-          }, { onConflict: "user_id,key" });
-
-        if (error) throw error;
-        toast.success("AI Auto-reply disabled GLOBALLY");
-      } else {
-        const { error } = await supabase
-          .from("preferences")
-          .delete()
-          .eq("user_id", authUser.id)
-          .eq("key", key);
-
-        if (error) throw error;
-        toast.success("AI Auto-reply enabled GLOBALLY");
-      }
-    } catch (err: any) {
-      toast.error("Failed to update preference: " + err.message);
-      setGlobalAutoReply(!checked);
-    }
-  }
-
-  const [waCode, setWaCode] = useState<string | null>(null);
-  const [waCodeExpires, setWaCodeExpires] = useState<number | null>(null);
-  const [waGenerating, setWaGenerating] = useState(false);
   const [waPhone, setWaPhone] = useState("");
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [requestingCode, setRequestingCode] = useState(false);
   const [linkMethod, setLinkMethod] = useState<"qr" | "code">("qr");
 
+  // Google
+  const [gStatus, setGStatus] = useState<GoogleStatus | null>(null);
+  const [gLoading, setGLoading] = useState(true);
+  const [gBusy, setGBusy] = useState(false);
+
+  // Expanded cards
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  // ── Load on mount ──
+  useEffect(() => { refreshTg(); refreshWa(); refreshGoogle(); loadAutoReply(); }, []);
+  useEffect(() => { if (waStatus?.linked) return; const i = setInterval(refreshWa, 4000); return () => clearInterval(i); }, [waStatus?.linked]);
   useEffect(() => {
-    refreshStatus();
-    refreshWaStatus();
-    loadGlobalAutoReplyState();
+    if (!codeExpires) return;
+    const t = setInterval(() => { if (Date.now() > codeExpires) { setCode(null); setCodeExpires(null); } }, 1000);
+    return () => clearInterval(t);
+  }, [codeExpires]);
+
+  // Google URL params
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("google") === "connected") { toast.success("Google connected."); window.history.replaceState({}, "", window.location.pathname); }
+    else if (p.get("google_error")) { toast.error(`Google failed: ${p.get("google_error")}`); window.history.replaceState({}, "", window.location.pathname); }
   }, []);
 
-  useEffect(() => {
-    if (waStatus?.linked) return;
-    const interval = setInterval(() => {
-      refreshWaStatus();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [waStatus?.linked]);
-
-  useEffect(() => {
-    if (!codeExpires && !waCodeExpires) return;
-    const t = setInterval(() => {
-      if (codeExpires && Date.now() > codeExpires) {
-        setCode(null);
-        setCodeExpires(null);
-      }
-      if (waCodeExpires && Date.now() > waCodeExpires) {
-        setWaCode(null);
-        setWaCodeExpires(null);
-      }
-    }, 1000);
-    return () => clearInterval(t);
-  }, [codeExpires, waCodeExpires]);
-
-  async function refreshStatus() {
+  // ── Refresh functions ──
+  async function refreshTg() {
     setTgLoading(true);
-    try {
-      const s = await callTelegramFn("status");
-      setTgStatus(s);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setTgLoading(false);
-    }
+    try { setTgStatus(await callTelegramFn("status")); } catch (e: any) { toast.error(e.message); } finally { setTgLoading(false); }
   }
-
-  async function refreshWaStatus() {
+  async function refreshWa() {
     setWaLoading(true);
     try {
-      const res = await fetch('https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status');
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const data = await res.json();
+      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status");
+      if (!res.ok) throw new Error(`${res.status}`);
+      const d = await res.json();
+      if (d.linked) setWaStatus({ linked: true, connection: { whatsapp_phone: d.phone, whatsapp_name: d.name, linked_at: new Date().toISOString(), last_message_at: null, status: "active" } });
+      else setWaStatus({ linked: false, connection: null, pendingQr: d.pendingQr || null, pairingCode: d.pairingCode || null });
+    } catch { setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null }); } finally { setWaLoading(false); }
+  }
+  async function refreshGoogle() {
+    setGLoading(true);
+    try { setGStatus(await callGoogleFn("google-status")); } catch (e: any) { toast.error(e.message); } finally { setGLoading(false); }
+  }
 
-      if (data.linked) {
-        setWaStatus({
-          linked: true,
-          connection: {
-            whatsapp_phone: data.phone,
-            whatsapp_name: data.name,
-            linked_at: new Date().toISOString(),
-            last_message_at: null,
-            status: 'active',
-          }
-        });
+  // ── Auto-reply ──
+  async function loadAutoReply() {
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      const { data } = await supabase.from("preferences").select("value").eq("user_id", u.id).eq("key", "wa_global_auto_reply_disabled").maybeSingle();
+      if (data && (data.value === true || (data.value && typeof data.value === "object" && (data.value as any).disabled === true))) setGlobalAutoReply(false);
+      else setGlobalAutoReply(true);
+    } catch {}
+  }
+  async function handleToggleAutoReply(checked: boolean) {
+    setGlobalAutoReply(checked);
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      if (!checked) {
+        await supabase.from("preferences").upsert({ user_id: u.id, key: "wa_global_auto_reply_disabled", value: { disabled: true }, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
+        toast.success("AI Auto-reply disabled");
       } else {
-        setWaStatus({
-          linked: false,
-          connection: null,
-          pendingQr: data.pendingQr || null,
-          pairingCode: data.pairingCode || null
-        });
+        await supabase.from("preferences").delete().eq("user_id", u.id).eq("key", "wa_global_auto_reply_disabled");
+        toast.success("AI Auto-reply enabled");
       }
-    } catch (e: any) {
-      // Server not running — show waiting state
-      setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null });
-    } finally {
-      setWaLoading(false);
-    }
+    } catch (e: any) { toast.error(e.message); setGlobalAutoReply(!checked); }
   }
 
+  // ── Handlers ──
   async function handleWaUnlink() {
-    if (!confirm("Unlink WhatsApp from your account?")) return;
+    if (!confirm("Unlink WhatsApp?")) return;
+    const { data: { session } } = await supabase.auth.getSession(); if (!session) return;
+    await supabase.from("whatsapp_connections").update({ status: "unlinked" }).eq("user_id", session.user.id).eq("status", "active");
+    toast.success("WhatsApp unlinked."); refreshWa();
+  }
+  async function handleRequestPairing() {
+    if (!waPhone.trim()) { toast.error("Enter phone number"); return; }
+    setRequestingCode(true); setPairingCode(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { error } = await supabase
-        .from("whatsapp_connections")
-        .update({ status: "unlinked" })
-        .eq("user_id", session.user.id)
-        .eq("status", "active");
-
-      if (error) throw error;
-      toast.success("WhatsApp unlinked.");
-      await refreshWaStatus();
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/request-pairing-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phoneNumber: waPhone }) });
+      const d = await res.json(); if (!res.ok) throw new Error(d.error); setPairingCode(d.pairingCode); toast.success("Pairing code generated!");
+    } catch (e: any) { toast.error(e.message); } finally { setRequestingCode(false); }
   }
-
-  async function handleRequestPairingCode() {
-    if (!waPhone.trim()) {
-      toast.error("Please enter a phone number");
-      return;
-    }
-    setRequestingCode(true);
-    setPairingCode(null);
-    try {
-      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/request-pairing-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: waPhone }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate pairing code");
-      setPairingCode(data.pairingCode);
-      toast.success("Pairing code generated!");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setRequestingCode(false);
-    }
-  }
-
-  function copyWaCode() {
-    if (!waCode) return;
-    navigator.clipboard.writeText(`/link ${waCode}`);
-    toast.success("Copied. Send /link CODE to the WhatsApp bot.");
-  }
-
   async function handleGenerateCode() {
     setGenerating(true);
-    try {
-      const r = await callTelegramFn("generate_code");
-      setCode(r.code);
-      setCodeExpires(Date.now() + (r.expires_in_seconds ?? 600) * 1000);
-      toast.success("Code generated. Send it to your Telegram bot within 10 minutes.");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setGenerating(false);
-    }
+    try { const r = await callTelegramFn("generate_code"); setCode(r.code); setCodeExpires(Date.now() + (r.expires_in_seconds ?? 600) * 1000); toast.success("Code generated!"); }
+    catch (e: any) { toast.error(e.message); } finally { setGenerating(false); }
   }
+  async function handleTgUnlink() { if (!confirm("Unlink Telegram?")) return; await callTelegramFn("unlink"); toast.success("Telegram unlinked."); refreshTg(); }
+  function copyCode() { if (!code) return; navigator.clipboard.writeText(`/link ${code}`); toast.success("Copied!"); }
+  async function handleGoogleConnect() { setGBusy(true); try { const { url } = await callGoogleFn("google-oauth-start"); window.location.href = url; } catch (e: any) { toast.error(e.message); setGBusy(false); } }
+  async function handleGoogleDisconnect() { if (!confirm("Disconnect Google?")) return; setGBusy(true); try { await callGoogleFn("google-status", { action: "disconnect" }); toast.success("Disconnected."); refreshGoogle(); } catch (e: any) { toast.error(e.message); } finally { setGBusy(false); } }
+  async function handleRegisterWebhook() { setRegisteringWebhook(true); try { const r = await callTelegramFn("set_webhook", { url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-webhook` }); if (r?.ok) toast.success("Webhook registered."); else toast.error(r?.description || "Failed"); } catch (e: any) { toast.error(e.message); } finally { setRegisteringWebhook(false); } }
+  async function handleCheckWebhook() { setCheckingWebhook(true); try { const r = await callTelegramFn("webhook_info"); setWebhookInfo(r?.result ?? r); toast.success("Fetched."); } catch (e: any) { toast.error(e.message); } finally { setCheckingWebhook(false); } }
 
-  async function handleUnlink() {
-    if (!confirm("Unlink Telegram from your account?")) return;
-    try {
-      await callTelegramFn("unlink");
-      toast.success("Telegram unlinked.");
-      await refreshStatus();
-    } catch (e: any) {
-      toast.error(e.message);
-    }
-  }
-
-  function copyCode() {
-    if (!code) return;
-    navigator.clipboard.writeText(`/link ${code}`);
-    toast.success("Copied. Paste it in your Telegram chat with the bot.");
-  }
-
-  async function handleRegisterWebhook() {
-    setRegisteringWebhook(true);
-    try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-webhook`;
-      const r = await callTelegramFn("set_webhook", { url });
-      if (r?.ok) {
-        toast.success("Webhook registered with Telegram.");
-      } else {
-        toast.error(r?.description || "Telegram rejected the webhook URL.");
-      }
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setRegisteringWebhook(false);
-    }
-  }
-
-  async function handleCheckWebhook() {
-    setCheckingWebhook(true);
-    try {
-      const r = await callTelegramFn("webhook_info");
-      setWebhookInfo(r?.result ?? r);
-      toast.success("Fetched webhook status.");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setCheckingWebhook(false);
-    }
-  }
-
-  const codeRemainingSec = codeExpires ? Math.max(0, Math.floor((codeExpires - Date.now()) / 1000)) : 0;
-  const waCodeRemainingSec = waCodeExpires ? Math.max(0, Math.floor((waCodeExpires - Date.now()) / 1000)) : 0;
+  const codeRemaining = codeExpires ? Math.max(0, Math.floor((codeExpires - Date.now()) / 1000)) : 0;
+  const toggle = (id: string) => setExpanded(expanded === id ? null : id);
 
   return (
-    <div>
-      <PageHeader title="Settings" subtitle="Account, integrations, and preferences." />
+    <div className="relative min-h-screen">
+      {/* Green glow at bottom */}
+      <div className="pointer-events-none fixed bottom-0 left-0 right-0 h-60" style={{ background: "radial-gradient(ellipse at center bottom, rgba(34,197,94,0.08) 0%, transparent 70%)" }} />
 
-      <div className="space-y-6 max-w-4xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="hover:shadow-[0_0_25px_rgba(99,102,241,0.05)] transition-all duration-300">
-            <h3 className="font-semibold mb-4 text-sm flex items-center gap-2 border-b border-border/40 pb-3 text-foreground"><User className="h-4 w-4 text-primary" /> Account Details</h3>
-            <div className="text-xs space-y-3">
-              <div className="flex justify-between bg-black/20 p-2.5 rounded-lg border border-border/30"><span className="text-muted-foreground">Email</span><span className="text-foreground font-medium">{user?.email}</span></div>
-              <div className="flex justify-between bg-black/20 p-2.5 rounded-lg border border-border/30"><span className="text-muted-foreground">User ID</span><span className="font-mono text-foreground font-medium">{user?.id?.slice(0, 12)}…</span></div>
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Multi-Channel AI Assistant</h1>
+        <p className="text-sm text-white/50 mt-1">Connection Overview</p>
+      </div>
+
+      {/* Integration Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+
+        {/* ── WhatsApp ── */}
+        <GlassCard className="cursor-pointer" onClick={() => toggle("wa")}>
+          <SparkChart color="#22c55e" seed={1} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+              <span className="text-[9px] text-white/30">{waStatus?.linked ? "6 active" : ""}</span>
             </div>
-            <button onClick={() => supabase.auth.signOut()} className="mt-4 w-full text-xs px-3 py-2 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/25 font-semibold transition">
-              Sign out Account
-            </button>
-          </Card>
-
-          <ProfileCard />
-        </div>
-
-        <div className="border-t border-border/40 pt-6">
-          <h2 className="text-base font-semibold text-foreground mb-4">Integrations Dashboard</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* WhatsApp Card */}
-            <Card className="hover:shadow-[0_0_25px_rgba(34,197,94,0.12)] transition-all duration-300 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                      <MessageCircle className="h-5 w-5 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground text-sm">WhatsApp</h3>
-                      <p className="text-[10px] text-muted-foreground">Mobile messaging automation</p>
-                    </div>
-                  </div>
-                  <div>
-                    {waStatus?.linked ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Connected
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {waLoading && !waStatus ? (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2 py-4">
-                    <RefreshCw className="h-3 w-3 animate-spin text-primary" /> Loading WhatsApp Status...
-                  </div>
-                ) : waStatus?.linked ? (
-                  <div className="space-y-4">
-                    <div className="text-xs space-y-2 bg-black/20 p-3 rounded-lg border border-border/30">
-                      <div className="flex justify-between"><span className="text-muted-foreground">WhatsApp User</span><span className="font-medium text-foreground">{waStatus.connection?.whatsapp_name || waStatus.connection?.whatsapp_phone || "—"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Linked Phone</span><span className="font-mono text-foreground">{waStatus.connection?.whatsapp_phone || "—"}</span></div>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-black/10 border border-border/30 rounded-lg p-3">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-xs text-foreground">Manual Mode (Global)</span>
-                        <span className="text-[9px] text-muted-foreground">Silence bot replies globally</span>
-                      </div>
-                      <Switch
-                        checked={!globalAutoReply}
-                        onCheckedChange={(checked) => handleToggleGlobalAutoReply(!checked)}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Connect your WhatsApp so Mr. Cisco can automatically answer inquiries and handle messages based on your preferences.
-                    </p>
-
-                    <div className="flex border-b border-border/40 mb-3">
-                      <button
-                        type="button"
-                        onClick={() => setLinkMethod("qr")}
-                        className={`flex-1 pb-1.5 text-xs font-semibold border-b-2 transition ${
-                          linkMethod === "qr"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Scan QR
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLinkMethod("code")}
-                        className={`flex-1 pb-1.5 text-xs font-semibold border-b-2 transition ${
-                          linkMethod === "code"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Pairing Code
-                      </button>
-                    </div>
-
-                    {linkMethod === "qr" ? (
-                      waStatus?.pendingQr ? (
-                        <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-primary/20 bg-primary/5 space-y-2">
-                          <div className="p-2 bg-white rounded-lg shadow-sm border border-border">
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(waStatus.pendingQr)}`}
-                              alt="WhatsApp QR Code"
-                              className="w-[140px] h-[140px]"
-                            />
-                          </div>
-                          <span className="text-[9px] text-muted-foreground text-center">
-                            Scan from WhatsApp → Linked Devices.
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center p-4 rounded-lg border border-dashed border-border bg-card/40 space-y-2">
-                          <RefreshCw className="h-5 w-5 text-primary animate-spin" />
-                          <span className="text-[11px] font-medium text-muted-foreground">Starting client session...</span>
-                        </div>
-                      )
-                    ) : (
-                      <div className="space-y-3 p-3 rounded-lg border border-border/30 bg-card/20">
-                        <div className="flex gap-2">
-                          <input
-                            type="tel"
-                            value={waPhone}
-                            onChange={(e) => setWaPhone(e.target.value)}
-                            placeholder="e.g. 254713288681"
-                            className="flex-1 bg-sidebar border border-border rounded-md px-3 py-1 text-xs focus:outline-none focus:border-primary/50 text-foreground"
-                          />
-                          <button
-                            onClick={handleRequestPairingCode}
-                            disabled={requestingCode}
-                            className="text-xs px-3 py-1 rounded-lg gradient-primary text-primary-foreground font-semibold shadow-glow hover:opacity-90 transition disabled:opacity-50"
-                          >
-                            {requestingCode ? "..." : "Get Code"}
-                          </button>
-                        </div>
-
-                        {(pairingCode || waStatus?.pairingCode) && (
-                          <div className="flex flex-col items-center justify-center p-2 rounded border border-primary/40 bg-primary/5 space-y-1">
-                            <span className="text-[9px] text-muted-foreground">Pairing Code:</span>
-                            <div className="text-xl font-mono tracking-widest text-primary font-bold">
-                              {pairingCode || waStatus?.pairingCode}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+            <WhatsAppIcon className="w-12 h-12 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-4">WhatsApp Business</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${waStatus?.linked ? "bg-emerald-400" : "bg-zinc-500"}`} />
+                <span className="text-xs text-white/70">{waStatus?.linked ? "Connected" : "Not Connected"}</span>
               </div>
-
-              <div className="mt-4 pt-3 border-t border-border/30 flex gap-2 w-full">
-                {waStatus?.linked ? (
-                  <>
-                    <button onClick={handleWaUnlink} className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/25 transition flex items-center gap-1"><Unlink className="h-3 w-3" /> Unlink</button>
-                    <button onClick={refreshWaStatus} disabled={waLoading} className="text-xs px-3 py-1.5 rounded-lg bg-card border border-border hover:border-primary/40 transition ml-auto flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                      <RefreshCw className={`h-3 w-3 ${waLoading ? "animate-spin" : ""}`} /> Refresh
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={refreshWaStatus} disabled={waLoading} className="w-full text-xs px-3 py-2 rounded-lg bg-card border border-border hover:border-primary/40 transition flex items-center justify-center gap-1.5 font-semibold text-foreground">
-                    <RefreshCw className={`h-3 w-3 ${waLoading ? "animate-spin" : ""}`} /> Check Link Status
-                  </button>
-                )}
-              </div>
-            </Card>
-
-            {/* Telegram Card */}
-            <Card className="hover:shadow-[0_0_25px_rgba(59,130,246,0.12)] transition-all duration-300 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                      <Send className="h-5 w-5 text-blue-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground text-sm">Telegram</h3>
-                      <p className="text-[10px] text-muted-foreground">Bot channel integration</p>
-                    </div>
-                  </div>
-                  <div>
-                    {tgStatus?.linked ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Connected
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {tgLoading && !tgStatus ? (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2 py-4">
-                    <RefreshCw className="h-3 w-3 animate-spin text-primary" /> Loading Telegram Status...
-                  </div>
-                ) : tgStatus?.linked ? (
-                  <div className="space-y-4">
-                    <div className="text-xs space-y-2 bg-black/20 p-3 rounded-lg border border-border/30">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Connected User</span><span className="font-medium text-foreground">{tgStatus.connection?.telegram_username ? `@${tgStatus.connection.telegram_username}` : tgStatus.connection?.telegram_first_name || "—"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Linked At</span><span className="text-foreground">{new Date(tgStatus.connection!.linked_at).toLocaleDateString()}</span></div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3 text-xs text-muted-foreground">
-                    <p className="leading-relaxed">Chat with Mr. Cisco via Telegram. Generate a one-time code to link your bot:</p>
-                    <ol className="list-decimal pl-4 space-y-1">
-                      <li>Start chat with bot in Telegram</li>
-                      <li>Generate a one-time code below</li>
-                      <li>Send <code className="font-mono bg-black/35 px-1 py-0.5 rounded">/link CODE</code> to the bot</li>
-                    </ol>
-
-                    {code && (
-                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 mt-2 flex items-center justify-between">
-                        <code className="text-md font-mono font-bold text-foreground">/link {code}</code>
-                        <button onClick={copyCode} className="text-[10px] px-2 py-1 bg-card border border-border hover:border-primary/45 rounded transition">Copy</button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-border/30 flex gap-2 w-full">
-                {tgStatus?.linked ? (
-                  <>
-                    <button onClick={handleUnlink} className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/25 transition flex items-center gap-1"><Unlink className="h-3 w-3" /> Unlink</button>
-                    <button onClick={refreshStatus} disabled={tgLoading} className="text-xs px-3 py-1.5 rounded-lg bg-card border border-border hover:border-primary/40 transition ml-auto flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                      <RefreshCw className={`h-3 w-3 ${tgLoading ? "animate-spin" : ""}`} /> Refresh
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={handleGenerateCode} disabled={generating} className="w-full text-xs px-3 py-2 rounded-lg gradient-primary text-primary-foreground font-semibold shadow-glow hover:opacity-90 transition disabled:opacity-50">
-                    {generating ? "Generating..." : "Generate Code"}
-                  </button>
-                )}
-              </div>
-            </Card>
-
-            {/* Google Card */}
-            <GoogleCard />
-
-            {/* Instagram Card (Mocked) */}
-            <Card className="opacity-70 hover:opacity-85 transition-all duration-300 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
-                      <Instagram className="h-5 w-5 text-pink-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground text-sm">Instagram</h3>
-                      <p className="text-[10px] text-muted-foreground">Auto-reply & direct messages</p>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                      Coming Soon
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Link your Instagram Professional account to let Mr. Cisco automatically reply to comments and direct messages.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border/30 w-full">
-                <button disabled className="w-full text-xs px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700/50 text-zinc-500 font-semibold cursor-not-allowed">
-                  Connect Instagram
-                </button>
-              </div>
-            </Card>
-
-            {/* Facebook Card (Mocked) */}
-            <Card className="opacity-70 hover:opacity-85 transition-all duration-300 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center">
-                      <Facebook className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground text-sm">Facebook Messenger</h3>
-                      <p className="text-[10px] text-muted-foreground">Customer chat automation</p>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                      Coming Soon
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Connect your Facebook Page Messenger to let Mr. Cisco handle customer inquiries and direct messages.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border/30 w-full">
-                <button disabled className="w-full text-xs px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700/50 text-zinc-500 font-semibold cursor-not-allowed">
-                  Connect Messenger
-                </button>
-              </div>
-            </Card>
-
+              <Switch checked={waStatus?.linked ? globalAutoReply : false} onCheckedChange={waStatus?.linked ? handleToggleAutoReply : undefined} disabled={!waStatus?.linked} />
+            </div>
+            <p className="text-[10px] text-white/30 mt-3">Status: {waStatus?.linked ? "Active & Synced" : "Inactive"}</p>
           </div>
-        </div>
-
-        {/* Webhook Settings and Metadata Footer */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-border/40 pt-6">
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Telegram Webhook Manager</div>
-              <div className="flex gap-2">
-                <button onClick={handleRegisterWebhook} disabled={registeringWebhook} className="text-[10px] px-2.5 py-1 rounded bg-card border border-border hover:border-primary/45 transition">Register</button>
-                <button onClick={handleCheckWebhook} disabled={checkingWebhook} className="text-[10px] px-2.5 py-1 rounded bg-card border border-border hover:border-primary/45 transition">Check Status</button>
-              </div>
-            </div>
-            {webhookInfo && (
-              <div className="text-xs space-y-1.5 bg-black/25 p-3 rounded-lg border border-border/30">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Registered</span>
-                  <span className={webhookInfo.url ? "text-emerald-400" : "text-zinc-400 font-medium"}>{webhookInfo.url ? "Yes" : "No"}</span>
+          {/* Expanded */}
+          {expanded === "wa" && (
+            <div className="relative z-10 mt-4 pt-4 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
+              {waStatus?.linked ? (
+                <>
+                  <div className="text-xs space-y-1.5 bg-black/30 p-3 rounded-lg">
+                    <div className="flex justify-between"><span className="text-white/40">User</span><span className="text-white/80">{waStatus.connection?.whatsapp_name || waStatus.connection?.whatsapp_phone}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">Phone</span><span className="text-white/80 font-mono">{waStatus.connection?.whatsapp_phone}</span></div>
+                  </div>
+                  <button onClick={handleWaUnlink} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition flex items-center gap-1"><Unlink className="h-3 w-3" /> Unlink</button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex border-b border-white/10 mb-2">
+                    <button onClick={() => setLinkMethod("qr")} className={`flex-1 pb-1.5 text-xs font-semibold border-b-2 transition ${linkMethod === "qr" ? "border-emerald-400 text-emerald-400" : "border-transparent text-white/40"}`}>QR Code</button>
+                    <button onClick={() => setLinkMethod("code")} className={`flex-1 pb-1.5 text-xs font-semibold border-b-2 transition ${linkMethod === "code" ? "border-emerald-400 text-emerald-400" : "border-transparent text-white/40"}`}>Pairing Code</button>
+                  </div>
+                  {linkMethod === "qr" ? (
+                    waStatus?.pendingQr ? (
+                      <div className="flex flex-col items-center p-3 rounded-lg bg-white/5 space-y-2">
+                        <div className="p-2 bg-white rounded-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(waStatus.pendingQr)}`} alt="QR" className="w-[130px] h-[130px]" /></div>
+                        <span className="text-[9px] text-white/40">Scan from WhatsApp</span>
+                      </div>
+                    ) : <div className="flex flex-col items-center p-4"><RefreshCw className="h-5 w-5 text-emerald-400 animate-spin" /><span className="text-[10px] text-white/40 mt-2">Starting...</span></div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input type="tel" value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="254..." className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white" />
+                        <button onClick={handleRequestPairing} disabled={requestingCode} className="text-xs px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 font-semibold">{requestingCode ? "..." : "Get"}</button>
+                      </div>
+                      {(pairingCode || waStatus?.pairingCode) && <div className="text-center text-xl font-mono font-bold text-emerald-400 py-2">{pairingCode || waStatus?.pairingCode}</div>}
+                    </div>
+                  )}
                 </div>
-                {webhookInfo.url && <div className="flex justify-between gap-4"><span className="text-muted-foreground shrink-0">URL</span><span className="font-mono text-[9px] truncate text-foreground">{webhookInfo.url}</span></div>}
-                {webhookInfo.last_error_message && <div className="text-destructive font-mono text-[9px] mt-1">Error: {webhookInfo.last_error_message}</div>}
+              )}
+            </div>
+          )}
+        </GlassCard>
+
+        {/* ── Instagram ── */}
+        <GlassCard>
+          <SparkChart color="#E1306C" seed={2} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+            </div>
+            <InstagramIcon className="w-12 h-12 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-4">Instagram</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                <span className="text-xs text-white/70">Not Connected</span>
               </div>
-            )}
-          </Card>
-
-          <Card className="flex flex-col justify-between">
-            <div>
-              <h3 className="font-semibold text-xs uppercase tracking-widest text-muted-foreground mb-2">About Mr. Cisco</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Mr. Cisco is a modular executive assistant built using Deno edge workers and Supabase. The agent securely manages your workspace using client-authorized RLS credentials.
-              </p>
+              <Switch checked={false} disabled />
             </div>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="text-[10px] text-muted-foreground">Version 1.0.0</span>
-              <button onClick={() => toast.info("Mr. Cisco v1.0.0")} className="text-[10px] px-2.5 py-1 rounded bg-card border border-border hover:border-primary/45 transition ml-auto">Build Info</button>
-            </div>
-          </Card>
-        </div>
+            <p className="text-[10px] text-white/30 mt-3">Status: Inactive</p>
+          </div>
+        </GlassCard>
 
+        {/* ── Facebook Messenger ── */}
+        <GlassCard>
+          <SparkChart color="#1877F2" seed={3} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+            </div>
+            <FacebookIcon className="w-12 h-12 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-4">Facebook Messenger</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                <span className="text-xs text-white/70">Not Connected</span>
+              </div>
+              <Switch checked={false} disabled />
+            </div>
+            <p className="text-[10px] text-white/30 mt-3">Status: Inactive</p>
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        {/* ── Telegram ── */}
+        <GlassCard className="cursor-pointer" onClick={() => toggle("tg")}>
+          <SparkChart color="#2AABEE" seed={4} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+              <span className="text-[9px] text-white/30">{tgStatus?.linked ? "3 active" : ""}</span>
+            </div>
+            <TelegramIcon className="w-12 h-12 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-4">Telegram</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${tgStatus?.linked ? "bg-emerald-400" : "bg-zinc-500"}`} />
+                <span className="text-xs text-white/70">{tgStatus?.linked ? "Connected" : "Not Connected"}</span>
+              </div>
+              <Switch checked={tgStatus?.linked || false} onCheckedChange={tgStatus?.linked ? () => handleTgUnlink() : () => handleGenerateCode()} />
+            </div>
+            <p className="text-[10px] text-white/30 mt-3">Status: {tgStatus?.linked ? "Active & Synced" : "Inactive"}</p>
+          </div>
+          {expanded === "tg" && (
+            <div className="relative z-10 mt-4 pt-4 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
+              {tgStatus?.linked ? (
+                <>
+                  <div className="text-xs space-y-1.5 bg-black/30 p-3 rounded-lg">
+                    <div className="flex justify-between"><span className="text-white/40">User</span><span className="text-white/80">{tgStatus.connection?.telegram_username ? `@${tgStatus.connection.telegram_username}` : tgStatus.connection?.telegram_first_name}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">Linked</span><span className="text-white/80">{new Date(tgStatus.connection!.linked_at).toLocaleDateString()}</span></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleTgUnlink} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1"><Unlink className="h-3 w-3" /> Unlink</button>
+                    <button onClick={handleRegisterWebhook} disabled={registeringWebhook} className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70">{registeringWebhook ? "..." : "Register Webhook"}</button>
+                    <button onClick={handleCheckWebhook} disabled={checkingWebhook} className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70">{checkingWebhook ? "..." : "Check"}</button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-white/50">Generate a code, then send <code className="bg-white/10 px-1 rounded">/link CODE</code> to the bot.</p>
+                  {code && (
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <code className="font-mono font-bold text-white">/link {code}</code>
+                      <button onClick={copyCode} className="text-[10px] px-2 py-1 bg-white/10 rounded">Copy</button>
+                    </div>
+                  )}
+                  <button onClick={handleGenerateCode} disabled={generating} className="w-full text-xs py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold">{generating ? "Generating..." : "Generate Code"}</button>
+                </div>
+              )}
+            </div>
+          )}
+        </GlassCard>
+
+        {/* ── Gmail & Calendar ── */}
+        <GlassCard className="cursor-pointer" onClick={() => toggle("google")}>
+          <SparkChart color="#EA4335" seed={5} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+            </div>
+            <GmailCalIcon className="w-12 h-12 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-4">Gmail & Calendar</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${gStatus?.connected ? "bg-emerald-400" : "bg-zinc-500"}`} />
+                <span className="text-xs text-white/70">{gStatus?.connected ? "Connected" : "Not Connected"}</span>
+              </div>
+              <Switch checked={gStatus?.connected || false} onCheckedChange={gStatus?.connected ? () => handleGoogleDisconnect() : () => handleGoogleConnect()} disabled={gBusy} />
+            </div>
+            <p className="text-[10px] text-white/30 mt-3">Status: {gStatus?.connected ? "Synced" : "Inactive"}</p>
+          </div>
+          {expanded === "google" && (
+            <div className="relative z-10 mt-4 pt-4 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
+              {gStatus?.connected ? (
+                <>
+                  <div className="text-xs space-y-1.5 bg-black/30 p-3 rounded-lg">
+                    <div className="flex justify-between"><span className="text-white/40">Account</span><span className="text-white/80">{gStatus.email}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">Gmail</span><span className="text-emerald-400">{gStatus.gmail_ok ? "Active" : "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">Calendar</span><span className="text-emerald-400">{gStatus.calendar_ok ? "Active" : "—"}</span></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleGoogleConnect} disabled={gBusy} className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70">Reconnect</button>
+                    <button onClick={handleGoogleDisconnect} disabled={gBusy} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1"><Unlink className="h-3 w-3" /> Disconnect</button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-white/50">Connect Gmail and Calendar to let Mr. Cisco manage your inbox and schedule.</p>
+                  <button onClick={handleGoogleConnect} disabled={gBusy} className="w-full text-xs py-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold">{gBusy ? "Redirecting..." : "Connect Google"}</button>
+                </div>
+              )}
+            </div>
+          )}
+        </GlassCard>
+      </div>
+
+      {/* Account Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <GlassCard>
+          <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm text-white/90"><User className="h-4 w-4 text-purple-400" /> Account</h3>
+          <div className="text-xs space-y-2 bg-black/20 p-3 rounded-lg mb-3">
+            <div className="flex justify-between"><span className="text-white/40">Email</span><span className="text-white/80">{user?.email}</span></div>
+            <div className="flex justify-between"><span className="text-white/40">User ID</span><span className="font-mono text-white/80">{user?.id?.slice(0, 12)}...</span></div>
+          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-full text-xs py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 font-semibold transition">Sign Out</button>
+        </GlassCard>
+        <ProfileCard />
       </div>
     </div>
   );
