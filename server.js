@@ -99,7 +99,7 @@ app.post('/api/send-message', async (req, res) => {
   }
 
   try {
-    // 1. Fetch conversation details to get the title (which has the phone number)
+    // 1. Fetch conversation details
     const { data: convo, error: convoErr } = await supabase
       .from('conversations')
       .select('*')
@@ -110,32 +110,51 @@ app.post('/api/send-message', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Conversation not found' });
     }
 
-    // 2. Extract phone number
-    const match = convo.title.match(/\((\d+)\)/);
-    const phone = match ? match[1] : convo.title.replace('WhatsApp: ', '').trim();
+    // 2. Try to find the most recent message to get the sender JID
+    const { data: lastMsg } = await supabase
+      .from('chat_messages')
+      .select('metadata')
+      .eq('conversation_id', conversationId)
+      .eq('role', 'user')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (!phone || !/^\d+$/.test(phone)) {
-      return res.status(400).json({ ok: false, error: 'Invalid phone number format in conversation title' });
+    // 3. Determine WhatsApp JID from metadata or title
+    let jid = lastMsg?.metadata?.whatsapp_jid || lastMsg?.metadata?.from || null;
+
+    if (!jid) {
+      // Try extracting phone from title like "WhatsApp: Name (254712345678)"
+      const phoneMatch = convo.title.match(/(\d{7,15})/);
+      if (phoneMatch) {
+        jid = `${phoneMatch[1]}@c.us`;
+      }
     }
 
-    // 3. Send message via WhatsApp
-    const formattedPhone = `${phone}@c.us`;
-    console.log(`✉️ Sending manual reply to ${formattedPhone}: "${message}"`);
-    await client.sendMessage(formattedPhone, message);
+    // 4. Block broadcast/status (cannot message them)
+    if (!jid || jid.includes('broadcast') || jid.includes('status')) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'This is a broadcast or status contact — you cannot send direct messages to it. Select a real customer conversation.' 
+      });
+    }
 
-    // 4. Save to database
+    console.log(`✉️ Sending manual reply to ${jid}: "${message}"`);
+    await client.sendMessage(jid, message);
+
+    // 5. Save to database
     const { error: msgErr } = await supabase.from('chat_messages').insert({
       user_id: convo.user_id,
       conversation_id: conversationId,
       role: 'assistant',
       content: message,
       channel: 'whatsapp',
-      metadata: { whatsapp_phone: phone, manual: true }
+      metadata: { whatsapp_jid: jid, manual: true }
     });
 
     if (msgErr) throw msgErr;
 
-    // 5. Update last message timestamps
+    // 6. Update last message timestamp
     await supabase.from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', conversationId);

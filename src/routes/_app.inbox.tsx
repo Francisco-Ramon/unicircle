@@ -134,9 +134,15 @@ function InboxPage() {
           ai_paused: pausedMap.has(c.id),
         }));
 
-        setConversations(formatted);
-        if (!selectedConvo && formatted.length > 0) {
-          setSelectedConvo(formatted[0]);
+        // Filter out broadcast/status contacts — they are not real customer conversations
+        const realConvos = formatted.filter((c) =>
+          !c.title?.toLowerCase().includes('status@broadcast') &&
+          !c.title?.toLowerCase().includes('broadcast')
+        );
+
+        setConversations(realConvos);
+        if (!selectedConvo && realConvos.length > 0) {
+          setSelectedConvo(realConvos[0]);
         }
       }
     } catch (e: any) {
