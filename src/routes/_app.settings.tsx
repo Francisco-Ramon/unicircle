@@ -454,6 +454,17 @@ function SettingsPage() {
                     <p className="text-[11px] text-white/70">Enter your Meta Instagram Business Account ID and Access Token to enable Mr. Cisco AI DMs & Human Handoff.</p>
                   </div>
                   <div className="space-y-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIgAccountId("ig_business_demo_254713288681");
+                        setIgToken("EAAX_meta_access_token_demo_mr_cisco");
+                        toast.success("Test demo credentials filled! Click Connect below.");
+                      }}
+                      className="w-full text-[11px] py-1 rounded bg-white/10 text-pink-300 font-medium hover:bg-white/15 transition border border-pink-500/30"
+                    >
+                      ⚡ Quick Test (Load Demo Account ID & Token)
+                    </button>
                     <input type="text" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} placeholder="Instagram Business Account ID / Page ID" className="w-full bg-white/5 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-white/30" />
                     <input type="password" value={igToken} onChange={(e) => setIgToken(e.target.value)} placeholder="Meta Graph API Access Token" className="w-full bg-white/5 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-white/30" />
                     <button onClick={handleIgSave} disabled={savingIg || !igAccountId.trim() || !igToken.trim()} className="w-full text-xs py-1.5 rounded bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold hover:opacity-90 transition disabled:opacity-40">{savingIg ? "Connecting..." : "Connect Instagram DMs"}</button>
