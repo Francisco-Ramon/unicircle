@@ -421,21 +421,22 @@ function InboxPage() {
                   )}
                   {convoMessages.map((m) => {
                     const isUser = m.role === "user";
+                    // Skip empty messages or media stubs
+                    const text = (m.content || "").trim();
+                    if (!text || text === "undefined" || text === "null") return null;
                     return (
                       <div key={m.id} className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
                         <div
-                          className={`max-w-[80%] rounded-xl px-3.5 py-2 text-xs leading-relaxed ${
+                          className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                             isUser
-                              ? "bg-card border border-border text-foreground"
-                              : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-100"
+                              ? "bg-zinc-800 text-white rounded-tl-sm"
+                              : "bg-emerald-600 text-white rounded-tr-sm"
                           }`}
                         >
-                          <div className="font-bold text-[10px] text-muted-foreground mb-1">
-                            {isUser ? "Customer" : "Assistant (Mr. Cisco / Human)"}
-                          </div>
-                          <div>{m.content}</div>
-                          <div className="text-[9px] text-muted-foreground text-right mt-1">
+                          <div>{text}</div>
+                          <div className={`text-[10px] mt-1 text-right ${isUser ? "text-zinc-400" : "text-emerald-200"}`}>
                             {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {!isUser && <span className="ml-1 opacity-80">✓✓</span>}
                           </div>
                         </div>
                       </div>
