@@ -190,72 +190,82 @@ const supabase = createClient(
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Helper to get AI response — Gemini primary, Groq fallback
+// Helper to get AI response — OpenRouter free models → Groq fallback
 async function getAIResponse(messagesInput, systemPrompt) {
   const messages = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   
   if (Array.isArray(messagesInput)) {
-    // Filter out empty messages
     messages.push(...messagesInput.filter(m => m.content && m.content.trim()));
   } else if (typeof messagesInput === 'string') {
     messages.push({ role: 'user', content: messagesInput });
   }
 
-  // 1. Try Gemini (most reliable)
+  console.log(`🤖 Sending ${messages.length} messages to AI. Last user msg: "${messages.filter(m=>m.role==='user').slice(-1)[0]?.content?.slice(0,80)}"`);
+
+  // 1. OpenRouter — completely free, no billing needed
+  const openrouterKey = process.env.OPENROUTER_API_KEY || 'sk-or-v1-placeholder';
+  const freeModels = [
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'google/gemma-3-27b-it:free',
+    'mistralai/mistral-7b-instruct:free'
+  ];
+
+  if (openrouterKey && !openrouterKey.includes('placeholder')) {
+    for (const model of freeModels) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openrouterKey}`,
+            'HTTP-Referer': 'https://executive-agent-hub-main.vercel.app',
+            'X-Title': 'Mr. Cisco WhatsApp Bot'
+          },
+          body: JSON.stringify({ model, messages, max_tokens: 300, temperature: 0.9 })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.choices?.[0]?.message?.content?.trim();
+          if (text) { console.log(`✅ OpenRouter (${model}) OK`); return text; }
+        }
+      } catch (e) { console.error(`OpenRouter ${model} failed:`, e.message); }
+    }
+  }
+
+  // 2. Groq — free tier, fast Llama models
+  const groqKey = process.env.GROQ_API_KEY || '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';
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: 300, temperature: 0.9 })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content?.trim();
+      if (text) { console.log('✅ Groq OK'); return text; }
+    } else {
+      const err = await res.text();
+      console.error('Groq error:', res.status, err);
+    }
+  } catch (e) { console.error('Groq failed:', e.message); }
+
+  // 3. Gemini via AI Studio (free)
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${geminiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gemini-2.0-flash',
-          messages,
-          max_tokens: 350,
-          temperature: 0.85
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${geminiKey}` },
+        body: JSON.stringify({ model: 'gemini-2.0-flash', messages, max_tokens: 300, temperature: 0.9 })
       });
       if (res.ok) {
         const data = await res.json();
         const text = data?.choices?.[0]?.message?.content?.trim();
-        if (text) { console.log('✅ Gemini response OK'); return text; }
-      } else {
-        console.error('Gemini error:', res.status, await res.text());
+        if (text) { console.log('✅ Gemini OK'); return text; }
       }
-    } catch (e) {
-      console.error('Gemini call failed:', e);
-    }
-  }
-
-  // 2. Groq fallback
-  const groqKey = process.env.GROQ_API_KEY || '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';
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqKey}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 350,
-        temperature: 0.85
-      })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content?.trim();
-      if (text) { console.log('✅ Groq fallback response OK'); return text; }
-    } else {
-      console.error('Groq error:', res.status, await res.text());
-    }
-  } catch (e) {
-    console.error('Groq call failed:', e);
+    } catch (e) { console.error('Gemini failed:', e.message); }
   }
 
   return null;
@@ -757,35 +767,35 @@ async function handleMessage(msg) {
     const detectedLanguage = detectLanguage(msg.body);
     console.log(`🌍 Detected language: ${detectedLanguage} for message: "${msg.body}"`);
 
-    // Build a rich, human-like system prompt
-    const isFirstMessage = formattedMessages.length <= 1;
-    const systemPrompt = `You are Mr. Cisco, a warm and highly capable personal assistant working for ${ownerName}.
-You handle WhatsApp conversations, emails, scheduling, tasks, and general support on ${ownerName}'s behalf.
+    // Build a simple, direct system prompt — less rules = better AI understanding
+    const isNewConvo = formattedMessages.length <= 1;
+    const systemPrompt = `You are Mr. Cisco, the personal WhatsApp assistant of ${ownerName}.
 
-Your personality:
-- You sound like a real, intelligent, friendly human — not a chatbot.
-- You are warm, conversational, and never robotic.
-- You keep replies short and natural — like a real person texting (1-3 sentences max).
-- You never use bullet points or lists in casual chat — just natural sentences.
-- You never repeat the same sentence twice.
-- You never say "How can I assist you" or "Is there anything I can help with" — sound more natural.
-- If someone is casual, be casual back. If professional, match that energy.
-${ isFirstMessage ? `- Since this is the start of the conversation, you may greet them warmly and briefly mention you handle things for ${ownerName}.` : `- This is an ongoing conversation. Do NOT re-introduce yourself. Just respond naturally to what they said.` }
+Rules:
+- Reply ONLY to what the person just said. Read their message carefully and respond to it directly.
+- Sound like a real human texting — casual, warm, short (1-3 sentences).
+- Never use bullet points. Never start with "Certainly" or "Of course".
+- Never repeat yourself or ignore what they said.
+- If it's the first message, greet briefly. Otherwise just reply to the point.
+- Language: ${detectedLanguage}.
+${ownerName !== 'the owner' ? `- You represent: ${ownerName}` : ''}
+${docContext ? `\nBusiness info you can use:\n${docContext}` : ''}`;
 
-Task handling — when someone asks you to:
-- Set a meeting / remind someone / schedule something: confirm you'll handle it and ask for details if needed.
-- Get info / check status / follow up: tell them you'll look into it and get back to them.
-- Give advice or answer questions: answer directly and helpfully.
-- Just chat / say hi: respond warmly and naturally.
+    // Always make sure the current message is last in the history
+    const currentMsg = msg.body?.trim();
+    const historyWithoutCurrent = formattedMessages.filter(
+      (m, i) => !(i === formattedMessages.length - 1 && m.role === 'user' && m.content === currentMsg)
+    );
+    // Rebuild clean message array: history + explicit current message
+    const messagesForAI = [
+      ...historyWithoutCurrent.slice(-10), // last 10 messages for context
+      { role: 'user', content: currentMsg }
+    ];
 
-Language: Always respond in ${detectedLanguage}.
-${ ownerName !== 'the owner' ? `You work for: ${ownerName}` : '' }
-${style ? `\nCommunication style to mirror:\n${style}` : ''}
-${emailContext ? `\nRecent emails from this contact:\n${emailContext}` : ''}
-${docContext ? `\nRelevant business info:\n${docContext}` : ''}`;
+    console.log(`📤 Sending to AI — last msg: "${currentMsg}" | history: ${messagesForAI.length} msgs`);
 
     // 6. Generate reply
-    const reply = await getAIResponse(formattedMessages, systemPrompt);
+    const reply = await getAIResponse(messagesForAI, systemPrompt);
     
     // If AI completely failed, use a natural sounding fallback
     const naturalFallbacks = [
