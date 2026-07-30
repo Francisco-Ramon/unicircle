@@ -63,6 +63,7 @@ export const agentTools = [
   { type: "function", function: { name: "add_book", description: "Add a book to the reading room.", parameters: { type: "object", properties: { title: { type: "string" }, author: { type: "string" } }, required: ["title"], additionalProperties: false } } },
   { type: "function", function: { name: "list_books", description: "List user's books.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
   { type: "function", function: { name: "generate_daily_briefing", description: "Aggregate emails, schedule, tasks, reading into a daily briefing.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
+  { type: "function", function: { name: "search_customer_chats", description: "Search customer chat history across WhatsApp, Telegram, and Instagram by customer name, phone, or message content.", parameters: { type: "object", properties: { query: { type: "string", description: "Customer name, phone number, or keyword to search (e.g. 'James', 'invoice', 'pricing')" }, channel: { type: "string", enum: ["whatsapp", "telegram", "instagram", "all"], description: "Optional channel filter" } }, required: ["query"], additionalProperties: false } } },
 ];
 
 export async function executeAgentTool(name: string, args: any, supabase: any, userId: string): Promise<any> {
@@ -239,6 +240,52 @@ export async function executeAgentTool(name: string, args: any, supabase: any, u
       const { data: tasks } = await supabase.from("tasks").select("*").eq("user_id", userId).neq("status", "completed").order("priority", { ascending: false }).limit(5);
       const { data: books } = await supabase.from("books").select("*").eq("user_id", userId).eq("status", "reading").limit(1);
       return { tasks: tasks ?? [], current_book: books?.[0] ?? null, hint: "Use list_today_events and summarize_inbox for live email/calendar info." };
+    }
+    case "search_customer_chats": {
+      const query = args.query ?? "";
+      const channel = args.channel ?? "all";
+
+      let convQuery = supabase.from("conversations").select("id, title, channel, updated_at, last_message_at").eq("user_id", userId);
+      if (query) convQuery = convQuery.ilike("title", `%${query}%`);
+      const { data: convos } = await convQuery.limit(10);
+
+      let msgQuery = supabase.from("chat_messages").select("id, conversation_id, role, content, channel, created_at").eq("user_id", userId);
+      if (query) msgQuery = msgQuery.ilike("content", `%${query}%`);
+      if (channel && channel !== "all") msgQuery = msgQuery.eq("channel", channel);
+      const { data: matchedMsgs } = await msgQuery.order("created_at", { ascending: false }).limit(15);
+
+      const convoIds = Array.from(new Set([
+        ...(convos ?? []).map((c: any) => c.id),
+        ...(matchedMsgs ?? []).map((m: any) => m.conversation_id)
+      ])).slice(0, 5);
+
+      if (convoIds.length === 0) {
+        return { found: false, message: `No customer chats found matching '${query}'.` };
+      }
+
+      const { data: fullConvos } = await supabase
+        .from("conversations")
+        .select("id, title, channel, last_message_at")
+        .in("id", convoIds);
+
+      const { data: recentMsgs } = await supabase
+        .from("chat_messages")
+        .select("conversation_id, role, content, channel, created_at")
+        .in("conversation_id", convoIds)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      const results = (fullConvos ?? []).map((c: any) => {
+        const msgs = (recentMsgs ?? []).filter((m: any) => m.conversation_id === c.id).reverse();
+        return {
+          title: c.title,
+          channel: c.channel || "whatsapp",
+          last_message_at: c.last_message_at,
+          recent_messages: msgs.map((m: any) => ({ role: m.role, text: m.content, time: m.created_at }))
+        };
+      });
+
+      return { found: true, conversations: results };
     }
     default: return { error: `Unknown tool: ${name}` };
   }

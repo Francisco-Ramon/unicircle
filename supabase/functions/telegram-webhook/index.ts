@@ -21,8 +21,9 @@ TOOL USE (CRITICAL — DO NOT SKIP):
 - "tasks" / "todos" → CALL list_tasks.
 - "books" / "reading" → CALL list_books.
 - "daily briefing" / "morning brief" → CALL generate_daily_briefing + list_today_events + summarize_inbox.
+- "check whatsapp" / "did james text" / "search customer chats" / "any message from X" → CALL search_customer_chats.
 - If a Google tool returns { error: "not_connected" }, tell the user to connect Google in the dashboard Settings.
-- Never say you can't read email/calendar — you can. Call the tool.
+- Never say you can't read email/calendar/whatsapp — you can. Call the tool.
 
 APPROVAL: Never send email. Drafts only, surfaced in the dashboard. For calendar events, propose first and ask the user to confirm in the dashboard.`;
 
