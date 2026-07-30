@@ -171,9 +171,8 @@ const supabase = createClient(
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Helper to get AI response via Groq
+// Helper to get AI response via Groq with Gemini fallback
 async function getAIResponse(messagesInput, systemPrompt) {
-  const url = 'https://api.groq.com/openai/v1/chat/completions';
   const messages = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   
@@ -183,30 +182,61 @@ async function getAIResponse(messagesInput, systemPrompt) {
     messages.push({ role: 'user', content: messagesInput });
   }
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 300,
-        temperature: 0.7
-      })
-    });
-    if (!res.ok) {
-      console.error('Groq error:', await res.text());
-      return 'Sorry, I could not generate a response right now.';
+  // 1. Try Groq
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages,
+          max_tokens: 300,
+          temperature: 0.7
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content?.trim();
+        if (text) return text;
+      }
+    } catch (e) {
+      console.error('Groq call failed, trying fallback...', e);
     }
-    const data = await res.json();
-    return data?.choices?.[0]?.message?.content || "I didn't catch that.";
-  } catch (e) {
-    console.error('Groq connection error:', e);
-    return 'Connection error reaching the AI model.';
   }
+
+  // 2. Try Gemini Fallback
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${geminiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-lite',
+          messages,
+          max_tokens: 300,
+          temperature: 0.7
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content?.trim();
+        if (text) return text;
+      }
+    } catch (e) {
+      console.error('Gemini fallback failed:', e);
+    }
+  }
+
+  return "I'm here to help! What can I do for you?";
 }
 
 // Helper to check and renew Google Access Token (for Gmail style learning)
