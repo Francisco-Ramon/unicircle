@@ -499,7 +499,7 @@ function SettingsPage() {
                       e.stopPropagation();
                       setSavingIg(true);
                       toast.loading("Opening Meta Instagram Login...", { id: "ig-oauth" });
-                      const metaAppId = import.meta.env.VITE_META_APP_ID || "122114539569381461";
+                      const metaAppId = import.meta.env.VITE_META_APP_ID || "923086486766042";
                       const redirectUri = window.location.origin + "/settings";
                       const scopes = ["instagram_basic", "instagram_manage_messages", "pages_manage_metadata", "pages_read_engagement"].join(",");
                       const metaAuthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=token`;
