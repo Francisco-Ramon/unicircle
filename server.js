@@ -190,74 +190,75 @@ const supabase = createClient(
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Helper to get AI response via Groq with Gemini fallback
+// Helper to get AI response — Gemini primary, Groq fallback
 async function getAIResponse(messagesInput, systemPrompt) {
   const messages = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   
   if (Array.isArray(messagesInput)) {
-    messages.push(...messagesInput);
+    // Filter out empty messages
+    messages.push(...messagesInput.filter(m => m.content && m.content.trim()));
   } else if (typeof messagesInput === 'string') {
     messages.push({ role: 'user', content: messagesInput });
   }
 
-  // 1. Try Groq (with default fallback key)
-  const groqKey = process.env.GROQ_API_KEY || "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";
-  if (groqKey) {
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${groqKey}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages,
-          max_tokens: 300,
-          temperature: 0.7
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.choices?.[0]?.message?.content?.trim();
-        if (text) return text;
-      } else {
-        console.error('Groq API error:', res.status, await res.text());
-      }
-    } catch (e) {
-      console.error('Groq call failed, trying fallback...', e);
-    }
-  }
-
-  // 2. Try Gemini Fallback
+  // 1. Try Gemini (most reliable)
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${geminiKey}`
         },
         body: JSON.stringify({
-          model: 'gemini-2.5-flash-lite',
+          model: 'gemini-2.0-flash',
           messages,
-          max_tokens: 300,
-          temperature: 0.7
+          max_tokens: 350,
+          temperature: 0.85
         })
       });
       if (res.ok) {
         const data = await res.json();
         const text = data?.choices?.[0]?.message?.content?.trim();
-        if (text) return text;
+        if (text) { console.log('✅ Gemini response OK'); return text; }
+      } else {
+        console.error('Gemini error:', res.status, await res.text());
       }
     } catch (e) {
-      console.error('Gemini fallback failed:', e);
+      console.error('Gemini call failed:', e);
     }
   }
 
-  return "I'm here to help! What can I do for you?";
+  // 2. Groq fallback
+  const groqKey = process.env.GROQ_API_KEY || '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';
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 350,
+        temperature: 0.85
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content?.trim();
+      if (text) { console.log('✅ Groq fallback response OK'); return text; }
+    } else {
+      console.error('Groq error:', res.status, await res.text());
+    }
+  } catch (e) {
+    console.error('Groq call failed:', e);
+  }
+
+  return null;
 }
 
 // Helper to check and renew Google Access Token (for Gmail style learning)
@@ -690,14 +691,14 @@ async function handleMessage(msg) {
       conversationId = newConvo.id;
     }
 
-    // 3. Save incoming customer message
+    // 3. Save incoming customer message with full JID for replies
     await supabase.from("chat_messages").insert({
       user_id: userId,
       conversation_id: conversationId,
       role: "user",
       content: msg.body,
       channel: "whatsapp",
-      metadata: { whatsapp_phone: fromPhone, whatsapp_name: contactName }
+      metadata: { whatsapp_phone: fromPhone, whatsapp_name: contactName, whatsapp_jid: msg.from }
     });
 
     // Check if auto-reply is disabled globally
@@ -756,33 +757,53 @@ async function handleMessage(msg) {
     const detectedLanguage = detectLanguage(msg.body);
     console.log(`🌍 Detected language: ${detectedLanguage} for message: "${msg.body}"`);
 
-    const systemPrompt = `You are Mr. Cisco — ${ownerName}'s personal AI executive assistant.
-You manage ${ownerName}'s WhatsApp messages, emails, tasks, calendar, and business communications.
+    // Build a rich, human-like system prompt
+    const isFirstMessage = formattedMessages.length <= 1;
+    const systemPrompt = `You are Mr. Cisco, a warm and highly capable personal assistant working for ${ownerName}.
+You handle WhatsApp conversations, emails, scheduling, tasks, and general support on ${ownerName}'s behalf.
 
-CRITICAL CONVERSATIONAL RULES:
-- DO NOT introduce yourself repeatedly in an active conversation.
-- NEVER say "Hi, I'm Mr. Cisco..." or "What's up?" unless explicitly asked who you are.
-- Answer the customer's question, statement, or order request directly and helpfully.
-- Keep replies concise (1 to 3 short sentences).
-- Sound warm, helpful, professional, and natural.
-- Respond in ${detectedLanguage}.
+Your personality:
+- You sound like a real, intelligent, friendly human — not a chatbot.
+- You are warm, conversational, and never robotic.
+- You keep replies short and natural — like a real person texting (1-3 sentences max).
+- You never use bullet points or lists in casual chat — just natural sentences.
+- You never repeat the same sentence twice.
+- You never say "How can I assist you" or "Is there anything I can help with" — sound more natural.
+- If someone is casual, be casual back. If professional, match that energy.
+${ isFirstMessage ? `- Since this is the start of the conversation, you may greet them warmly and briefly mention you handle things for ${ownerName}.` : `- This is an ongoing conversation. Do NOT re-introduce yourself. Just respond naturally to what they said.` }
 
-${style ? `${ownerName.toUpperCase()}'S COMMUNICATION STYLE (mirror this):\n${style}` : ''}
-${emailContext ? `EMAIL CONTEXT:\n${emailContext}` : ''}
-${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
+Task handling — when someone asks you to:
+- Set a meeting / remind someone / schedule something: confirm you'll handle it and ask for details if needed.
+- Get info / check status / follow up: tell them you'll look into it and get back to them.
+- Give advice or answer questions: answer directly and helpfully.
+- Just chat / say hi: respond warmly and naturally.
+
+Language: Always respond in ${detectedLanguage}.
+${ ownerName !== 'the owner' ? `You work for: ${ownerName}` : '' }
+${style ? `\nCommunication style to mirror:\n${style}` : ''}
+${emailContext ? `\nRecent emails from this contact:\n${emailContext}` : ''}
+${docContext ? `\nRelevant business info:\n${docContext}` : ''}`;
 
     // 6. Generate reply
     const reply = await getAIResponse(formattedMessages, systemPrompt);
-    const finalReply = reply || "I didn't catch that — could you rephrase?";
+    
+    // If AI completely failed, use a natural sounding fallback
+    const naturalFallbacks = [
+      "Got it, let me check on that for you.",
+      "Sure thing, I'll look into it.",
+      "On it — give me a moment.",
+      "Noted! I'll follow up shortly."
+    ];
+    const finalReply = reply || naturalFallbacks[Math.floor(Math.random() * naturalFallbacks.length)];
 
-    // 7. Save assistant message and reply to WhatsApp client
+    // 7. Save assistant message
     await supabase.from("chat_messages").insert({
       user_id: userId,
       conversation_id: conversationId,
       role: "assistant",
       content: finalReply,
       channel: "whatsapp",
-      metadata: { whatsapp_phone: fromPhone }
+      metadata: { whatsapp_phone: fromPhone, whatsapp_jid: msg.from }
     });
 
     await supabase.from("conversations")
@@ -793,8 +814,9 @@ ${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", connection.id);
 
-    // 10-second human typing delay
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    // Human-like typing delay: 5-12 seconds random
+    const delay = 5000 + Math.floor(Math.random() * 7000);
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     await msg.reply(finalReply);
     console.log(`📨 Replied to ${contactName || fromPhone}: ${finalReply}`);
