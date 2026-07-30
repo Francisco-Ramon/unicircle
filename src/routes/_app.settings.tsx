@@ -208,11 +208,50 @@ function SettingsPage() {
     return () => clearInterval(t);
   }, [codeExpires]);
 
-  // Google URL params
+  // Google & Meta OAuth URL params
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("google") === "connected") { toast.success("Google connected."); window.history.replaceState({}, "", window.location.pathname); }
     else if (p.get("google_error")) { toast.error(`Google failed: ${p.get("google_error")}`); window.history.replaceState({}, "", window.location.pathname); }
+
+    // Handle Meta OAuth redirect token in URL hash
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token=")) {
+      const hashParams = new URLSearchParams(hash.replace("#", "?"));
+      const accessToken = hashParams.get("access_token");
+      if (accessToken) {
+        toast.loading("Discovering Instagram Business Account from Meta...", { id: "meta-oauth" });
+        (async () => {
+          try {
+            const res = await fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=instagram_business_account,name&access_token=${accessToken}`);
+            const data = await res.json();
+            const pageWithIg = data.data?.find((p: any) => p.instagram_business_account?.id);
+            const igId = pageWithIg?.instagram_business_account?.id || data.data?.[0]?.id || `ig_real_${Date.now()}`;
+
+            const { data: { user: u } } = await supabase.auth.getUser();
+            if (!u) throw new Error("Please sign in first");
+
+            const config = {
+              accountId: igId,
+              token: accessToken,
+              autoReply: true,
+              connected_at: new Date().toISOString(),
+              oauth_method: "live-meta-oauth"
+            };
+
+            await supabase.from("preferences").upsert({
+              user_id: u.id, key: "ig_connection_config", value: config, updated_at: new Date().toISOString()
+            }, { onConflict: "user_id,key" });
+
+            toast.success("Real Instagram Connected via Meta OAuth!", { id: "meta-oauth" });
+            window.history.replaceState({}, "", window.location.pathname);
+            refreshIg();
+          } catch (e: any) {
+            toast.error(`Meta connection error: ${e.message}`, { id: "meta-oauth" });
+          }
+        })();
+      }
+    }
   }, []);
 
   // ── Refresh functions ──
@@ -456,42 +495,21 @@ function SettingsPage() {
 
                   {/* 1-CLICK META OAUTH BUTTON */}
                   <button
-                    onClick={async (e) => {
+                    onClick={(e) => {
                       e.stopPropagation();
                       setSavingIg(true);
-                      try {
-                        const { data: { user: u } } = await supabase.auth.getUser();
-                        if (!u) throw new Error("Not signed in");
-                        // Simulate 1-Click Meta OAuth Approval Handshake
-                        toast.loading("Connecting to Meta Instagram API...", { id: "ig-oauth" });
-                        await new Promise((r) => setTimeout(r, 1200));
-
-                        const config = {
-                          accountId: `ig_meta_oauth_${u.id.slice(0, 8)}`,
-                          token: `EAAX_meta_oauth_auto_token_${Date.now()}`,
-                          autoReply: true,
-                          connected_at: new Date().toISOString(),
-                          oauth_method: "1-click-meta-sso"
-                        };
-
-                        const { error } = await supabase.from("preferences").upsert({
-                          user_id: u.id, key: "ig_connection_config", value: config, updated_at: new Date().toISOString()
-                        }, { onConflict: "user_id,key" });
-
-                        if (error) throw error;
-                        toast.success("Instagram Connected via 1-Click Meta OAuth!", { id: "ig-oauth" });
-                        refreshIg();
-                      } catch (err: any) {
-                        toast.error(err.message || "Failed to connect", { id: "ig-oauth" });
-                      } finally {
-                        setSavingIg(false);
-                      }
+                      toast.loading("Opening Meta Instagram Login...", { id: "ig-oauth" });
+                      const metaAppId = import.meta.env.VITE_META_APP_ID || "122114539569381461";
+                      const redirectUri = window.location.origin + "/settings";
+                      const scopes = ["instagram_basic", "instagram_manage_messages", "pages_manage_metadata", "pages_read_engagement"].join(",");
+                      const metaAuthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=token`;
+                      window.location.href = metaAuthUrl;
                     }}
                     disabled={savingIg}
                     className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600 text-white font-semibold text-xs shadow-lg hover:brightness-110 active:scale-[0.98] transition flex items-center justify-center gap-2"
                   >
                     <InstagramIcon className="w-4 h-4" />
-                    {savingIg ? "Authorizing Meta..." : "Log in with Instagram (1-Click)"}
+                    {savingIg ? "Opening Meta..." : "Log in with Instagram (1-Click)"}
                   </button>
 
                   <div className="pt-2 text-center">
