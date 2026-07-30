@@ -189,11 +189,18 @@ function SettingsPage() {
   const [gLoading, setGLoading] = useState(true);
   const [gBusy, setGBusy] = useState(false);
 
+  // Instagram DMs
+  const [igStatus, setIgStatus] = useState<{ linked: boolean; accountId?: string; token?: string } | null>(null);
+  const [igAccountId, setIgAccountId] = useState("");
+  const [igToken, setIgToken] = useState("");
+  const [savingIg, setSavingIg] = useState(false);
+  const [igAutoReply, setIgAutoReply] = useState(true);
+
   // Expanded cards
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // ── Load on mount ──
-  useEffect(() => { refreshTg(); refreshWa(); refreshGoogle(); loadAutoReply(); }, []);
+  useEffect(() => { refreshTg(); refreshWa(); refreshGoogle(); refreshIg(); loadAutoReply(); }, []);
   useEffect(() => { if (waStatus?.linked) return; const i = setInterval(refreshWa, 4000); return () => clearInterval(i); }, [waStatus?.linked]);
   useEffect(() => {
     if (!codeExpires) return;
@@ -226,6 +233,58 @@ function SettingsPage() {
   async function refreshGoogle() {
     setGLoading(true);
     try { setGStatus(await callGoogleFn("google-status")); } catch (e: any) { toast.error(e.message); } finally { setGLoading(false); }
+  }
+  async function refreshIg() {
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      const { data } = await supabase.from("preferences").select("value").eq("user_id", u.id).eq("key", "ig_connection_config").maybeSingle();
+      if (data?.value && typeof data.value === "object" && (data.value as any).accountId) {
+        const val = data.value as any;
+        setIgStatus({ linked: true, accountId: val.accountId, token: val.token });
+        setIgAccountId(val.accountId);
+        setIgAutoReply(val.autoReply !== false);
+      } else {
+        setIgStatus({ linked: false });
+      }
+    } catch { setIgStatus({ linked: false }); }
+  }
+
+  async function handleIgSave() {
+    if (!igAccountId.trim() || !igToken.trim()) { toast.error("Enter Account ID & Token"); return; }
+    setSavingIg(true);
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) throw new Error("Not signed in");
+      const config = { accountId: igAccountId.trim(), token: igToken.trim(), autoReply: true, connected_at: new Date().toISOString() };
+      const { error } = await supabase.from("preferences").upsert({
+        user_id: u.id, key: "ig_connection_config", value: config, updated_at: new Date().toISOString()
+      }, { onConflict: "user_id,key" });
+      if (error) throw error;
+      toast.success("Instagram connected successfully!");
+      refreshIg();
+    } catch (e: any) { toast.error(e.message); } finally { setSavingIg(false); }
+  }
+
+  async function handleIgUnlink() {
+    if (!confirm("Unlink Instagram DMs?")) return;
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      await supabase.from("preferences").delete().eq("user_id", u.id).eq("key", "ig_connection_config");
+      toast.success("Instagram unlinked.");
+      refreshIg();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function handleToggleIgAutoReply(checked: boolean) {
+    setIgAutoReply(checked);
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      const { data } = await supabase.from("preferences").select("value").eq("user_id", u.id).eq("key", "ig_connection_config").maybeSingle();
+      if (data?.value && typeof data.value === "object") {
+        const val = { ...(data.value as any), autoReply: checked };
+        await supabase.from("preferences").upsert({ user_id: u.id, key: "ig_connection_config", value: val, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
+        toast.success(checked ? "Instagram AI Auto-reply enabled" : "Instagram AI Auto-reply paused");
+      }
+    } catch (e: any) { toast.error(e.message); setIgAutoReply(!checked); }
   }
 
   // ── Auto-reply ──
@@ -353,24 +412,56 @@ function SettingsPage() {
           )}
         </GlassCard>
 
-        {/* ── Instagram ── */}
-        <GlassCard>
+        {/* ── Instagram DMs ── */}
+        <GlassCard className="cursor-pointer" onClick={() => toggle("ig")}>
           <SparkChart color="#E1306C" seed={2} />
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-6">
               <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Activity</span>
+              <span className="text-[9px] text-white/30">{igStatus?.linked ? "Active" : ""}</span>
             </div>
             <InstagramIcon className="w-12 h-12 mb-3" />
-            <h3 className="text-lg font-bold text-white mb-4">Instagram</h3>
+            <h3 className="text-lg font-bold text-white mb-4">Instagram Direct</h3>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-zinc-500" />
-                <span className="text-xs text-white/70">Not Connected</span>
+                <span className={`w-2 h-2 rounded-full ${igStatus?.linked ? "bg-emerald-400" : "bg-zinc-500"}`} />
+                <span className="text-xs text-white/70">{igStatus?.linked ? "Connected" : "Not Connected"}</span>
               </div>
-              <Switch checked={false} disabled />
+              <div onClick={(e) => e.stopPropagation()}>
+                <Switch
+                  checked={igStatus?.linked ? igAutoReply : false}
+                  onCheckedChange={igStatus?.linked ? handleToggleIgAutoReply : undefined}
+                  disabled={!igStatus?.linked}
+                />
+              </div>
             </div>
-            <p className="text-[10px] text-white/30 mt-3">Status: Inactive</p>
+            <p className="text-[10px] text-white/30 mt-3">Status: {igStatus?.linked ? "Active & Synced" : "Inactive"}</p>
           </div>
+          {expanded === "ig" && (
+            <div className="relative z-10 mt-4 pt-4 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
+              {igStatus?.linked ? (
+                <>
+                  <div className="text-xs space-y-1.5 bg-black/30 p-3 rounded-lg">
+                    <div className="flex justify-between"><span className="text-white/40">Account ID</span><span className="text-white/80 font-mono">{igStatus.accountId}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">Auto-Reply</span><span className="text-emerald-400">{igAutoReply ? "Enabled" : "Paused"}</span></div>
+                  </div>
+                  <button onClick={handleIgUnlink} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition flex items-center gap-1"><Unlink className="h-3 w-3" /> Unlink Instagram</button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-xs space-y-1.5 text-pink-200">
+                    <div className="font-semibold">Connect Instagram DMs:</div>
+                    <p className="text-[11px] text-white/70">Enter your Meta Instagram Business Account ID and Access Token to enable Mr. Cisco AI DMs & Human Handoff.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <input type="text" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} placeholder="Instagram Business Account ID / Page ID" className="w-full bg-white/5 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-white/30" />
+                    <input type="password" value={igToken} onChange={(e) => setIgToken(e.target.value)} placeholder="Meta Graph API Access Token" className="w-full bg-white/5 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-white/30" />
+                    <button onClick={handleIgSave} disabled={savingIg || !igAccountId.trim() || !igToken.trim()} className="w-full text-xs py-1.5 rounded bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold hover:opacity-90 transition disabled:opacity-40">{savingIg ? "Connecting..." : "Connect Instagram DMs"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </GlassCard>
 
         {/* ── Facebook Messenger ── */}

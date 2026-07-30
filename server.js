@@ -166,6 +166,161 @@ app.post('/api/send-message', async (req, res) => {
   }
 });
 
+// Instagram Webhook Verification (Meta setup)
+app.get('/api/instagram-webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const expectedToken = process.env.WEBHOOK_VERIFY_TOKEN || 'MrCiscoVerifyToken123';
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    console.log('✅ Instagram Webhook verified successfully!');
+    res.status(200).send(challenge);
+  } else {
+    console.error('❌ Instagram Webhook verification failed');
+    res.sendStatus(403);
+  }
+});
+
+// Instagram Incoming Message Event Webhook
+app.post('/api/instagram-webhook', async (req, res) => {
+  res.status(200).send('EVENT_RECEIVED');
+  try {
+    const body = req.body;
+    if (body.object === 'instagram' || body.object === 'page') {
+      for (const entry of body.entry || []) {
+        for (const messagingObj of entry.messaging || []) {
+          const senderId = messagingObj.sender?.id;
+          const messageText = messagingObj.message?.text;
+          const isEcho = messagingObj.message?.is_echo;
+          if (senderId && messageText && !isEcho) {
+            console.log(`📸 Incoming Instagram DM from ${senderId}: "${messageText}"`);
+            handleInstagramMessage(senderId, messageText).catch(e => console.error('IG DM error:', e));
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error handling Instagram webhook:', e);
+  }
+});
+
+// Process Instagram DM with Central AI Brain & Document Memory
+async function handleInstagramMessage(senderId, messageText) {
+  try {
+    // 1. Find active Instagram connection in preferences
+    const { data: prefData } = await supabase
+      .from('preferences')
+      .select('user_id, value')
+      .eq('key', 'ig_connection_config')
+      .limit(1)
+      .maybeSingle();
+
+    if (!prefData || !prefData.value || !prefData.value.accountId) {
+      console.log('⚠️ No active Instagram connection config found in DB.');
+      return;
+    }
+
+    const userId = prefData.user_id;
+    const config = prefData.value;
+    const token = config.token;
+
+    if (config.autoReply === false) {
+      console.log('🤖 Instagram auto-reply is PAUSED.');
+      return;
+    }
+
+    // 2. Retrieve or create Instagram conversation
+    const title = `Instagram: Customer (${senderId})`;
+    let { data: convo } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', title)
+      .maybeSingle();
+
+    let conversationId;
+    if (convo) {
+      conversationId = convo.id;
+    } else {
+      const { data: newConvo, error: convoErr } = await supabase
+        .from('conversations')
+        .insert({ user_id: userId, title, title_generated: true, channel: 'instagram' })
+        .select('id').single();
+      if (convoErr) throw convoErr;
+      conversationId = newConvo.id;
+    }
+
+    // 3. Save incoming customer DM
+    await supabase.from('chat_messages').insert({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: 'user',
+      content: messageText,
+      channel: 'instagram',
+      metadata: { instagram_sender_id: senderId }
+    });
+
+    // 4. Load recent history
+    const { data: history } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(20);
+
+    const formatted = (history ?? []).map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }));
+
+    // 5. Gather central document context
+    const docContext = await getDocumentContext(userId, messageText);
+    const detectedLang = detectLanguage(messageText);
+
+    const systemPrompt = `You are Mr. Cisco, the personal Instagram DM assistant.
+Reply directly, warmly, and naturally to what the customer said (1-2 sentences).
+Language: ${detectedLang}.
+${docContext ? `\nBusiness info you can use:\n${docContext}` : ''}`;
+
+    const reply = await getAIResponse(formatted, systemPrompt);
+    const finalReply = reply || "Thanks for reaching out! Let me check on that for you.";
+
+    // 6. Save assistant response
+    await supabase.from('chat_messages').insert({
+      user_id: userId,
+      conversation_id: conversationId,
+      role: 'assistant',
+      content: finalReply,
+      channel: 'instagram',
+      metadata: { instagram_sender_id: senderId }
+    });
+
+    await supabase.from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', conversationId);
+
+    // 7. Send reply via Meta Graph API
+    if (token) {
+      const sendRes = await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: senderId },
+          message: { text: finalReply }
+        })
+      });
+      if (sendRes.ok) {
+        console.log(`📨 Sent Instagram DM reply to ${senderId}: "${finalReply}"`);
+      } else {
+        console.error('Failed to send Instagram DM via Meta API:', sendRes.status, await sendRes.text());
+      }
+    }
+  } catch (e) {
+    console.error('Error in handleInstagramMessage:', e);
+  }
+}
+
 const API_PORT = process.env.PORT || 3001;
 app.listen(API_PORT, () => {
   console.log(`🌐 WhatsApp API server listening on http://localhost:${API_PORT}`);
