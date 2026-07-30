@@ -322,8 +322,8 @@ ${docContext ? `\nBusiness info you can use:\n${docContext}` : ''}`;
 }
 
 const API_PORT = process.env.PORT || 3001;
-app.listen(API_PORT, () => {
-  console.log(`🌐 WhatsApp API server listening on http://localhost:${API_PORT}`);
+app.listen(API_PORT, '0.0.0.0', () => {
+  console.log(`🌐 WhatsApp API server listening on http://0.0.0.0:${API_PORT}`);
 });
 
 // Initialize Supabase admin client using Service Role Key to manage user integrations
