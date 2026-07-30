@@ -182,8 +182,8 @@ async function getAIResponse(messagesInput, systemPrompt) {
     messages.push({ role: 'user', content: messagesInput });
   }
 
-  // 1. Try Groq
-  const groqKey = process.env.GROQ_API_KEY;
+  // 1. Try Groq (with default fallback key)
+  const groqKey = process.env.GROQ_API_KEY || "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";
   if (groqKey) {
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -203,6 +203,8 @@ async function getAIResponse(messagesInput, systemPrompt) {
         const data = await res.json();
         const text = data?.choices?.[0]?.message?.content?.trim();
         if (text) return text;
+      } else {
+        console.error('Groq API error:', res.status, await res.text());
       }
     } catch (e) {
       console.error('Groq call failed, trying fallback...', e);
