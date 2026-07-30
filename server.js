@@ -172,11 +172,16 @@ const supabase = createClient(
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 // Helper to get AI response via Groq
-async function getAIResponse(message, systemPrompt) {
+async function getAIResponse(messagesInput, systemPrompt) {
   const url = 'https://api.groq.com/openai/v1/chat/completions';
   const messages = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  messages.push({ role: 'user', content: message });
+  
+  if (Array.isArray(messagesInput)) {
+    messages.push(...messagesInput);
+  } else if (typeof messagesInput === 'string') {
+    messages.push({ role: 'user', content: messagesInput });
+  }
 
   try {
     const res = await fetch(url, {
@@ -676,15 +681,18 @@ async function handleMessage(msg) {
       return;
     }
 
-    // 4. Load full conversation history (up to 100 messages for long conversations)
+    // 4. Load full conversation history
     const { data: history } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
-      .limit(100);
+      .limit(50);
 
-    const recent = (history ?? []).map(m => `${m.role}: ${m.content}`).join('\n');
+    const formattedMessages = (history ?? []).map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
+    }));
 
     // 5. Gather writing style, document context, and email context
     const style = await learnUserStyle(userId);
@@ -693,42 +701,27 @@ async function handleMessage(msg) {
       ? await getEmailContext(userId, contactName, fromPhone)
       : "";
 
-    // Detect the language the customer used
+    // Detect language
     const detectedLanguage = detectLanguage(msg.body);
     console.log(`🌍 Detected language: ${detectedLanguage} for message: "${msg.body}"`);
 
     const systemPrompt = `You are Mr. Cisco — ${ownerName}'s personal AI executive assistant.
-You manage ${ownerName}'s WhatsApp messages, emails, tasks, calendar, and business communications on their behalf.
+You manage ${ownerName}'s WhatsApp messages, emails, tasks, calendar, and business communications.
 
-WHO YOU ARE:
-- You speak on behalf of ${ownerName} in a natural, direct, and professional way.
-- When introducing yourself for the first time, say something like: "Hi, I'm Mr. Cisco, ${ownerName}'s assistant."
-- You can help contacts with: scheduling, follow-ups, document requests, email confirmations, task updates, and general business queries.
-
-LANGUAGE RULE (MOST IMPORTANT):
-- The customer is writing in ${detectedLanguage}.
-- You MUST reply ENTIRELY in ${detectedLanguage}. No exceptions.
-- If the language is Swahili, reply fully in natural Swahili.
-- If the language is Arabic, reply in Arabic script.
-- If the language is French, reply in French.
-- If the language switches, switch your reply language to match immediately.
-- Never mix languages in the same reply.
-
-REPLY RULES (CRITICAL):
-- Be concise: 1–3 short sentences. Never write essays.
-- Sound human — not like a bot or corporate email.
-- NEVER say "Best regards", "Sincerely", "Customer Service", or "Kind regards".
-- NEVER say you are an AI or mention any app name in replies.
-- NEVER use formal letter structure.
-- If asked about an email — check the email context below and reference it directly.
-- If you don't know something — say ${ownerName} will get back to them shortly.
+CRITICAL CONVERSATIONAL RULES:
+- DO NOT introduce yourself repeatedly in an active conversation.
+- NEVER say "Hi, I'm Mr. Cisco..." or "What's up?" unless explicitly asked who you are.
+- Answer the customer's question, statement, or order request directly and helpfully.
+- Keep replies concise (1 to 3 short sentences).
+- Sound warm, helpful, professional, and natural.
+- Respond in ${detectedLanguage}.
 
 ${style ? `${ownerName.toUpperCase()}'S COMMUNICATION STYLE (mirror this):\n${style}` : ''}
-${emailContext ? `EMAIL CONTEXT (recent emails from this contact — use to answer their question):\n${emailContext}` : ''}
+${emailContext ? `EMAIL CONTEXT:\n${emailContext}` : ''}
 ${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
 
     // 6. Generate reply
-    const reply = await getAIResponse(`${recent}\nassistant:`, systemPrompt);
+    const reply = await getAIResponse(formattedMessages, systemPrompt);
     const finalReply = reply || "I didn't catch that — could you rephrase?";
 
     // 7. Save assistant message and reply to WhatsApp client
@@ -748,6 +741,9 @@ ${docContext ? `BUSINESS DOCUMENTS / INFO:\n${docContext}` : ''}`;
     await supabase.from("whatsapp_connections")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", connection.id);
+
+    // 10-second human typing delay
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
     await msg.reply(finalReply);
     console.log(`📨 Replied to ${contactName || fromPhone}: ${finalReply}`);
