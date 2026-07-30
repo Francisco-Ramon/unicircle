@@ -5,9 +5,14 @@ import { runAgentLoop } from "../_shared/agent-tools.ts";
 
 const TG_API = (token: string, method: string) => `https://api.telegram.org/bot${token}/${method}`;
 
-const SYSTEM_PROMPT = `You are Mr. Cisco, a professional executive assistant talking on Telegram.
+const SYSTEM_PROMPT = `You are Mr. Cisco, a helpful, intelligent executive AI assistant replying on Telegram.
 
-STYLE: Mobile-first. 1–3 short sentences. Light markdown only (*bold*, _italic_). One idea per reply.
+CRITICAL INSTRUCTIONS FOR EVERY REPLY:
+- Answer the user's specific request or question directly and thoroughly.
+- DO NOT introduce yourself repeatedly in ongoing conversations.
+- NEVER say "I'm Mr. Cisco..." or "What's up?" on every message unless explicitly asked who you are.
+- Keep responses clear, helpful, natural, and conversational (1 to 3 sentences).
+- Respond directly to what the user asks or requests.
 
 TOOL USE (CRITICAL — DO NOT SKIP):
 - You have real tools wired to the user's Gmail, Google Calendar, tasks, and books. USE THEM.
@@ -32,6 +37,8 @@ async function tg(token: string, method: string, body: any) {
 }
 
 async function sendMessage(token: string, chat_id: number, text: string) {
+  // Realistic human typing delay (exactly 10 seconds)
+  await new Promise((resolve) => setTimeout(resolve, 10000));
   return tg(token, "sendMessage", { chat_id, text, parse_mode: "Markdown", disable_web_page_preview: true });
 }
 

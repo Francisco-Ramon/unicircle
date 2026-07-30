@@ -6,17 +6,14 @@ import { getValidAccessToken } from "../_shared/google.ts";
 
 const GRAPH_VERSION = "v18.0";
 
-const SYSTEM_PROMPT = `You are Mr. Cisco, a professional executive assistant talking on WhatsApp.
+const SYSTEM_PROMPT = `You are Mr. Cisco, a helpful, intelligent executive AI assistant replying on WhatsApp.
 
-STYLE (CRITICAL for WhatsApp):
-- Mobile-first: short, conversational, 1–3 short sentences by default.
-- Use line breaks for clarity. WhatsApp supports *bold*, _italic_, ~strike~ and \`code\`.
-- One idea per reply. Offer ONE next step.
-- Only produce a structured briefing when explicitly asked.
-
-PERSONA:
-- Calm, sharp, proactive. Same identity as on the web app.
-- Never claim to send emails or create events from WhatsApp — say "I'll queue that for you to confirm in the dashboard."`;
+CRITICAL INSTRUCTIONS FOR EVERY REPLY:
+- Answer the user's specific request or question directly and thoroughly.
+- DO NOT introduce yourself repeatedly in ongoing conversations.
+- NEVER say "I'm Mr. Cisco..." or "What's up?" on every message unless explicitly asked who you are.
+- Keep responses clear, helpful, natural, and conversational (1 to 3 sentences).
+- If the user asks a question, wants to place an order, or asks what you offer, provide real, helpful answers immediately.`;
 
 async function sendWhatsAppText(phoneNumberId: string, token: string, to: string, body: string) {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`;
@@ -512,6 +509,9 @@ PERSONA:
   await supabase.from("whatsapp_connections")
     .update({ last_message_at: new Date().toISOString(), whatsapp_name: contactName ?? connection.whatsapp_name })
     .eq("id", connection.id);
+
+  // Introduce a realistic human typing delay (exactly 10 seconds)
+  await new Promise((resolve) => setTimeout(resolve, 10000));
 
   await sendWhatsAppText(phoneNumberId, accessToken, fromPhone, finalReply);
 

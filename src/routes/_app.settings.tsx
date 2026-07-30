@@ -410,7 +410,19 @@ function SettingsPage() {
                 <span className={`w-2 h-2 rounded-full ${tgStatus?.linked ? "bg-emerald-400" : "bg-zinc-500"}`} />
                 <span className="text-xs text-white/70">{tgStatus?.linked ? "Connected" : "Not Connected"}</span>
               </div>
-              <Switch checked={tgStatus?.linked || false} onCheckedChange={tgStatus?.linked ? () => handleTgUnlink() : () => handleGenerateCode()} />
+              <div onClick={(e) => e.stopPropagation()}>
+                <Switch
+                  checked={tgStatus?.linked || false}
+                  onCheckedChange={async (checked) => {
+                    if (tgStatus?.linked) {
+                      await handleTgUnlink();
+                    } else {
+                      setExpanded("tg");
+                      await handleGenerateCode();
+                    }
+                  }}
+                />
+              </div>
             </div>
             <p className="text-[10px] text-white/30 mt-3">Status: {tgStatus?.linked ? "Active & Synced" : "Inactive"}</p>
           </div>
@@ -430,14 +442,21 @@ function SettingsPage() {
                 </>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-white/50">Generate a code, then send <code className="bg-white/10 px-1 rounded">/link CODE</code> to the bot.</p>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs space-y-1 text-blue-200">
+                    <div className="font-semibold">How to connect Telegram:</div>
+                    <ol className="list-decimal list-inside space-y-1 text-white/70 text-[11px]">
+                      <li>Click <strong>Generate Code</strong> below</li>
+                      <li>Open your Telegram app</li>
+                      <li>Send <code className="bg-black/40 px-1 rounded text-cyan-300">/link YOUR_CODE</code> to <strong>@MrCiscoBot</strong></li>
+                    </ol>
+                  </div>
                   {code && (
-                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                      <code className="font-mono font-bold text-white">/link {code}</code>
-                      <button onClick={copyCode} className="text-[10px] px-2 py-1 bg-white/10 rounded">Copy</button>
+                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-cyan-500/30">
+                      <code className="font-mono text-sm font-bold text-cyan-300">/link {code}</code>
+                      <button onClick={copyCode} className="text-[10px] px-2 py-1 bg-cyan-500/20 text-cyan-300 font-semibold rounded hover:bg-cyan-500/30">Copy command</button>
                     </div>
                   )}
-                  <button onClick={handleGenerateCode} disabled={generating} className="w-full text-xs py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold">{generating ? "Generating..." : "Generate Code"}</button>
+                  <button onClick={handleGenerateCode} disabled={generating} className="w-full text-xs py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold shadow-lg hover:opacity-90 transition">{generating ? "Generating..." : "Generate Link Code"}</button>
                 </div>
               )}
             </div>
@@ -458,7 +477,9 @@ function SettingsPage() {
                 <span className={`w-2 h-2 rounded-full ${gStatus?.connected ? "bg-emerald-400" : "bg-zinc-500"}`} />
                 <span className="text-xs text-white/70">{gStatus?.connected ? "Connected" : "Not Connected"}</span>
               </div>
-              <Switch checked={gStatus?.connected || false} onCheckedChange={gStatus?.connected ? () => handleGoogleDisconnect() : () => handleGoogleConnect()} disabled={gBusy} />
+              <div onClick={(e) => e.stopPropagation()}>
+                <Switch checked={gStatus?.connected || false} onCheckedChange={gStatus?.connected ? () => handleGoogleDisconnect() : () => handleGoogleConnect()} disabled={gBusy} />
+              </div>
             </div>
             <p className="text-[10px] text-white/30 mt-3">Status: {gStatus?.connected ? "Synced" : "Inactive"}</p>
           </div>
