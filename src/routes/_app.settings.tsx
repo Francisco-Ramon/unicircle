@@ -391,11 +391,37 @@ function SettingsPage() {
     setWaLoading(true);
     try {
       const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status");
-      if (!res.ok) throw new Error(`${res.status}`);
-      const d = await res.json();
-      if (d.linked) setWaStatus({ linked: true, connection: { whatsapp_phone: d.phone, whatsapp_name: d.name, linked_at: new Date().toISOString(), last_message_at: null, status: "active" } });
-      else setWaStatus({ linked: false, connection: null, pendingQr: d.pendingQr || null, pairingCode: d.pairingCode || null });
-    } catch { setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null }); } finally { setWaLoading(false); }
+      if (res.ok) {
+        const d = await res.json();
+        if (d.linked) {
+          setWaStatus({ linked: true, connection: { whatsapp_phone: d.phone, whatsapp_name: d.name, linked_at: new Date().toISOString(), last_message_at: null, status: "active" } });
+          setWaLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
+    // Fallback: Check Supabase whatsapp_connections table
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) {
+        const { data: conn } = await supabase
+          .from("whatsapp_connections")
+          .select("*")
+          .eq("user_id", u.id)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (conn) {
+          setWaStatus({ linked: true, connection: conn });
+          setWaLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
+    setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null });
+    setWaLoading(false);
   }
   async function refreshGoogle() {
     setGLoading(true);
