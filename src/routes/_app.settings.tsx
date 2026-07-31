@@ -158,6 +158,134 @@ function ProfileCard() {
   );
 }
 
+/* ── Business Knowledge Base Card ── */
+function BusinessKnowledgeCard() {
+  const [companyName, setCompanyName] = useState("");
+  const [description, setDescription] = useState("");
+  const [faqs, setFaqs] = useState("");
+  const [persona, setPersona] = useState("Friendly & Professional");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("preferences")
+        .select("value")
+        .eq("user_id", user.id)
+        .eq("key", "business_knowledge_base")
+        .maybeSingle();
+      if (data?.value) {
+        setCompanyName(data.value.companyName || "");
+        setDescription(data.value.description || "");
+        setFaqs(data.value.faqs || "");
+        setPersona(data.value.persona || "Friendly & Professional");
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const kb = { companyName, description, faqs, persona, updated_at: new Date().toISOString() };
+      const { error } = await supabase.from("preferences").upsert({
+        user_id: user.id,
+        key: "business_knowledge_base",
+        value: kb,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id,key" });
+      if (error) throw error;
+      toast.success("Business Knowledge Base saved! AI will now use this for all customer responses.");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save Knowledge Base");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <GlassCard className="col-span-full">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-base text-white flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">🏢</span>
+            Company Knowledge Base & AI Brain
+          </h3>
+          <p className="text-xs text-white/50 mt-0.5">
+            Add your company details, services, FAQs, and pricing here. The AI will read this to answer your customers on WhatsApp, Instagram & Telegram.
+          </p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={loading || saving}
+          className="text-xs px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold shadow-lg hover:brightness-110 active:scale-95 transition disabled:opacity-50"
+        >
+          {saving ? "Saving AI Knowledge..." : "Save AI Knowledge"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-white/70 font-medium mb-1">Company / Brand Name</label>
+            <input
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              disabled={loading}
+              placeholder="e.g. Cisco Electronics & Repairs"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+            />
+          </div>
+
+          <div>
+            <label className="block text-white/70 font-medium mb-1">AI Persona & Tone</label>
+            <select
+              value={persona}
+              onChange={(e) => setPersona(e.target.value)}
+              disabled={loading}
+              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+            >
+              <option value="Friendly & Professional">Casual, Friendly & Professional</option>
+              <option value="Direct Sales & Closing">Direct Sales & Deal Closing</option>
+              <option value="Formal & Executive">Formal & Executive Support</option>
+              <option value="Humorous & Energetic">Humorous & High Energy</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-white/70 font-medium mb-1">Business Description & Services</label>
+            <textarea
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={loading}
+              placeholder="e.g. We sell original iPhone accessories, repair laptops and smartphones, and deliver nationwide within 24 hours."
+              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500/50 transition resize-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-white/70 font-medium mb-1">Frequently Asked Questions, Pricing & Rules</label>
+          <textarea
+            rows={9}
+            value={faqs}
+            onChange={(e) => setFaqs(e.target.value)}
+            disabled={loading}
+            placeholder={`e.g.\nQ: Where are you located?\nA: Westlands Mall, 2nd Floor, Nairobi.\nQ: What are your opening hours?\nA: Mon-Sat 8AM - 7PM.\nQ: What are the delivery fees?\nA: Nairobi 300 KES, countrywide 500 KES.`}
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500/50 transition resize-none font-mono text-[11px]"
+          />
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 /* ── Route Export ── */
 export const Route = createFileRoute("/_app/settings")({ component: SettingsPage });
 
@@ -671,6 +799,11 @@ function SettingsPage() {
             </div>
           )}
         </GlassCard>
+      </div>
+
+      {/* Business Knowledge Base & AI Brain */}
+      <div className="mb-8">
+        <BusinessKnowledgeCard />
       </div>
 
       {/* Account Row */}

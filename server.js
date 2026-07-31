@@ -922,19 +922,36 @@ async function handleMessage(msg) {
     const detectedLanguage = detectLanguage(msg.body);
     console.log(`🌍 Detected language: ${detectedLanguage} for message: "${msg.body}"`);
 
-    // Build a simple, direct system prompt — less rules = better AI understanding
-    const isNewConvo = formattedMessages.length <= 1;
-    const systemPrompt = `You are Mr. Cisco, the personal WhatsApp assistant of ${ownerName}.
+    // Load custom Business Knowledge Base configured in Settings
+    const { data: kbPref } = await supabase
+      .from("preferences")
+      .select("value")
+      .eq("user_id", userId)
+      .eq("key", "business_knowledge_base")
+      .maybeSingle();
+
+    const kb = kbPref?.value;
+    const businessKnowledge = kb ? `
+=== BUSINESS KNOWLEDGE BASE ===
+Company Name: ${kb.companyName || ownerName}
+AI Tone & Persona: ${kb.persona || 'Friendly & Professional'}
+Company Description & Services: ${kb.description || ''}
+Frequently Asked Questions, Pricing & Rules:
+${kb.faqs || ''}
+=================================
+` : '';
+
+    // Build system prompt with business knowledge base
+    const systemPrompt = `You are Mr. Cisco, the AI assistant of ${kb?.companyName || ownerName}.
 
 Rules:
 - Reply ONLY to what the person just said. Read their message carefully and respond to it directly.
 - Sound like a real human texting — casual, warm, short (1-3 sentences).
+- AI Tone: ${kb?.persona || 'Friendly & Professional'}.
 - Never use bullet points. Never start with "Certainly" or "Of course".
-- Never repeat yourself or ignore what they said.
-- If it's the first message, greet briefly. Otherwise just reply to the point.
 - Language: ${detectedLanguage}.
-${ownerName !== 'the owner' ? `- You represent: ${ownerName}` : ''}
-${docContext ? `\nBusiness info you can use:\n${docContext}` : ''}`;
+${businessKnowledge}
+${docContext ? `\nDocument Knowledge Context:\n${docContext}` : ''}`;
 
     // Always make sure the current message is last in the history
     const currentMsg = msg.body?.trim();
