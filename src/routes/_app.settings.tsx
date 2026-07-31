@@ -536,7 +536,9 @@ function SettingsPage() {
                 <span className={`w-2 h-2 rounded-full ${waStatus?.linked ? "bg-emerald-400" : "bg-zinc-500"}`} />
                 <span className="text-xs text-white/70">{waStatus?.linked ? "Connected" : "Not Connected"}</span>
               </div>
-              <Switch checked={waStatus?.linked ? globalAutoReply : false} onCheckedChange={waStatus?.linked ? handleToggleAutoReply : undefined} disabled={!waStatus?.linked} />
+              <div onClick={(e) => e.stopPropagation()}>
+                <Switch checked={globalAutoReply} onCheckedChange={handleToggleAutoReply} />
+              </div>
             </div>
             <p className="text-[10px] text-white/30 mt-3">Status: {waStatus?.linked ? "Active & Synced" : "Inactive"}</p>
           </div>
