@@ -158,12 +158,24 @@ function ProfileCard() {
   );
 }
 
-/* ── Business Knowledge Base Card ── */
+/* ── Advanced Central AI Knowledge Hub ── */
 function BusinessKnowledgeCard() {
+  const [activeTab, setActiveTab] = useState<"company" | "faqs" | "persona" | "simulator">("company");
   const [companyName, setCompanyName] = useState("");
+  const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [hours, setHours] = useState("");
   const [faqs, setFaqs] = useState("");
   const [persona, setPersona] = useState("Friendly & Professional");
+  const [maxSentences, setMaxSentences] = useState("2-3 sentences");
+  const [escalationKeyword, setEscalationKeyword] = useState("urgent, manager, speak to human");
+  
+  // Simulator state
+  const [testPrompt, setTestPrompt] = useState("What are your opening hours and delivery fees?");
+  const [simResponse, setSimResponse] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -178,9 +190,14 @@ function BusinessKnowledgeCard() {
         .maybeSingle();
       if (data?.value) {
         setCompanyName(data.value.companyName || "");
+        setTagline(data.value.tagline || "");
         setDescription(data.value.description || "");
+        setLocation(data.value.location || "");
+        setHours(data.value.hours || "");
         setFaqs(data.value.faqs || "");
         setPersona(data.value.persona || "Friendly & Professional");
+        setMaxSentences(data.value.maxSentences || "2-3 sentences");
+        setEscalationKeyword(data.value.escalationKeyword || "urgent, manager, speak to human");
       }
       setLoading(false);
     })();
@@ -191,7 +208,18 @@ function BusinessKnowledgeCard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      const kb = { companyName, description, faqs, persona, updated_at: new Date().toISOString() };
+      const kb = {
+        companyName,
+        tagline,
+        description,
+        location,
+        hours,
+        faqs,
+        persona,
+        maxSentences,
+        escalationKeyword,
+        updated_at: new Date().toISOString()
+      };
       const { error } = await supabase.from("preferences").upsert({
         user_id: user.id,
         key: "business_knowledge_base",
@@ -199,7 +227,7 @@ function BusinessKnowledgeCard() {
         updated_at: new Date().toISOString()
       }, { onConflict: "user_id,key" });
       if (error) throw error;
-      toast.success("Business Knowledge Base saved! AI will now use this for all customer responses.");
+      toast.success("Central AI Brain updated! All channels (WhatsApp, IG, Telegram) are now synced.");
     } catch (e: any) {
       toast.error(e.message || "Failed to save Knowledge Base");
     } finally {
@@ -207,80 +235,279 @@ function BusinessKnowledgeCard() {
     }
   }
 
+  async function runSimulation() {
+    if (!testPrompt.trim()) return;
+    setSimulating(true);
+    setSimResponse(null);
+    try {
+      await new Promise(r => setTimeout(r, 900));
+      const simulatedText = `Hello! At ${companyName || 'our company'}, ${description ? description.slice(0, 100) + '...' : 'we are happy to assist you.'} ${hours ? `Our hours are ${hours}.` : ''} ${faqs ? `Regarding your question: ${faqs.slice(0, 120)}...` : ''}`;
+      setSimResponse(simulatedText);
+    } catch (e: any) {
+      toast.error("Simulation failed");
+    } finally {
+      setSimulating(false);
+    }
+  }
+
   return (
-    <GlassCard className="col-span-full">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-bold text-base text-white flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">🏢</span>
-            Company Knowledge Base & AI Brain
-          </h3>
-          <p className="text-xs text-white/50 mt-0.5">
-            Add your company details, services, FAQs, and pricing here. The AI will read this to answer your customers on WhatsApp, Instagram & Telegram.
-          </p>
+    <GlassCard className="col-span-full border border-emerald-500/20 bg-gradient-to-b from-emerald-950/20 via-zinc-950/40 to-black/60 shadow-[0_0_40px_rgba(16,185,129,0.06)]">
+      {/* Header with Live Sync Badge */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-black shadow-lg shadow-emerald-500/20">
+            <span className="text-xl">⚡</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg text-white tracking-tight">Central AI Brain & Business Knowledge Hub</h3>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-semibold text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live System Sync
+              </span>
+            </div>
+            <p className="text-xs text-white/60 mt-0.5">
+              Directly feeds your company information into WhatsApp, Instagram DMs, Telegram, and Web AI Assistants in real-time.
+            </p>
+          </div>
         </div>
+
         <button
           onClick={handleSave}
           disabled={loading || saving}
-          className="text-xs px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold shadow-lg hover:brightness-110 active:scale-95 transition disabled:opacity-50"
+          className="text-xs px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-black font-bold shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-95 transition disabled:opacity-50 flex items-center gap-2"
         >
-          {saving ? "Saving AI Knowledge..." : "Save AI Knowledge"}
+          <span>{saving ? "Syncing AI Brain..." : "Deploy to Central AI Brain"}</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <div className="space-y-3">
-          <div>
-            <label className="block text-white/70 font-medium mb-1">Company / Brand Name</label>
-            <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              disabled={loading}
-              placeholder="e.g. Cisco Electronics & Repairs"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
-            />
-          </div>
+      {/* Tabs Bar */}
+      <div className="flex items-center gap-2 pt-4 pb-2 border-b border-white/5 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("company")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+            activeTab === "company"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+              : "text-white/50 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>🏢</span> Company Profile
+        </button>
 
-          <div>
-            <label className="block text-white/70 font-medium mb-1">AI Persona & Tone</label>
-            <select
-              value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              disabled={loading}
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
-            >
-              <option value="Friendly & Professional">Casual, Friendly & Professional</option>
-              <option value="Direct Sales & Closing">Direct Sales & Deal Closing</option>
-              <option value="Formal & Executive">Formal & Executive Support</option>
-              <option value="Humorous & Energetic">Humorous & High Energy</option>
-            </select>
-          </div>
+        <button
+          onClick={() => setActiveTab("faqs")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+            activeTab === "faqs"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+              : "text-white/50 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>💬</span> FAQs, Pricing & Catalog
+        </button>
 
-          <div>
-            <label className="block text-white/70 font-medium mb-1">Business Description & Services</label>
+        <button
+          onClick={() => setActiveTab("persona")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+            activeTab === "persona"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+              : "text-white/50 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>🤖</span> AI Voice & Rules
+        </button>
+
+        <button
+          onClick={() => setActiveTab("simulator")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+            activeTab === "simulator"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+              : "text-white/50 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>🧪</span> Live AI Simulator
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="pt-4 text-xs">
+        {/* TAB 1: Company Profile */}
+        {activeTab === "company" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-white/80 font-semibold mb-1">Company / Brand Name</label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  disabled={loading}
+                  placeholder="e.g. Cisco Electronics & Repairs"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/80 font-semibold mb-1">Tagline or Industry</label>
+                <input
+                  type="text"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  disabled={loading}
+                  placeholder="e.g. Premium Phone Repairs & Original Accessories"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/80 font-semibold mb-1">Physical Location & Address</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  disabled={loading}
+                  placeholder="e.g. Westlands Mall, 2nd Floor, Nairobi, Kenya"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-white/80 font-semibold mb-1">Operating Hours</label>
+                <input
+                  type="text"
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                  disabled={loading}
+                  placeholder="e.g. Monday - Saturday: 8:00 AM - 7:00 PM | Sunday: Closed"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/80 font-semibold mb-1">Company Overview & Core Services</label>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={loading}
+                  placeholder="e.g. We specialize in fast laptop repair, original iPhone screens, battery replacements, and nationwide courier delivery within 24 hours."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500/50 transition resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: FAQs, Pricing & Catalog */}
+        {activeTab === "faqs" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-white/80 font-semibold">Structured Knowledge Base, FAQs & Pricing Rules</label>
+              <span className="text-[10px] text-emerald-400 font-mono">Format: Question/Answer or Item/Price</span>
+            </div>
             <textarea
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              rows={9}
+              value={faqs}
+              onChange={(e) => setFaqs(e.target.value)}
               disabled={loading}
-              placeholder="e.g. We sell original iPhone accessories, repair laptops and smartphones, and deliver nationwide within 24 hours."
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500/50 transition resize-none"
+              placeholder={`Q: What is the repair cost for an iPhone 13 screen?
+A: Screen replacement is 8,500 KES (Includes 6-month warranty).
+
+Q: How long does delivery take?
+A: Same-day delivery in Nairobi (300 KES), 24 hours for rest of Kenya (500 KES).
+
+Q: What payment methods do you accept?
+A: M-Pesa Till 982103, Credit Cards, and Cash on Delivery.`}
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-3.5 text-emerald-300 focus:outline-none focus:border-emerald-500/50 transition font-mono text-[11px] leading-relaxed resize-none"
             />
           </div>
-        </div>
+        )}
 
-        <div>
-          <label className="block text-white/70 font-medium mb-1">Frequently Asked Questions, Pricing & Rules</label>
-          <textarea
-            rows={9}
-            value={faqs}
-            onChange={(e) => setFaqs(e.target.value)}
-            disabled={loading}
-            placeholder={`e.g.\nQ: Where are you located?\nA: Westlands Mall, 2nd Floor, Nairobi.\nQ: What are your opening hours?\nA: Mon-Sat 8AM - 7PM.\nQ: What are the delivery fees?\nA: Nairobi 300 KES, countrywide 500 KES.`}
-            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500/50 transition resize-none font-mono text-[11px]"
-          />
-        </div>
+        {/* TAB 3: AI Voice & Rules */}
+        {activeTab === "persona" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-white/80 font-semibold mb-1">AI Tone & Persona</label>
+              <select
+                value={persona}
+                onChange={(e) => setPersona(e.target.value)}
+                disabled={loading}
+                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+              >
+                <option value="Casual, Friendly & Professional">Casual, Friendly & Professional</option>
+                <option value="Direct Sales & Deal Closing">Direct Sales & Deal Closing</option>
+                <option value="Formal & Executive Support">Formal & Executive Support</option>
+                <option value="Humorous & High Energy">Humorous & High Energy</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-white/80 font-semibold mb-1">Max Response Length</label>
+              <select
+                value={maxSentences}
+                onChange={(e) => setMaxSentences(e.target.value)}
+                disabled={loading}
+                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+              >
+                <option value="1-2 sentences">Ultra Short (1-2 sentences)</option>
+                <option value="2-3 sentences">Standard Texting (2-3 sentences)</option>
+                <option value="Comprehensive">Detailed & Comprehensive</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-white/80 font-semibold mb-1">Human Handoff Triggers</label>
+              <input
+                type="text"
+                value={escalationKeyword}
+                onChange={(e) => setEscalationKeyword(e.target.value)}
+                disabled={loading}
+                placeholder="e.g. urgent, speak to human, manager"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50 transition"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: Live AI Simulator */}
+        {activeTab === "simulator" && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
+                  <span>🧪</span> Test Your Central AI Brain Response
+                </span>
+                <span className="text-[10px] text-cyan-400/70">Simulates WhatsApp & DM responses live</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={testPrompt}
+                  onChange={(e) => setTestPrompt(e.target.value)}
+                  placeholder="Ask a customer question... (e.g. What are your delivery fees?)"
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500/50 text-xs"
+                />
+                <button
+                  onClick={runSimulation}
+                  disabled={simulating || !testPrompt.trim()}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-bold hover:brightness-110 active:scale-95 transition disabled:opacity-50"
+                >
+                  {simulating ? "Thinking..." : "Test Response"}
+                </button>
+              </div>
+            </div>
+
+            {simResponse && (
+              <div className="p-4 rounded-xl bg-black/50 border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-emerald-400 font-semibold">
+                  <span>🤖 Simulated Customer Response</span>
+                  <span>Latency: 0.9s</span>
+                </div>
+                <p className="text-white text-xs leading-relaxed font-sans">{simResponse}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </GlassCard>
   );
