@@ -998,39 +998,41 @@ client.on('disconnected', async (reason) => {
   console.log('⚠️ Client was disconnected:', reason);
   waState = { ready: false, phone: null, name: null, pendingQr: null, pairingCode: null };
 
-  // Auto-reconnect after 10 seconds
-  console.log('🔄 Will attempt to reconnect in 10 seconds...');
-  setTimeout(async () => {
-    try {
-      console.log('🚀 Reconnecting WhatsApp client...');
-      await client.initialize();
-    } catch (e) {
-      console.error('❌ Reconnection failed:', e);
-      // Try again after 30 seconds
-      setTimeout(() => {
-        console.log('🔄 Retrying reconnection...');
-        client.initialize().catch(err => console.error('❌ Retry failed:', err));
-      }, 30000);
-    }
-  }, 10000);
+  // Resilient auto-reconnect loop
+  let attempt = 0;
+  const attemptReconnect = async () => {
+    attempt++;
+    const backoffMs = Math.min(10000 * Math.pow(1.5, attempt - 1), 120000); // 10s -> 15s -> 22.5s ... max 2 mins
+    console.log(`🔄 Attempting automatic reconnection (Attempt #${attempt}) in ${Math.round(backoffMs / 1000)}s...`);
+    setTimeout(async () => {
+      try {
+        console.log(`🚀 Executing auto-reconnect attempt #${attempt}...`);
+        await client.initialize();
+      } catch (e) {
+        console.error(`❌ Reconnection attempt #${attempt} failed:`, e?.message || e);
+        attemptReconnect();
+      }
+    }, backoffMs);
+  };
+
+  attemptReconnect();
 });
 
 client.on('auth_failure', (msg) => {
   console.error('❌ Auth failure:', msg);
   waState = { ready: false, phone: null, name: null, pendingQr: null, pairingCode: null };
-  // Session is invalid, clear and restart to get new QR
   setTimeout(async () => {
     try {
       if (fs.existsSync(SESSION_DIR)) {
         fs.rmSync(SESSION_DIR, { recursive: true, force: true });
         fs.mkdirSync(SESSION_DIR, { recursive: true });
-        console.log('🗑️ Cleared invalid session, restarting...');
+        console.log('🗑️ Cleared invalid session, preparing new QR code...');
       }
       await client.initialize();
     } catch (e) {
-      console.error('❌ Re-init after auth failure failed:', e);
+      console.error('❌ Re-init after auth failure failed:', e?.message || e);
     }
-  }, 5000);
+  }, 3000);
 });
 
 // Keep-alive: ping Railway every 10 minutes to prevent idle shutdown
