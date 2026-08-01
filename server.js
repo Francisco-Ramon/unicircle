@@ -108,6 +108,32 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime(), activeSessions: userSessions.size, ts: new Date().toISOString() });
 });
 
+app.post('/api/register', async (req, res) => {
+  const { email, password, name } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ ok: false, error: 'Email and password are required' });
+  }
+  console.log(`👤 Registering new user account: ${email}`);
+  try {
+    const { data: user, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { display_name: name || email.split('@')[0] }
+    });
+    if (error) {
+      if (error.message.includes('already registered')) {
+        return res.status(400).json({ ok: false, error: 'User already registered. Please sign in instead.' });
+      }
+      throw error;
+    }
+    res.json({ ok: true, user: user.user });
+  } catch (e) {
+    console.error('Registration failed:', e);
+    res.status(400).json({ ok: false, error: e.message || 'Failed to create account' });
+  }
+});
+
 app.post('/api/request-pairing-code', async (req, res) => {
   const { userId, phoneNumber } = req.body;
   const uid = userId || DEFAULT_USER_ID;

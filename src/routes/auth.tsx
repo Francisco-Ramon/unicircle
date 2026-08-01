@@ -64,31 +64,40 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email, password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth`,
-            data: { display_name: name || email.split("@")[0] },
-          },
-        });
-        if (error) {
-          if (error.message.toLowerCase().includes("rate limit")) {
-            toast.error("Email rate limit reached! Use 'Continue with Google' to sign up instantly with 1 click.");
-            return;
+        // 1. Register auto-confirmed user via backend API to bypass email rate limits
+        try {
+          const regRes = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, name }),
+          });
+          const regData = await regRes.json();
+          if (!regRes.ok && regData.error) {
+            if (regData.error.includes("already registered")) {
+              toast.info("Account already exists. Signing in...");
+            } else {
+              throw new Error(regData.error);
+            }
           }
-          throw error;
-        }
-        if (!data.session) {
-          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-          if (signInErr) {
-            toast.info("Account created! Sign in below or use Google.");
-            setMode("signin");
-          } else {
-            toast.success("Welcome aboard! Setting up your workspace…");
+        } catch (regErr: any) {
+          if (regErr?.message && !regErr.message.includes("Failed to fetch")) {
+            throw regErr;
           }
-        } else {
-          toast.success("Welcome aboard! Setting up your workspace…");
+          // Fallback to standard Supabase signup if backend unreachable
+          const { error: signUpErr } = await supabase.auth.signUp({
+            email, password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth`,
+              data: { display_name: name || email.split("@")[0] },
+            },
+          });
+          if (signUpErr) throw signUpErr;
         }
+
+        // 2. Sign in immediately!
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr) throw signInErr;
+        toast.success("Welcome aboard! Setting up your workspace…");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
