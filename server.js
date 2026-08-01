@@ -87,10 +87,24 @@ function getSessionState(userId) {
   return s.state;
 }
 
+// ── Destroy + Rebuild helper (used in disconnect & reset) ──
+async function destroyAndRebuildSession(userId, delayMs = 12000) {
+  const session = userSessions.get(userId);
+  userSessions.delete(userId);              // remove BEFORE destroy so status API shows no QR
+  if (session) {
+    try { await session.client.destroy(); } catch (_) {}
+  }
+  const userAuthDir = path.join(SESSION_DIR, `session-${userId}`);
+  cleanChromiumLocks(userAuthDir);
+  console.log(`♻️  Rebuilding session for user ${userId} in ${delayMs}ms…`);
+  setTimeout(() => { initClientForUser(userId); }, delayMs);
+}
+
 // ── Express API Endpoints ──
 app.get('/api/whatsapp-status', (req, res) => {
   const userId = req.query.userId || DEFAULT_USER_ID;
-  if (!userSessions.has(userId)) {
+  const existing = userSessions.get(userId);
+  if (!existing) {
     initClientForUser(userId);
   }
   const state = getSessionState(userId);
@@ -156,19 +170,21 @@ app.post('/api/request-pairing-code', async (req, res) => {
 app.post('/api/reset-session', async (req, res) => {
   const { userId } = req.body;
   const uid = userId || DEFAULT_USER_ID;
-  console.log(`🔄 Resetting WhatsApp session for user ${uid}...`);
+  console.log(`🔄 Full reset for user ${uid}...`);
   try {
     const session = userSessions.get(uid);
+    userSessions.delete(uid);
     if (session) {
-      await session.client.destroy().catch(() => {});
-      userSessions.delete(uid);
+      try { await session.client.destroy(); } catch (_) {}
     }
     const userAuthDir = path.join(SESSION_DIR, `session-${uid}`);
     if (fs.existsSync(userAuthDir)) {
       fs.rmSync(userAuthDir, { recursive: true, force: true });
+      console.log(`🗑️  Deleted session folder: ${userAuthDir}`);
     }
-    setTimeout(() => { initClientForUser(uid); }, 1500);
-    res.json({ ok: true, message: 'Session reset. New QR code generating...' });
+    cleanChromiumLocks(SESSION_DIR);
+    setTimeout(() => { initClientForUser(uid); }, 3000);
+    res.json({ ok: true, message: 'Session wiped. Fresh QR generating in 3s…' });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
@@ -214,23 +230,26 @@ app.post('/api/send-message', async (req, res) => {
 
 // ── Multi-Session Initializer ──
 function initClientForUser(userId) {
+  if (!userId) return null;
   if (userSessions.has(userId)) {
     return userSessions.get(userId);
   }
+
+  const userAuthDir = path.join(SESSION_DIR, `session-${userId}`);
+  cleanChromiumLocks(userAuthDir);
 
   console.log(`🚀 Initializing isolated WhatsApp client for user: ${userId}`);
   const state = { ready: false, phone: null, name: null, pendingQr: null, pairingCode: null };
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: userId, dataPath: SESSION_DIR }),
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018944880-alpha.html',
-    },
     takeoverOnConflict: true,
+    authTimeoutMs: 90000,
+    qrMaxRetries: 10,
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
+      bypassCSP: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -245,7 +264,7 @@ function initClientForUser(userId) {
     }
   });
 
-  const sessionObj = { client, state };
+  const sessionObj = { client, state, isInitializing: true };
   userSessions.set(userId, sessionObj);
 
   client.on('qr', (qr) => {
@@ -368,17 +387,26 @@ function initClientForUser(userId) {
   });
 
   client.on('disconnected', (reason) => {
-    console.log(`⚠️ Client for user ${userId} disconnected:`, reason);
+    console.log(`⚠️ Client for user ${userId} disconnected: ${reason}`);
     state.ready = false;
-    setTimeout(() => { client.initialize().catch((e) => console.error(`Re-init user ${userId} failed:`, e)); }, 10000);
+    state.pendingQr = null;
+    // Full rebuild — never call initialize() on the old client again
+    destroyAndRebuildSession(userId, 12000);
   });
 
   client.on('auth_failure', (msg) => {
     console.error(`❌ Auth failure for user ${userId}:`, msg);
     state.ready = false;
+    state.pendingQr = null;
+    destroyAndRebuildSession(userId, 8000);
   });
 
-  client.initialize().catch((err) => console.error(`Failed to initialize client for user ${userId}:`, err));
+  client.initialize().catch((err) => {
+    console.error(`Failed to initialize client for user ${userId}:`, err);
+    userSessions.delete(userId);
+    cleanChromiumLocks(path.join(SESSION_DIR, `session-${userId}`));
+    setTimeout(() => initClientForUser(userId), 10000);
+  });
   return sessionObj;
 }
 
