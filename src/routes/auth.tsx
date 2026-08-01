@@ -27,15 +27,24 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email, password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `https://executive-agent-hub-main.vercel.app/auth`,
             data: { display_name: name || email.split("@")[0] },
           },
         });
         if (error) throw error;
-        toast.success("Welcome aboard. Setting up your workspace…");
+        if (!data.session) {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInErr) {
+            toast.info("Account created! You can now sign in directly.");
+          } else {
+            toast.success("Welcome aboard! Setting up your workspace…");
+          }
+        } else {
+          toast.success("Welcome aboard! Setting up your workspace…");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
