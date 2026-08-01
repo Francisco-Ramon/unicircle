@@ -644,11 +644,17 @@ function SettingsPage() {
   async function refreshWa() {
     setWaLoading(true);
     try {
-      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status");
+      const { data: { user: u } } = await supabase.auth.getUser();
+      const userIdParam = u ? `?userId=${u.id}` : "";
+      const res = await fetch(`https://mr-cisco-whatsapp-production.up.railway.app/api/whatsapp-status${userIdParam}`);
       if (res.ok) {
         const d = await res.json();
         if (d.linked) {
           setWaStatus({ linked: true, connection: { whatsapp_phone: d.phone, whatsapp_name: d.name, linked_at: new Date().toISOString(), last_message_at: null, status: "active" } });
+          setWaLoading(false);
+          return;
+        } else if (d.pendingQr || d.pairingCode) {
+          setWaStatus({ linked: false, connection: null, pendingQr: d.pendingQr || null, pairingCode: d.pairingCode || null });
           setWaLoading(false);
           return;
         }
@@ -768,7 +774,11 @@ function SettingsPage() {
     if (!waPhone.trim()) { toast.error("Enter phone number"); return; }
     setRequestingCode(true); setPairingCode(null);
     try {
-      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/request-pairing-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phoneNumber: waPhone }) });
+      const { data: { user: u } } = await supabase.auth.getUser();
+      const res = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/request-pairing-code", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: u?.id, phoneNumber: waPhone })
+      });
       const d = await res.json(); if (!res.ok) throw new Error(d.error); setPairingCode(d.pairingCode); toast.success("Pairing code generated!");
     } catch (e: any) { toast.error(e.message); } finally { setRequestingCode(false); }
   }
