@@ -89,7 +89,7 @@ function getSessionState(userId) {
 
 // ── Express API Endpoints ──
 app.get('/api/whatsapp-status', (req, res) => {
-  const userId = (req.query.userId as string) || DEFAULT_USER_ID;
+  const userId = req.query.userId || DEFAULT_USER_ID;
   if (!userSessions.has(userId)) {
     initClientForUser(userId);
   }
