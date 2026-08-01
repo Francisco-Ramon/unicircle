@@ -612,7 +612,34 @@ function SettingsPage() {
   // ── Refresh functions ──
   async function refreshTg() {
     setTgLoading(true);
-    try { setTgStatus(await callTelegramFn("status")); } catch (e: any) { toast.error(e.message); } finally { setTgLoading(false); }
+    try {
+      const result = await callTelegramFn("status");
+      setTgStatus(result);
+      setTgLoading(false);
+      return;
+    } catch {}
+
+    // Fallback: Check Supabase telegram_connections table directly
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) {
+        const { data: conn } = await supabase
+          .from("telegram_connections")
+          .select("*")
+          .eq("user_id", u.id)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (conn) {
+          setTgStatus({ linked: true, connection: conn });
+          setTgLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
+    setTgStatus({ linked: false, connection: null });
+    setTgLoading(false);
   }
   async function refreshWa() {
     setWaLoading(true);
