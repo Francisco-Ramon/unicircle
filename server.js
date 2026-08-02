@@ -244,11 +244,16 @@ function initClientForUser(userId) {
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: userId, dataPath: SESSION_DIR }),
     takeoverOnConflict: true,
-    authTimeoutMs: 90000,
+    authTimeoutMs: 120000,
     qrMaxRetries: 10,
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018944880-alpha.html',
+    },
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
+      protocolTimeout: 120000,
       bypassCSP: true,
       args: [
         '--no-sandbox',
@@ -257,8 +262,9 @@ function initClientForUser(userId) {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--single-process',
         '--disable-gpu',
+        '--disable-extensions',
+        '--disable-component-update',
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
       ]
     }
