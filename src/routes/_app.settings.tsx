@@ -553,7 +553,7 @@ function SettingsPage() {
   const [igAutoReply, setIgAutoReply] = useState(true);
 
   // Expanded cards
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>("wa");
 
   // ── Load on mount ──
   useEffect(() => { refreshTg(); refreshWa(); refreshGoogle(); refreshIg(); loadAutoReply(); }, []);
@@ -654,8 +654,14 @@ function SettingsPage() {
           setWaStatus({ linked: true, connection: { whatsapp_phone: d.phone, whatsapp_name: d.name, linked_at: new Date().toISOString(), last_message_at: null, status: "active" } });
           setWaLoading(false);
           return;
-        } else if (d.pendingQr || d.pairingCode) {
-          setWaStatus({ linked: false, connection: null, pendingQr: d.pendingQr || null, pairingCode: d.pairingCode || null });
+        } else {
+          setWaStatus({
+            linked: false,
+            authenticating: !!d.authenticating,
+            connection: null,
+            pendingQr: d.pendingQr || null,
+            pairingCode: d.pairingCode || null
+          });
           setWaLoading(false);
           return;
         }
