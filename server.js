@@ -88,14 +88,22 @@ function getSessionState(userId) {
 }
 
 // ── Destroy + Rebuild helper (used in disconnect & reset) ──
-async function destroyAndRebuildSession(userId, delayMs = 12000) {
+async function destroyAndRebuildSession(userId, delayMs = 12000, wipeAuth = false) {
   const session = userSessions.get(userId);
   userSessions.delete(userId);              // remove BEFORE destroy so status API shows no QR
   if (session) {
     try { await session.client.destroy(); } catch (_) {}
   }
   const userAuthDir = path.join(SESSION_DIR, `session-${userId}`);
-  cleanChromiumLocks(userAuthDir);
+  if (wipeAuth && fs.existsSync(userAuthDir)) {
+    try {
+      fs.rmSync(userAuthDir, { recursive: true, force: true });
+      console.log(`🗑️ Wiped corrupted auth folder: ${userAuthDir}`);
+    } catch (e) {
+      console.error('Error wiping auth folder:', e);
+    }
+  }
+  cleanChromiumLocks(SESSION_DIR);
   console.log(`♻️  Rebuilding session for user ${userId} in ${delayMs}ms…`);
   setTimeout(() => { initClientForUser(userId); }, delayMs);
 }
@@ -246,6 +254,10 @@ function initClientForUser(userId) {
     takeoverOnConflict: true,
     authTimeoutMs: 120000,
     qrMaxRetries: 10,
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014587000-alpha.html',
+    },
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
@@ -392,15 +404,15 @@ function initClientForUser(userId) {
     console.log(`⚠️ Client for user ${userId} disconnected: ${reason}`);
     state.ready = false;
     state.pendingQr = null;
-    // Full rebuild — never call initialize() on the old client again
-    destroyAndRebuildSession(userId, 12000);
+    const isLogout = String(reason).toUpperCase().includes('LOGOUT');
+    destroyAndRebuildSession(userId, isLogout ? 3000 : 12000, isLogout);
   });
 
   client.on('auth_failure', (msg) => {
     console.error(`❌ Auth failure for user ${userId}:`, msg);
     state.ready = false;
     state.pendingQr = null;
-    destroyAndRebuildSession(userId, 8000);
+    destroyAndRebuildSession(userId, 3000, true);
   });
 
   client.initialize().catch((err) => {
