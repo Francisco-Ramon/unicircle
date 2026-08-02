@@ -246,10 +246,6 @@ function initClientForUser(userId) {
     takeoverOnConflict: true,
     authTimeoutMs: 120000,
     qrMaxRetries: 10,
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018944880-alpha.html',
-    },
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
