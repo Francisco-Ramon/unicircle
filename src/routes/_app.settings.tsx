@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 type GoogleStatus = { connected: boolean; email?: string; scopes?: string[]; gmail_ok?: boolean; gmail_compose?: boolean; calendar_ok?: boolean };
 type WaStatus = {
   linked: boolean;
+  authenticating?: boolean;
   connection: null | { whatsapp_phone: string; whatsapp_name: string | null; linked_at: string; last_message_at: string | null; status: string; };
   pendingQr?: string | null;
   pairingCode?: string | null;
@@ -850,7 +851,13 @@ function SettingsPage() {
                     <button onClick={() => setLinkMethod("code")} className={`flex-1 pb-1.5 text-xs font-semibold border-b-2 transition ${linkMethod === "code" ? "border-emerald-400 text-emerald-400" : "border-transparent text-white/40"}`}>Pairing Code</button>
                   </div>
                   {linkMethod === "qr" ? (
-                    waStatus?.pendingQr ? (
+                    waStatus?.authenticating ? (
+                      <div className="flex flex-col items-center p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                        <RefreshCw className="h-5 w-5 text-emerald-400 animate-spin" />
+                        <span className="text-xs font-semibold text-emerald-400 mt-2">Connecting to WhatsApp...</span>
+                        <span className="text-[10px] text-white/40 mt-0.5">Completing key exchange</span>
+                      </div>
+                    ) : waStatus?.pendingQr ? (
                       <div className="flex flex-col items-center p-3 rounded-lg bg-white/5 space-y-2">
                         <div className="p-2 bg-white rounded-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(waStatus.pendingQr)}`} alt="QR" className="w-[130px] h-[130px]" /></div>
                         <span className="text-[9px] text-white/40">Scan from WhatsApp</span>

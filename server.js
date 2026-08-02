@@ -121,6 +121,7 @@ app.get('/api/whatsapp-status', (req, res) => {
   }
   return res.json({
     linked: false,
+    authenticating: !!state.authenticating,
     pendingQr: state.pendingQr,
     pairingCode: state.pairingCode
   });
@@ -254,10 +255,6 @@ function initClientForUser(userId) {
     takeoverOnConflict: true,
     authTimeoutMs: 120000,
     qrMaxRetries: 10,
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014587000-alpha.html',
-    },
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
@@ -284,13 +281,23 @@ function initClientForUser(userId) {
   client.on('qr', (qr) => {
     console.log(`📡 QR code generated for user ${userId}`);
     state.ready = false;
+    state.authenticating = false;
     state.pendingQr = qr;
+  });
+
+  client.on('authenticated', () => {
+    console.log(`🔑 WhatsApp Client AUTHENTICATED for user ${userId}`);
+    state.ready = false;
+    state.authenticating = true;
+    state.pendingQr = null;
+    state.pairingCode = null;
   });
 
   client.on('ready', async () => {
     const myPhone = client.info.wid.user;
     console.log(`✅ WhatsApp Client READY for user ${userId} | Phone: ${myPhone}`);
     state.ready = true;
+    state.authenticating = false;
     state.phone = myPhone;
     state.pendingQr = null;
 
