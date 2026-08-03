@@ -167,25 +167,31 @@ app.post('/api/request-pairing-code', async (req, res) => {
   console.log(`📱 Requesting pairing code for user ${uid}, phone: ${cleanPhone}`);
   try {
     const session = initClientForUser(uid);
+
+    // Wait up to 90 seconds for WhatsApp Web to fully load (QR generated = page ready)
+    console.log(`⏳ Waiting for WhatsApp Web to load for user ${uid}...`);
     let retries = 0;
-    while ((!session.client.pupPage || session.client.pupPage.isClosed()) && retries < 40) {
+    while (!session.state.ready && !session.state.pendingQr && retries < 180) {
       await new Promise((r) => setTimeout(r, 500));
       retries++;
     }
+    console.log(`✅ WhatsApp Web ready after ${retries * 500}ms for user ${uid}`);
 
+    // Try requesting pairing code up to 3 times
     let code = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        console.log(`🔑 Attempt ${attempt} to get pairing code for ${cleanPhone}`);
         code = await session.client.requestPairingCode(cleanPhone);
-        if (code) break;
+        if (code) { console.log(`✅ Pairing code generated: ${code}`); break; }
       } catch (err) {
         console.warn(`Attempt ${attempt} for pairing code failed:`, err.message);
-        await new Promise((r) => setTimeout(r, 2000));
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 3000));
       }
     }
 
     if (!code) {
-      throw new Error('Could not generate pairing code. Please tap Get Code again in 3 seconds.');
+      throw new Error('Could not generate pairing code. Please tap Get Code again.');
     }
 
     session.state.pairingCode = code;
