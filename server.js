@@ -87,10 +87,10 @@ function getSessionState(userId) {
   return s.state;
 }
 
-// ── Destroy + Rebuild helper (used in disconnect & reset) ──
+// ── Destroy + Rebuild helper (used in reset only) ──
 async function destroyAndRebuildSession(userId, delayMs = 12000, wipeAuth = false) {
   const session = userSessions.get(userId);
-  userSessions.delete(userId);              // remove BEFORE destroy so status API shows no QR
+  userSessions.delete(userId);
   if (session) {
     try { await session.client.destroy(); } catch (_) {}
   }
@@ -98,23 +98,17 @@ async function destroyAndRebuildSession(userId, delayMs = 12000, wipeAuth = fals
   if (wipeAuth && fs.existsSync(userAuthDir)) {
     try {
       fs.rmSync(userAuthDir, { recursive: true, force: true });
-      console.log(`🗑️ Wiped corrupted auth folder: ${userAuthDir}`);
-    } catch (e) {
-      console.error('Error wiping auth folder:', e);
-    }
+      console.log(`🗑️ Wiped auth dir for user ${userId}.`);
+    } catch (e) { console.error('Error wiping auth dir:', e); }
   }
-  cleanChromiumLocks(SESSION_DIR);
-  console.log(`♻️  Rebuilding session for user ${userId} in ${delayMs}ms…`);
-  setTimeout(() => { initClientForUser(userId); }, delayMs);
+  // Do NOT auto-restart — let the user re-initiate from the UI
+  console.log(`♻️ Session destroyed for ${userId}. User must re-link.`);
 }
 
 // ── Express API Endpoints ──
 app.get('/api/whatsapp-status', (req, res) => {
   const userId = req.query.userId || DEFAULT_USER_ID;
-  const existing = userSessions.get(userId);
-  if (!existing) {
-    initClientForUser(userId);
-  }
+  // NEVER auto-start a browser here — only return what's already in memory
   const state = getSessionState(userId);
   if (state.ready) {
     return res.json({ linked: true, phone: state.phone, name: state.name });
@@ -276,8 +270,19 @@ app.post('/api/send-message', async (req, res) => {
   }
 });
 
-// Concurrency lock for browser launches
+// Concurrency lock — only ONE Chromium browser launches at a time
 let isBrowserLaunching = false;
+const browserLaunchQueue = [];
+
+async function waitForBrowserSlot() {
+  if (!isBrowserLaunching) return;
+  return new Promise((resolve) => browserLaunchQueue.push(resolve));
+}
+function releaseBrowserSlot() {
+  isBrowserLaunching = false;
+  const next = browserLaunchQueue.shift();
+  if (next) next();
+}
 
 // ── Multi-Session Initializer ──
 function initClientForUser(userId) {
