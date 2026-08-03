@@ -43,7 +43,7 @@
   --color-info: var(--info);
 }
 
-/* Dark mode is the DEFAULT for Mr. Cisco */
+/* Dark mode is the DEFAULT for Campus Connect */
 :root {
   --radius: 0.875rem;
 
@@ -57,7 +57,7 @@
   --popover: oklch(0.205 0.025 290);
   --popover-foreground: oklch(0.96 0.01 290);
 
-  /* Brand: rich violet matching the Mr. Cisco logo */
+  /* Brand: rich violet & indigo matching Campus Connect */
   --primary: oklch(0.66 0.21 320);
   --primary-foreground: oklch(0.99 0 0);
   --primary-glow: oklch(0.78 0.18 310);
