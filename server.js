@@ -166,7 +166,15 @@ app.post('/api/request-pairing-code', async (req, res) => {
   const cleanPhone = phoneNumber.replace(/\D/g, '');
   console.log(`📱 Requesting pairing code for user ${uid}, phone: ${cleanPhone}`);
   try {
-    const session = await initClientForUser(uid);
+    const session = initClientForUser(uid);
+    let retries = 0;
+    while ((!session.client.pupPage || session.client.pupPage.isClosed()) && retries < 40) {
+      await new Promise((r) => setTimeout(r, 500));
+      retries++;
+    }
+    if (!session.client.pupPage) {
+      throw new Error('Browser loading... Please tap Get Code again in 5 seconds.');
+    }
     const code = await session.client.requestPairingCode(cleanPhone);
     session.state.pairingCode = code;
     res.json({ ok: true, pairingCode: code });
