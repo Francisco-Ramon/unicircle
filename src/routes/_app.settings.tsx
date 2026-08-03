@@ -772,10 +772,19 @@ function SettingsPage() {
 
   // ── Handlers ──
   async function handleWaUnlink() {
-    if (!confirm("Unlink WhatsApp?")) return;
-    const { data: { session } } = await supabase.auth.getSession(); if (!session) return;
-    await supabase.from("whatsapp_connections").update({ status: "unlinked" }).eq("user_id", session.user.id).eq("status", "active");
-    toast.success("WhatsApp unlinked."); refreshWa();
+    if (!confirm("Unlink current WhatsApp account and wipe session?")) return;
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser(); if (!u) return;
+      await supabase.from("whatsapp_connections").update({ status: "unlinked" }).eq("user_id", u.id).eq("status", "active");
+      await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/reset-session", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: u.id })
+      });
+      toast.success("WhatsApp session wiped. You can now link your new WhatsApp number!");
+      setWaStatus({ linked: false, connection: null, pendingQr: null, pairingCode: null });
+      setPairingCode(null);
+      setTimeout(() => refreshWa(), 2000);
+    } catch (e: any) { toast.error(e.message); }
   }
   async function handleRequestPairing() {
     if (!waPhone.trim()) { toast.error("Enter phone number"); return; }
