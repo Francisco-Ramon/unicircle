@@ -166,6 +166,19 @@ app.post('/api/request-pairing-code', async (req, res) => {
   const cleanPhone = phoneNumber.replace(/\D/g, '');
   console.log(`📱 Requesting pairing code for user ${uid}, phone: ${cleanPhone}`);
   try {
+    // Always wipe old auth so we get a fresh session, not an auto-login to the old number
+    const existingSession = userSessions.get(uid);
+    if (existingSession) {
+      try { await existingSession.client.destroy(); } catch {}
+      userSessions.delete(uid);
+    }
+    const userAuthDir = path.join(SESSION_DIR, `session-${uid}`);
+    if (fs.existsSync(userAuthDir)) {
+      fs.rmSync(userAuthDir, { recursive: true, force: true });
+      console.log(`🗑️ Wiped auth for ${uid} before pairing`);
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+
     const session = initClientForUser(uid);
 
     // Wait up to 90 seconds for WhatsApp Web to fully load (QR generated = page ready)
