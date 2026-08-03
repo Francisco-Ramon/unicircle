@@ -168,14 +168,26 @@ app.post('/api/request-pairing-code', async (req, res) => {
   try {
     const session = initClientForUser(uid);
     let retries = 0;
-    while ((!session.client.pupPage || session.client.pupPage.isClosed()) && retries < 40) {
+    while ((!session.client.pupPage || session.client.pupPage.isClosed() || (!session.state.pendingQr && !session.state.ready)) && retries < 40) {
       await new Promise((r) => setTimeout(r, 500));
       retries++;
     }
-    if (!session.client.pupPage) {
-      throw new Error('Browser loading... Please tap Get Code again in 5 seconds.');
+
+    let code = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        code = await session.client.requestPairingCode(cleanPhone);
+        if (code) break;
+      } catch (err) {
+        console.warn(`Attempt ${attempt} for pairing code failed:`, err.message);
+        await new Promise((r) => setTimeout(r, 2000));
+      }
     }
-    const code = await session.client.requestPairingCode(cleanPhone);
+
+    if (!code) {
+      throw new Error('Could not generate pairing code. Please tap Get Code again in 3 seconds.');
+    }
+
     session.state.pairingCode = code;
     res.json({ ok: true, pairingCode: code });
   } catch (e) {
