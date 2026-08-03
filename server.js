@@ -377,7 +377,7 @@ function initClientForUser(userId) {
 
   const processedMsgIds = new Set();
 
-  client.on('message', async (msg) => {
+  client.on('message_create', async (msg) => {
     if (msg.fromMe || msg.isGroup) return;
     if (processedMsgIds.has(msg.id?.id)) return;
     processedMsgIds.add(msg.id?.id);
@@ -446,8 +446,6 @@ function initClientForUser(userId) {
       });
       await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId);
 
-      const delay = 5000 + Math.floor(Math.random() * 6000);
-      await new Promise((r) => setTimeout(r, delay));
       await msg.reply(finalReply);
       console.log(`📨 [User ${userId}] Replied to ${fromPhone}: ${finalReply}`);
     } catch (err) {
