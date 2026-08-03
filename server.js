@@ -254,12 +254,13 @@ function initClientForUser(userId) {
     authStrategy: new LocalAuth({ clientId: userId, dataPath: SESSION_DIR }),
     takeoverOnConflict: true,
     authTimeoutMs: 120000,
-    qrMaxRetries: 10,
+    qrMaxRetries: 0,
     puppeteer: {
       headless: true,
       executablePath: browserPath || undefined,
       protocolTimeout: 120000,
       bypassCSP: true,
+      defaultViewport: { width: 1280, height: 800 },
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
