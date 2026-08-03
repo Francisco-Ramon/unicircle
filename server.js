@@ -168,7 +168,7 @@ app.post('/api/request-pairing-code', async (req, res) => {
   try {
     const session = initClientForUser(uid);
     let retries = 0;
-    while ((!session.client.pupPage || session.client.pupPage.isClosed() || (!session.state.pendingQr && !session.state.ready)) && retries < 40) {
+    while ((!session.client.pupPage || session.client.pupPage.isClosed()) && retries < 40) {
       await new Promise((r) => setTimeout(r, 500));
       retries++;
     }
