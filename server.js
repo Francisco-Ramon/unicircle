@@ -237,6 +237,9 @@ app.post('/api/send-message', async (req, res) => {
   }
 });
 
+// Concurrency lock for browser launches
+let isBrowserLaunching = false;
+
 // ── Multi-Session Initializer ──
 function initClientForUser(userId) {
   if (!userId) return null;
@@ -482,9 +485,6 @@ async function getAIResponse(messagesInput, systemPrompt) {
   }
   return null;
 }
-
-// Boot default user session on startup
-initClientForUser(DEFAULT_USER_ID);
 
 // Start Express Server
 app.listen(API_PORT, '0.0.0.0', () => {
