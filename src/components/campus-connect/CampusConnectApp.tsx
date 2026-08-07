@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Sparkles, Heart, MessageCircle, Calendar, ShieldAlert, User, Crown, SlidersHorizontal, Lock, CheckCircle2, Flame, GraduationCap, Building2, Globe, Menu, X, ArrowRight } from "lucide-react";
-import { BrandNamesModal } from "./BrandNamesModal";
+import {
+  Home, Search, Users, MessageSquare, Calendar, User, ShieldCheck,
+  Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles
+} from "lucide-react";
 import { RegistrationWizard, StudentProfileData } from "./RegistrationWizard";
 import { LiveFaceVerification } from "./LiveFaceVerification";
 import { DiscoverDeck, StudentProfile } from "./DiscoverDeck";
@@ -10,102 +12,19 @@ import { RealTimeChatSuite } from "./RealTimeChatSuite";
 import { CampusEventsHub } from "./CampusEventsHub";
 import { CommunityHub } from "./CommunityHub";
 import { UserProfileStudio } from "./UserProfileStudio";
-import { SafetyPrivacyCenter } from "./SafetyPrivacyCenter";
-import { ExecutiveAdminConsole } from "./ExecutiveAdminConsole";
-import { CampusVipStudio } from "./CampusVipStudio";
-import { INSTITUTIONS_DATA } from "./UniversityDatabase";
-
-// Initial Mock Verified Student Profiles across institutions
-const MOCK_PROFILES: StudentProfile[] = [
-  {
-    id: "1",
-    name: "Sarah Jenkins",
-    age: 21,
-    gender: "Female",
-    campus: "Stanford University",
-    course: "Computer Science & AI",
-    yearOfStudy: "3rd Year (Junior)",
-    distanceKm: 2,
-    compatibilityScore: 97,
-    verified: true,
-    online: true,
-    intentMode: "Dating",
-    photos: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
-    ],
-    bio: "AI researcher building generative models. Big fan of late-night espresso, indie rock concerts, and weekend bouldering!",
-    interests: ["AI & Coding", "Indie Rock", "Gym & Fitness", "Coffee & Cafes"],
-    prompts: [
-      { question: "My ideal Sunday on campus...", answer: "Coffee at student union, 2 hours of coding, then acoustic guitar on the oval lawn!" },
-    ],
-    height: "168 cm",
-    lifestyle: { smoking: "Non-smoker", drinking: "Socially" },
-  },
-  {
-    id: "2",
-    name: "Amani Wanjiru",
-    age: 21,
-    gender: "Female",
-    campus: "University of Nairobi",
-    course: "Medicine & Surgery",
-    yearOfStudy: "4th Year",
-    distanceKm: 5,
-    compatibilityScore: 96,
-    verified: true,
-    online: true,
-    intentMode: "Dating",
-    photos: [
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
-    ],
-    bio: "Med student at UoN Chiromo campus! Passionate about public health, debate, and exploring Nairobi cafes on weekends.",
-    interests: ["Medicine", "Debating", "Coffee & Cafes", "Volunteering"],
-    prompts: [
-      { question: "Key to my heart...", answer: "Good conversation over Kenya AA coffee." },
-    ],
-    height: "170 cm",
-    lifestyle: { smoking: "Non-smoker", drinking: "Socially" },
-  },
-  {
-    id: "3",
-    name: "Stacy Muthoni",
-    age: 20,
-    gender: "Female",
-    campus: "Jomo Kenyatta University of Agriculture and Technology",
-    course: "Mechatronics Engineering",
-    yearOfStudy: "3rd Year",
-    distanceKm: 8,
-    compatibilityScore: 93,
-    verified: true,
-    online: true,
-    intentMode: "Dating",
-    photos: [
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=800&auto=format&fit=crop&q=80",
-    ],
-    bio: "Building autonomous robotics at JKUAT Juja! Looking for fellow tech geeks and weekend road trip buddies.",
-    interests: ["Mechatronics", "Hackathons", "Travel & Backpacking", "Sci-Fi Movies"],
-    prompts: [
-      { question: "Fun fact about me...", answer: "I built my own drone controller in sophomore year!" },
-    ],
-    height: "166 cm",
-    lifestyle: { smoking: "Non-smoker", drinking: "Never" },
-  },
-];
-
+import { NotificationsScreen } from "./NotificationsScreen";
+import { SettingsScreen, AccentTheme, ThemeMode } from "./SettingsScreen";
+import { StudentHomeScreen } from "./StudentHomeScreen";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 
-export const CampusConnectApp: React.FC = () => {
-  // Brand selection state
-  const [brandName, setBrandName] = useState("UniCircle");
-  const [showBrandModal, setShowBrandModal] = useState(false);
 
+export const CampusConnectApp: React.FC = () => {
   // User Session & Registration State
   const [isRegistered, setIsRegistered] = useState(true);
   const [isBiometricVerified, setIsBiometricVerified] = useState(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
+
+  // User Profile
   const [userProfile, setUserProfile] = useState<StudentProfileData>({
     email: "student@uonbi.ac.ke",
     firstName: "Alex",
@@ -131,13 +50,20 @@ export const CampusConnectApp: React.FC = () => {
     verified: true,
   });
 
-  // Active Navigation Tab
-  const [activeTab, setActiveTab] = useState<"discover" | "communities" | "chat" | "events" | "profile" | "safety" | "admin" | "vip">("discover");
+  // Active Screen State
+  const [activeTab, setActiveTab] = useState<"home" | "discover" | "communities" | "events" | "chat" | "notifications" | "profile" | "settings">("home");
   const [intentMode, setIntentMode] = useState<string>("Dating");
   const [discoveryRadius, setDiscoveryRadius] = useState<"MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL">("NATIONWIDE");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
-  // Match State with 20 Student Profiles
+  // User Profile Avatar "More" Dropdown State
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+  // Theme & Personalization State
+  const [accentTheme, setAccentTheme] = useState<AccentTheme>("blue");
+  const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
+
+  // Connections State
   const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
   const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(TWENTY_STUDENT_PROFILES[0]);
   const [celebratedMatch, setCelebratedMatch] = useState<StudentProfile | null>(null);
@@ -150,7 +76,6 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   const handleSwipePass = (profile: StudentProfile) => {};
-
   const handleSwipeSuperLike = (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
@@ -160,40 +85,35 @@ export const CampusConnectApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#070A10] text-slate-100 font-sans flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Global Header */}
-      <header className="sticky top-0 z-40 bg-[#0B0F17]/90 border-b border-white/10 backdrop-blur-xl px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo & Brand Modal Switcher */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-600/30">
-              <Building2 className="w-5 h-5 fill-white" />
-            </div>
+      {/* 1. SLIM & LIGHTWEIGHT TOP HEADER */}
+      <header className="sticky top-0 z-40 bg-[#0B0F17]/90 border-b border-white/10 backdrop-blur-xl px-4 py-2.5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          {/* Brand Logo */}
+          <div
+            onClick={() => setActiveTab("home")}
+            className="flex items-center gap-2.5 cursor-pointer group"
+          >
+            <img
+              src="/unicircle-logo.png"
+              alt="UniCircle Logo"
+              className="w-8 h-8 object-contain filter drop-shadow-[0_0_8px_rgba(99,102,241,0.4)] group-hover:scale-105 transition-transform"
+            />
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-black tracking-tight text-white">{brandName}</h1>
-                <button
-                  onClick={() => setShowBrandModal(true)}
-                  className="px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold hover:bg-indigo-500/30 transition flex items-center gap-1"
-                >
-                  <Globe className="w-3 h-3 text-pink-400" /> Multi-Uni
-                </button>
-              </div>
-              <p className="text-[10px] text-slate-400 tracking-wider">National & International Verified Campus Ecosystem</p>
+              <h1 className="text-base font-black tracking-tight text-white flex items-center gap-0.5">
+                Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Circle</span>
+              </h1>
+              <p className="text-[9px] text-slate-400 font-medium">Verified Campus Network</p>
             </div>
           </div>
 
-          {/* Desktop Nav */}
+          {/* Desktop Navigation Icons Bar */}
           {isRegistered && (
-            <nav className="hidden lg:flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-2xl border border-white/10">
+            <nav className="hidden md:flex items-center gap-1 bg-slate-900/80 px-2 py-1 rounded-2xl border border-white/10">
               {[
-                { id: "discover", label: "Discover", icon: Heart },
-                { id: "communities", label: "Communities", icon: Building2 },
-                { id: "chat", label: `Chat (${matches.length})`, icon: MessageCircle },
-                { id: "events", label: "Events", icon: Calendar },
-                { id: "profile", label: "Profile", icon: User },
-                { id: "safety", label: "Safety", icon: ShieldAlert },
-                { id: "vip", label: "VIP Boost", icon: Crown },
-                { id: "admin", label: "Admin Console", icon: Lock },
+                { id: "home", label: "Home", icon: Home },
+                { id: "discover", label: "Discover", icon: Search },
+                { id: "communities", label: "Communities", icon: Users },
+                { id: "chat", label: `Chats (${matches.length})`, icon: MessageSquare },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -215,33 +135,96 @@ export const CampusConnectApp: React.FC = () => {
             </nav>
           )}
 
-          {/* Right Status & Permanent Gender Lock Badge */}
+          {/* Right Area: Notifications Bell + Profile Avatar Dropdown */}
           <div className="flex items-center gap-2">
+            {/* Notifications Bell */}
             <button
-              onClick={() => setIsRegistered(false)}
-              className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-bold transition flex items-center gap-1"
+              onClick={() => setActiveTab("notifications")}
+              className={`relative p-2 rounded-xl border transition ${
+                activeTab === "notifications"
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-slate-900/80 border-white/10 text-slate-300 hover:bg-white/10"
+              }`}
+              title="Notifications"
             >
-              <User className="w-3.5 h-3.5" /> Register New Account
+              <Bell className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-pink-500 border-2 border-slate-950" />
             </button>
 
-            {isBiometricVerified ? (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-                <CheckCircle2 className="w-3.5 h-3.5" /> {userProfile.gender} <span className="text-[10px] text-amber-400 font-mono">(Gender Locked 🔒)</span>
-              </span>
-            ) : (
+            {/* Profile Avatar "More" Menu Dropdown */}
+            <div className="relative">
               <button
-                onClick={() => setShowVerificationStudio(true)}
-                className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition"
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 p-1 rounded-xl bg-slate-900/80 border border-white/10 hover:border-white/20 transition"
               >
-                Verify Face Liveness
+                <img
+                  src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                  alt="User"
+                  className="w-7 h-7 rounded-lg object-cover"
+                />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 pr-1" />
               </button>
-            )}
+
+              {/* User Dropdown Menu */}
+              {showUserDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                  <div className="px-3 py-2 border-b border-white/10">
+                    <p className="text-xs font-bold text-white truncate">{userProfile.firstName} {userProfile.lastName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{userProfile.campus}</p>
+                  </div>
+
+                  <button
+                    onClick={() => { setActiveTab("profile"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <User className="w-4 h-4 text-indigo-400" /> My Profile
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab("settings"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab("settings"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <Palette className="w-4 h-4 text-pink-400" /> Personalize Theme
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab("communities"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <Users className="w-4 h-4 text-emerald-400" /> Communities
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab("events"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <Calendar className="w-4 h-4 text-amber-400" /> Events
+                  </button>
+
+                  <div className="pt-1 border-t border-white/10">
+                    <button
+                      onClick={() => setIsRegistered(false)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
+                    >
+                      <LogOut className="w-4 h-4" /> Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content Pane */}
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+      {/* 2. MAIN SINGLE-TASK SCREEN */}
+      <main className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full">
         {!isRegistered ? (
           <RegistrationWizard
             onComplete={(profile) => {
@@ -255,7 +238,7 @@ export const CampusConnectApp: React.FC = () => {
             onVerified={() => {
               setIsBiometricVerified(true);
               setShowVerificationStudio(false);
-              setActiveTab("discover");
+              setActiveTab("home");
             }}
             onSkipDemo={() => {
               setIsBiometricVerified(true);
@@ -264,6 +247,15 @@ export const CampusConnectApp: React.FC = () => {
           />
         ) : (
           <>
+            {activeTab === "home" && (
+              <StudentHomeScreen
+                userProfile={userProfile}
+                onNavigateToDiscover={() => setActiveTab("discover")}
+                onNavigateToEvents={() => setActiveTab("events")}
+                onNavigateToCommunity={() => setActiveTab("communities")}
+              />
+            )}
+
             {activeTab === "discover" && (
               <DiscoverDeck
                 currentProfile={userProfile}
@@ -276,7 +268,9 @@ export const CampusConnectApp: React.FC = () => {
               />
             )}
 
-            {activeTab === "communities" && <CommunityHub />}
+            {activeTab === "communities" && <CommunityHub userProfile={userProfile} />}
+
+            {activeTab === "events" && <CampusEventsHub />}
 
             {activeTab === "chat" && (
               <RealTimeChatSuite
@@ -286,35 +280,40 @@ export const CampusConnectApp: React.FC = () => {
               />
             )}
 
-            {activeTab === "events" && <CampusEventsHub />}
+            {activeTab === "notifications" && <NotificationsScreen />}
 
             {activeTab === "profile" && (
               <UserProfileStudio
                 profile={userProfile}
                 onUpdateProfile={(up) => setUserProfile(up)}
                 onLaunchLivenessScan={() => setShowVerificationStudio(true)}
+                onNavigateToSettings={() => setActiveTab("settings")}
               />
             )}
 
-            {activeTab === "safety" && <SafetyPrivacyCenter />}
-
-            {activeTab === "admin" && <ExecutiveAdminConsole />}
-
-            {activeTab === "vip" && <CampusVipStudio />}
+            {activeTab === "settings" && (
+              <SettingsScreen
+                userProfile={userProfile}
+                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                accentTheme={accentTheme}
+                onSelectAccentTheme={(acc) => setAccentTheme(acc)}
+                themeMode={themeMode}
+                onSelectThemeMode={(mode) => setThemeMode(mode)}
+              />
+            )}
           </>
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Bar */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR (5 Core Items) */}
       {isRegistered && (
-        <div className="lg:hidden sticky bottom-0 z-40 bg-[#0B0F17]/95 border-t border-white/10 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
+        <div className="md:hidden sticky bottom-0 z-40 bg-[#0B0F17]/95 border-t border-white/10 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
           {[
-            { id: "discover", label: "Discover", icon: Heart },
-            { id: "communities", label: "Hubs", icon: Building2 },
-            { id: "chat", label: "Chat", icon: MessageCircle },
-            { id: "events", label: "Events", icon: Calendar },
+            { id: "home", label: "Home", icon: Home },
+            { id: "discover", label: "Discover", icon: Search },
+            { id: "chat", label: "Chats", icon: MessageSquare },
+            { id: "notifications", label: "Alerts", icon: Bell },
             { id: "profile", label: "Profile", icon: User },
-            { id: "safety", label: "Safety", icon: ShieldAlert },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -323,7 +322,7 @@ export const CampusConnectApp: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition ${
-                  isActive ? "text-indigo-400" : "text-slate-500 hover:text-slate-300"
+                  isActive ? "text-indigo-400 font-extrabold" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? "text-indigo-400" : ""}`} />
@@ -335,16 +334,6 @@ export const CampusConnectApp: React.FC = () => {
       )}
 
       {/* Modals */}
-      <BrandNamesModal
-        isOpen={showBrandModal}
-        onClose={() => setShowBrandModal(false)}
-        onSelectName={(name) => {
-          setBrandName(name);
-          setShowBrandModal(false);
-        }}
-        selectedName={brandName}
-      />
-
       <FilterDrawer
         isOpen={showFilterDrawer}
         onClose={() => setShowFilterDrawer(false)}

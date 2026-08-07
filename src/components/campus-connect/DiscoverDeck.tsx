@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { Heart, X, Star, Bookmark, Flag, ShieldCheck, MapPin, GraduationCap, Sparkles, ChevronLeft, ChevronRight, Info, CheckCircle2, SlidersHorizontal, Eye } from "lucide-react";
+import {
+  Heart, X, ShieldCheck, MapPin, GraduationCap,
+  SlidersHorizontal, UserPlus, BookOpen, Briefcase,
+  Bookmark, Flag, Ban, ChevronDown
+} from "lucide-react";
 
 export interface StudentProfile {
   id: string;
@@ -8,6 +12,7 @@ export interface StudentProfile {
   gender: "Male" | "Female" | "Non-binary";
   orientation?: "Straight" | "Gay" | "Lesbian" | "Bisexual";
   campus: string;
+  country?: string;
   course: string;
   yearOfStudy: string;
   distanceKm: number;
@@ -42,297 +47,237 @@ export const DiscoverDeck: React.FC<Props> = ({
   onOpenFilters,
   intentMode,
 }) => {
-  // 100% STRICT BI-DIRECTIONAL & ORIENTATION RECOMMENDATION ALGORITHM
-  const filteredProfiles = profiles.filter((p) => {
-    if (!currentProfile?.gender) return false;
+  const [selectedProfile, setSelectedProfile] = useState<StudentProfile | null>(null);
+  const [savedProfiles, setSavedProfiles] = useState<Set<string>>(new Set());
 
-    const userGender = currentProfile.gender;
-    const userOrientation = currentProfile.orientation || (currentProfile.interestedIn === "Male" ? "Straight" : "Straight");
-
-    // 1. STRAIGHT FEMALE: Automatically brings Males
-    if (userGender === "Female" && (userOrientation === "Straight" || currentProfile.interestedIn === "Male")) {
-      if (p.gender !== "Male") return false;
-      if (p.orientation === "Gay") return false; // Exclude Gay Males
-    }
-
-    // 2. STRAIGHT MALE: Automatically brings Females
-    if (userGender === "Male" && (userOrientation === "Straight" || currentProfile.interestedIn === "Female")) {
-      if (p.gender !== "Female") return false;
-      if (p.orientation === "Lesbian") return false; // Exclude Lesbian Females
-    }
-
-    // 3. GAY MALE: Only Gay or Bisexual Males brought
-    if (userGender === "Male" && userOrientation === "Gay") {
-      if (p.gender !== "Male") return false;
-      if (p.orientation !== "Gay" && p.orientation !== "Bisexual") return false;
-    }
-
-    // 4. LESBIAN FEMALE: Only Lesbian or Bisexual Females brought
-    if (userGender === "Female" && userOrientation === "Lesbian") {
-      if (p.gender !== "Female") return false;
-      if (p.orientation !== "Lesbian" && p.orientation !== "Bisexual") return false;
-    }
-
-    return true;
-  });
-
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const [showDetailDrawer, setShowDetailDrawer] = useState(false);
-  const [swipeAnimation, setSwipeAnimation] = useState<"like" | "pass" | "superlike" | null>(null);
-
-  const activeCard = filteredProfiles[currentIndex];
-
-  const handleNextPhoto = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (activeCard && photoIndex < activeCard.photos.length - 1) {
-      setPhotoIndex(photoIndex + 1);
-    }
+  const toggleSave = (id: string) => {
+    setSavedProfiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
-
-  const handlePrevPhoto = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (photoIndex > 0) {
-      setPhotoIndex(photoIndex - 1);
-    }
-  };
-
-  const triggerSwipe = (action: "like" | "pass" | "superlike") => {
-    if (!activeCard) return;
-    setSwipeAnimation(action);
-    setTimeout(() => {
-      if (action === "like") onSwipeLike(activeCard);
-      if (action === "pass") onSwipePass(activeCard);
-      if (action === "superlike") onSwipeSuperLike(activeCard);
-
-      setSwipeAnimation(null);
-      setPhotoIndex(0);
-      setShowDetailDrawer(false);
-      setCurrentIndex((prev) => prev + 1);
-    }, 300);
-  };
-
-  if (!activeCard || currentIndex >= filteredProfiles.length) {
-    return (
-      <div className="w-full max-w-md mx-auto p-8 text-center bg-slate-900/80 border border-white/10 rounded-3xl backdrop-blur-xl flex flex-col items-center justify-center min-h-[500px]">
-        <div className="w-20 h-20 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4">
-          <Sparkles className="w-10 h-10 animate-spin" />
-        </div>
-        <h3 className="text-2xl font-bold text-white">That's everyone matching your profile!</h3>
-        <p className="text-xs text-slate-400 mt-2 max-w-xs">
-          Reviewed all verified student profiles matching your strict orientation algorithm settings.
-        </p>
-        <button
-          onClick={onOpenFilters}
-          className="mt-6 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2"
-        >
-          <SlidersHorizontal className="w-4 h-4" /> Expand Discovery Settings
-        </button>
-      </div>
-    );
-  }
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col items-center">
-      {/* Intent Banner */}
-      <div className="w-full flex items-center justify-between px-4 mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Mode:</span>
-          <span className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
-            {intentMode}
-          </span>
+    <div className="w-full max-w-4xl mx-auto space-y-6 py-2">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Discover</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Meet verified students near you</p>
         </div>
+
         <button
           onClick={onOpenFilters}
-          className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 transition text-xs flex items-center gap-1.5"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/90 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition"
         >
-          <SlidersHorizontal className="w-4 h-4" /> Filters
+          <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+          Filters
         </button>
       </div>
 
-      {/* Main Swipe Card */}
-      <div
-        className={`w-full aspect-[3/4] relative rounded-3xl overflow-hidden shadow-2xl border border-white/15 bg-slate-950 transition-all duration-300 ${
-          swipeAnimation === "like"
-            ? "translate-x-32 rotate-12 opacity-0"
-            : swipeAnimation === "pass"
-            ? "-translate-x-32 -rotate-12 opacity-0"
-            : swipeAnimation === "superlike"
-            ? "-translate-y-32 scale-90 opacity-0"
-            : ""
-        }`}
-      >
-        {/* Photo Image */}
-        <img
-          src={activeCard.photos[photoIndex]}
-          alt={activeCard.name}
-          className="w-full h-full object-cover select-none"
-        />
-
-        {/* Photo Navigation Touch Areas */}
-        <div className="absolute inset-y-0 left-0 w-1/3 z-10 cursor-pointer" onClick={handlePrevPhoto} />
-        <div className="absolute inset-y-0 right-0 w-1/3 z-10 cursor-pointer" onClick={handleNextPhoto} />
-
-        {/* Top Indicators */}
-        <div className="absolute top-3 inset-x-3 z-20 flex flex-col gap-2">
-          {/* Photo Pagination Dots */}
-          <div className="flex gap-1.5">
-            {activeCard.photos.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1 rounded-full flex-1 transition-all duration-200 ${
-                  idx === photoIndex ? "bg-white shadow" : "bg-white/30"
-                }`}
+      {/* Student Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+        {profiles.map((student) => (
+          <div
+            key={student.id}
+            onClick={() => setSelectedProfile(student)}
+            className="bg-slate-900/90 border border-white/[0.06] rounded-2xl overflow-hidden cursor-pointer group hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-600/5 transition-all duration-200"
+          >
+            {/* Photo */}
+            <div className="relative aspect-[3/4] overflow-hidden">
+              <img
+                src={student.photos[0]}
+                alt={student.name}
+                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
-            ))}
-          </div>
 
-          <div className="flex items-center justify-between">
-            {/* Verified Student Badge */}
-            {activeCard.verified && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[11px] font-bold backdrop-blur-md">
-                <ShieldCheck className="w-3.5 h-3.5" /> Verified Student
-              </span>
-            )}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
 
-            {/* Compatibility Score */}
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> {activeCard.compatibilityScore}% Match
-            </span>
-          </div>
-        </div>
+              {/* Badges */}
+              {student.verified && (
+                <div className="absolute top-2.5 left-2.5 p-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                </div>
+              )}
 
-        {/* Bottom Card Gradient & Quick Info */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-6 z-20 pointer-events-auto">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-3xl font-extrabold text-white tracking-tight">{activeCard.name}</h2>
-                <span className="text-2xl font-light text-slate-300">{activeCard.age}</span>
-              </div>
+              {student.online && (
+                <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-950 shadow-sm" />
+              )}
 
-              <div className="flex items-center gap-2 text-slate-300 text-xs mt-1">
-                <GraduationCap className="w-4 h-4 text-indigo-400" />
-                <span>{activeCard.course} • {activeCard.yearOfStudy}</span>
-              </div>
-
-              <div className="flex items-center gap-2 text-slate-400 text-xs mt-1">
-                <MapPin className="w-4 h-4 text-pink-400" />
-                <span>{activeCard.campus} (~{activeCard.distanceKm} km away)</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowDetailDrawer(true)}
-              className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition border border-white/20 shadow-lg"
-            >
-              <Info className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Quick Interest & Lifestyle Pills */}
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            <span className="px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[11px] font-bold border border-pink-500/30">
-              🚬 {activeCard.lifestyle.smoking}
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold border border-indigo-500/30">
-              🍸 {activeCard.lifestyle.drinking}
-            </span>
-            {activeCard.interests.slice(0, 2).map((tag) => (
-              <span key={tag} className="px-2.5 py-0.5 rounded-full bg-white/10 text-white text-[11px] font-medium backdrop-blur-md">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Action Buttons Deck */}
-      <div className="flex items-center justify-center gap-4 mt-6 z-20">
-        <button
-          onClick={() => triggerSwipe("pass")}
-          className="w-14 h-14 rounded-full bg-slate-900 border border-red-500/40 text-red-400 hover:bg-red-500/10 hover:scale-110 transition duration-200 flex items-center justify-center shadow-lg"
-        >
-          <X className="w-7 h-7" />
-        </button>
-
-        <button
-          onClick={() => triggerSwipe("superlike")}
-          className="w-12 h-12 rounded-full bg-slate-900 border border-amber-400/40 text-amber-400 hover:bg-amber-400/10 hover:scale-110 transition duration-200 flex items-center justify-center shadow-lg"
-        >
-          <Star className="w-6 h-6" />
-        </button>
-
-        <button
-          onClick={() => triggerSwipe("like")}
-          className="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-600 to-indigo-600 text-white hover:scale-110 transition duration-200 flex items-center justify-center shadow-xl shadow-pink-600/30"
-        >
-          <Heart className="w-8 h-8 fill-white" />
-        </button>
-      </div>
-
-      {/* Detailed Drawer Modal */}
-      {showDetailDrawer && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center p-0 sm:p-4 animate-in fade-in">
-          <div className="bg-[#0F172A] border-t sm:border border-white/15 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-white/10">
-              <div>
-                <h3 className="text-2xl font-bold text-white">{activeCard.name}, {activeCard.age}</h3>
-                <p className="text-xs text-indigo-400">{activeCard.campus} • {activeCard.course}</p>
-              </div>
+              {/* Save button */}
               <button
-                onClick={() => setShowDetailDrawer(false)}
-                className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold"
+                onClick={(e) => { e.stopPropagation(); toggleSave(student.id); }}
+                className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ right: student.online ? "28px" : "10px" }}
               >
-                Close
+                <Bookmark className={`w-3.5 h-3.5 ${savedProfiles.has(student.id) ? "fill-indigo-400 text-indigo-400" : "text-white"}`} />
               </button>
+
+              {/* Name overlay */}
+              <div className="absolute bottom-0 inset-x-0 p-3">
+                <h3 className="text-sm font-bold text-white leading-tight">{student.name}, {student.age}</h3>
+                <p className="text-[11px] text-indigo-300 font-medium truncate mt-0.5">{student.course}</p>
+              </div>
             </div>
 
-            {/* Bio */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Biography</h4>
-              <p className="text-sm text-slate-200 leading-relaxed bg-slate-950 p-4 rounded-2xl border border-white/5 italic">
-                "{activeCard.bio}"
+            {/* Card Footer */}
+            <div className="p-3 space-y-1.5">
+              <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                <GraduationCap className="w-3 h-3 text-slate-500 shrink-0" />
+                {student.campus}
               </p>
+              <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-slate-600 shrink-0" />
+                {student.country || "Kenya"} • {student.yearOfStudy}
+              </p>
+
+              {/* Mutual interests */}
+              {student.interests.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {student.interests.slice(0, 2).map((interest) => (
+                    <span key={interest} className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 text-[10px] font-medium">
+                      {interest}
+                    </span>
+                  ))}
+                  {student.interests.length > 2 && (
+                    <span className="text-[10px] text-slate-500 font-medium">+{student.interests.length - 2}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Profile Detail Modal */}
+      {selectedProfile && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative text-white">
+            {/* Close */}
+            <button
+              onClick={() => setSelectedProfile(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/40 backdrop-blur-sm hover:bg-white/10 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Hero Photo */}
+            <div className="relative aspect-[4/3] overflow-hidden rounded-t-3xl">
+              <img
+                src={selectedProfile.photos[0]}
+                alt={selectedProfile.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
             </div>
 
-            {/* Detailed Lifestyle Pills */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Lifestyle Specs</h4>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-400 block">Smoking:</span>
-                  <strong className="text-white">{activeCard.lifestyle.smoking}</strong>
+            <div className="p-6 space-y-5 -mt-10 relative">
+              {/* Name & Basics */}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-black">{selectedProfile.name}, {selectedProfile.age}</h2>
+                  {selectedProfile.verified && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                      <ShieldCheck className="w-3 h-3" /> Verified
+                    </span>
+                  )}
+                  {selectedProfile.online && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" /> Online
+                    </span>
+                  )}
                 </div>
-                <div className="p-3 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-400 block">Drinking:</span>
-                  <strong className="text-white">{activeCard.lifestyle.drinking}</strong>
-                </div>
-                <div className="p-3 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-400 block">Pets:</span>
-                  <strong className="text-white">{activeCard.lifestyle.pets || "Animal friendly"}</strong>
-                </div>
-                <div className="p-3 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-400 block">Height:</span>
-                  <strong className="text-white">{activeCard.height}</strong>
+
+                <p className="text-sm text-indigo-300 font-semibold mt-1">{selectedProfile.course} • {selectedProfile.yearOfStudy}</p>
+                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3 h-3" /> {selectedProfile.campus}, {selectedProfile.country || "Kenya"}
+                </p>
+              </div>
+
+              {/* Bio */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">About</h4>
+                <p className="text-sm text-slate-200 leading-relaxed">{selectedProfile.bio}</p>
+              </div>
+
+              {/* Interests */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Interests</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProfile.interests.map((interest) => (
+                    <span key={interest} className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
+                      {interest}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Bottom Actions */}
-            <div className="flex items-center gap-3 pt-4 border-t border-white/10">
-              <button
-                onClick={() => triggerSwipe("pass")}
-                className="flex-1 py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold text-xs border border-red-500/30"
-              >
-                Pass
-              </button>
-              <button
-                onClick={() => triggerSwipe("like")}
-                className="flex-1 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30"
-              >
-                Like Profile ❤️
-              </button>
+              {/* Lifestyle */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Lifestyle</h4>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                  <span className="px-3 py-1 rounded-full bg-white/5">{selectedProfile.height}</span>
+                  <span className="px-3 py-1 rounded-full bg-white/5">{selectedProfile.lifestyle.smoking}</span>
+                  <span className="px-3 py-1 rounded-full bg-white/5">{selectedProfile.lifestyle.drinking}</span>
+                </div>
+              </div>
+
+              {/* Connection Notice */}
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5 text-center">
+                <p className="text-[11px] text-slate-400 font-medium">
+                  🔒 Messaging becomes available once your connection request is accepted.
+                </p>
+              </div>
+
+              {/* Connection Actions */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
+                  className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5" /> Friend Request
+                </button>
+
+                <button
+                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
+                  className="py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <Heart className="w-3.5 h-3.5 fill-white" /> Relationship Interest
+                </button>
+
+                <button
+                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
+                  className="py-3 rounded-xl bg-white/5 hover:bg-blue-600/20 border border-white/10 text-slate-300 hover:text-blue-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Study Together
+                </button>
+
+                <button
+                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
+                  className="py-3 rounded-xl bg-white/5 hover:bg-amber-600/20 border border-white/10 text-slate-300 hover:text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <Briefcase className="w-3.5 h-3.5" /> Network
+                </button>
+              </div>
+
+              {/* Secondary Actions */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] text-slate-500">
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleSave(selectedProfile.id); }}
+                  className="flex items-center gap-1.5 hover:text-indigo-400 transition"
+                >
+                  <Bookmark className={`w-3.5 h-3.5 ${savedProfiles.has(selectedProfile.id) ? "fill-indigo-400 text-indigo-400" : ""}`} />
+                  {savedProfiles.has(selectedProfile.id) ? "Saved" : "Save Profile"}
+                </button>
+                <button className="flex items-center gap-1 hover:text-red-400 transition">
+                  <Flag className="w-3 h-3" /> Report
+                </button>
+                <button className="flex items-center gap-1 hover:text-red-400 transition">
+                  <Ban className="w-3 h-3" /> Block
+                </button>
+              </div>
             </div>
           </div>
         </div>

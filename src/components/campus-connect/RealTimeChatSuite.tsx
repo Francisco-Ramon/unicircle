@@ -20,16 +20,19 @@ interface Props {
 }
 
 const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
-  "1": [
-    { id: "m1", senderId: "1", text: "Hey! Saw we matched on Campus Connect! Loved your bio about CS and neural networks! 🚀", timestamp: "10:14 AM", isRead: true, type: "text" },
-    { id: "m2", senderId: "me", text: "Hey Sarah! Thanks! Are you in the Stanford AI lab this quarter?", timestamp: "10:16 AM", isRead: true, type: "text" },
-    { id: "m3", senderId: "1", text: "Yes! Currently working on computer vision models for biology. Are you going to the campus hackathon this Saturday?", timestamp: "10:18 AM", isRead: true, type: "text" },
-    { id: "m4", senderId: "1", text: "Voice note preview", timestamp: "10:20 AM", isRead: true, type: "voice", durationSec: 8 },
+  "sp-1": [
+    { id: "m1", senderId: "sp-1", text: "Hey! Saw we matched on UniCircle! Loved your bio about CS and neural networks! 🚀", timestamp: "10:14 AM", isRead: true, type: "text" },
+    { id: "m2", senderId: "me", text: "Hey Amani! Thanks! Are you in the med school library today?", timestamp: "10:16 AM", isRead: true, type: "text" },
+    { id: "m3", senderId: "sp-1", text: "Yes! Preparing for anatomy midterms. Are you going to the campus hackathon this Saturday?", timestamp: "10:18 AM", isRead: true, type: "text" },
   ],
-  "2": [
-    { id: "m20", senderId: "2", text: "Hi Alex! Ready for the upcoming midterms study session?", timestamp: "Yesterday", isRead: true, type: "text" },
+  "sp-2": [
+    { id: "m20", senderId: "sp-2", text: "Hi Alex! Ready for the finance study session?", timestamp: "Yesterday", isRead: true, type: "text" },
+  ],
+  "sp-3": [
+    { id: "m30", senderId: "sp-3", text: "Yo Alex! Let's team up for the East Africa AI challenge!", timestamp: "2 days ago", isRead: true, type: "text" },
   ],
 };
+
 
 export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSelectMatch }) => {
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);

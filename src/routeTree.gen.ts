@@ -11,14 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
-import { Route as AppIndexRouteImport } from './routes/_app.index'
-import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
-import { Route as AppTasksRouteImport } from './routes/_app.tasks'
-import { Route as AppSettingsRouteImport } from './routes/_app.settings'
-import { Route as AppReadingRouteImport } from './routes/_app.reading'
-import { Route as AppInsightsRouteImport } from './routes/_app.insights'
-import { Route as AppInboxRouteImport } from './routes/_app.inbox'
-import { Route as AppCalendarRouteImport } from './routes/_app.calendar'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppAppRouteImport } from './routes/_app.app'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -29,120 +23,44 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppWhatsappRoute = AppWhatsappRouteImport.update({
-  id: '/whatsapp',
-  path: '/whatsapp',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppTasksRoute = AppTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppReadingRoute = AppReadingRouteImport.update({
-  id: '/reading',
-  path: '/reading',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppInsightsRoute = AppInsightsRouteImport.update({
-  id: '/insights',
-  path: '/insights',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppInboxRoute = AppInboxRouteImport.update({
-  id: '/inbox',
-  path: '/inbox',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCalendarRoute = AppCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+const AppAppRoute = AppAppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/calendar': typeof AppCalendarRoute
-  '/inbox': typeof AppInboxRoute
-  '/insights': typeof AppInsightsRoute
-  '/reading': typeof AppReadingRoute
-  '/settings': typeof AppSettingsRoute
-  '/tasks': typeof AppTasksRoute
-  '/whatsapp': typeof AppWhatsappRoute
+  '/app': typeof AppAppRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/calendar': typeof AppCalendarRoute
-  '/inbox': typeof AppInboxRoute
-  '/insights': typeof AppInsightsRoute
-  '/reading': typeof AppReadingRoute
-  '/settings': typeof AppSettingsRoute
-  '/tasks': typeof AppTasksRoute
-  '/whatsapp': typeof AppWhatsappRoute
-  '/': typeof AppIndexRoute
+  '/app': typeof AppAppRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_app/calendar': typeof AppCalendarRoute
-  '/_app/inbox': typeof AppInboxRoute
-  '/_app/insights': typeof AppInsightsRoute
-  '/_app/reading': typeof AppReadingRoute
-  '/_app/settings': typeof AppSettingsRoute
-  '/_app/tasks': typeof AppTasksRoute
-  '/_app/whatsapp': typeof AppWhatsappRoute
-  '/_app/': typeof AppIndexRoute
+  '/_app/app': typeof AppAppRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth'
-    | '/calendar'
-    | '/inbox'
-    | '/insights'
-    | '/reading'
-    | '/settings'
-    | '/tasks'
-    | '/whatsapp'
+  fullPaths: '/' | '/auth' | '/app'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/auth'
-    | '/calendar'
-    | '/inbox'
-    | '/insights'
-    | '/reading'
-    | '/settings'
-    | '/tasks'
-    | '/whatsapp'
-    | '/'
-  id:
-    | '__root__'
-    | '/_app'
-    | '/auth'
-    | '/_app/calendar'
-    | '/_app/inbox'
-    | '/_app/insights'
-    | '/_app/reading'
-    | '/_app/settings'
-    | '/_app/tasks'
-    | '/_app/whatsapp'
-    | '/_app/'
+  to: '/' | '/auth' | '/app'
+  id: '__root__' | '/' | '/_app' | '/auth' | '/_app/app'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
 }
@@ -163,90 +81,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
+    '/': {
+      id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/whatsapp': {
-      id: '/_app/whatsapp'
-      path: '/whatsapp'
-      fullPath: '/whatsapp'
-      preLoaderRoute: typeof AppWhatsappRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/tasks': {
-      id: '/_app/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof AppTasksRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/reading': {
-      id: '/_app/reading'
-      path: '/reading'
-      fullPath: '/reading'
-      preLoaderRoute: typeof AppReadingRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/insights': {
-      id: '/_app/insights'
-      path: '/insights'
-      fullPath: '/insights'
-      preLoaderRoute: typeof AppInsightsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/inbox': {
-      id: '/_app/inbox'
-      path: '/inbox'
-      fullPath: '/inbox'
-      preLoaderRoute: typeof AppInboxRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/calendar': {
-      id: '/_app/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof AppCalendarRouteImport
+    '/_app/app': {
+      id: '/_app/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppAppRouteImport
       parentRoute: typeof AppRoute
     }
   }
 }
 
 interface AppRouteChildren {
-  AppCalendarRoute: typeof AppCalendarRoute
-  AppInboxRoute: typeof AppInboxRoute
-  AppInsightsRoute: typeof AppInsightsRoute
-  AppReadingRoute: typeof AppReadingRoute
-  AppSettingsRoute: typeof AppSettingsRoute
-  AppTasksRoute: typeof AppTasksRoute
-  AppWhatsappRoute: typeof AppWhatsappRoute
-  AppIndexRoute: typeof AppIndexRoute
+  AppAppRoute: typeof AppAppRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppCalendarRoute: AppCalendarRoute,
-  AppInboxRoute: AppInboxRoute,
-  AppInsightsRoute: AppInsightsRoute,
-  AppReadingRoute: AppReadingRoute,
-  AppSettingsRoute: AppSettingsRoute,
-  AppTasksRoute: AppTasksRoute,
-  AppWhatsappRoute: AppWhatsappRoute,
-  AppIndexRoute: AppIndexRoute,
+  AppAppRoute: AppAppRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
 }

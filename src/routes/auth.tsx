@@ -1,9 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import logo from "@/assets/mr-cisco-logo.png";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -20,8 +19,9 @@ function AuthPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
-    if (session) navigate({ to: "/" });
+    if (session) navigate({ to: "/app" });
   }, [session, navigate]);
+
 
   async function handleGoogleAuth() {
     setGoogleBusy(true);
@@ -64,67 +64,59 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        // 1. Register auto-confirmed user via backend API to bypass email rate limits
-        try {
-          const regRes = await fetch("https://mr-cisco-whatsapp-production.up.railway.app/api/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, name }),
-          });
-          const regData = await regRes.json();
-          if (!regRes.ok && regData.error) {
-            if (regData.error.includes("already registered")) {
-              toast.info("Account already exists. Signing in...");
-            } else {
-              throw new Error(regData.error);
-            }
-          }
-        } catch (regErr: any) {
-          if (regErr?.message && !regErr.message.includes("Failed to fetch")) {
-            throw regErr;
-          }
-          // Fallback to standard Supabase signup if backend unreachable
-          const { error: signUpErr } = await supabase.auth.signUp({
-            email, password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth`,
-              data: { display_name: name || email.split("@")[0] },
-            },
-          });
-          if (signUpErr) throw signUpErr;
-        }
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth`,
+            data: { display_name: name || email.split("@")[0] },
+          },
+        });
+        if (signUpErr) throw signUpErr;
 
-        // 2. Sign in immediately!
         const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInErr) throw signInErr;
-        toast.success("Welcome aboard! Setting up your workspace…");
+        if (signInErr) {
+          toast.success("Account created! Please check your email to verify.");
+        } else {
+          toast.success("Welcome to UniCircle!");
+          navigate({ to: "/app" });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success("Welcome back!");
+        navigate({ to: "/app" });
       }
     } catch (e: any) {
       toast.error(e.message || "Authentication failed");
     } finally {
       setBusy(false);
     }
+
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative bg-black/90">
-      <div className="w-full max-w-md glass rounded-2xl shadow-elegant p-8 relative z-[1] border border-white/10">
-        <div className="flex flex-col items-center mb-6">
-          <img src={logo} alt="Mr. Cisco" className="w-16 h-16 rounded-2xl shadow-glow mb-3" />
-          <h1 className="text-2xl font-semibold text-gradient">Mr. Cisco</h1>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Executive Agent Platform</p>
+    <div className="min-h-screen flex items-center justify-center px-4 relative bg-[#070A10] text-white">
+      {/* Background Glow */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/40 via-purple-950/20 to-pink-950/40 blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 relative z-10 border border-white/10">
+        <div className="flex flex-col items-center mb-6 text-center">
+          <Link to="/">
+            <img src="/unicircle-logo.png" alt="UniCircle Logo" className="w-20 h-20 object-contain mb-3 hover:scale-105 transition-transform" />
+          </Link>
+          <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">UniCircle</h1>
+          <p className="text-xs tracking-wider text-slate-400 mt-1">Verified Student Social Platform</p>
         </div>
 
         {/* 1-Click Google Auth Button */}
         {mode !== "forgot" && (
           <div className="mb-5 space-y-3">
             <button
+              type="button"
               onClick={handleGoogleAuth}
               disabled={googleBusy}
-              className="w-full py-2.5 px-4 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 text-white text-sm font-semibold flex items-center justify-center gap-3 transition shadow-lg active:scale-95 disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 text-white text-sm font-semibold flex items-center justify-center gap-3 transition active:scale-98 disabled:opacity-50"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -132,12 +124,12 @@ function AuthPage() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
-              {googleBusy ? "Connecting to Google..." : mode === "signup" ? "Sign Up with Google (1-Click)" : "Sign In with Google"}
+              {googleBusy ? "Connecting to Google..." : mode === "signup" ? "Sign Up with Google" : "Sign In with Google"}
             </button>
 
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] text-white/40 uppercase tracking-widest">or email</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">or continue with email</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
           </div>
@@ -146,35 +138,35 @@ function AuthPage() {
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
             <div>
-              <label className="text-xs text-muted-foreground">Name</label>
+              <label className="text-xs font-medium text-slate-300">First Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full bg-input/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 text-white"
-                placeholder="Your name"
+                className="mt-1 w-full bg-slate-950/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500"
+                placeholder="e.g. Alex"
               />
             </div>
           )}
           <div>
-            <label className="text-xs text-muted-foreground">Email</label>
+            <label className="text-xs font-medium text-slate-300">University Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full bg-input/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 text-white"
-              placeholder="you@company.com"
+              className="mt-1 w-full bg-slate-950/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500"
+              placeholder="you@university.edu"
             />
           </div>
           {mode !== "forgot" && (
             <div>
               <div className="flex justify-between items-center">
-                <label className="text-xs text-muted-foreground">Password</label>
+                <label className="text-xs font-medium text-slate-300">Password</label>
                 {mode === "signin" && (
                   <button
                     type="button"
                     onClick={() => setMode("forgot")}
-                    className="text-[11px] text-primary/80 hover:text-primary hover:underline"
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline"
                   >
                     Forgot Password?
                   </button>
@@ -186,7 +178,7 @@ function AuthPage() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full bg-input/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 text-white"
+                className="mt-1 w-full bg-slate-950/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500"
                 placeholder="••••••••"
               />
             </div>
@@ -194,35 +186,35 @@ function AuthPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full gradient-primary text-primary-foreground rounded-lg py-2.5 text-sm font-medium shadow-glow disabled:opacity-50 hover:opacity-95 transition"
+            className="w-full mt-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl py-3 text-sm font-bold shadow-lg shadow-indigo-600/30 disabled:opacity-50 hover:opacity-95 transition active:scale-98"
           >
             {busy
               ? "Please wait…"
               : mode === "forgot"
               ? "Send Reset Link"
               : mode === "signup"
-              ? "Create account"
-              : "Sign in"}
+              ? "Create UniCircle Account"
+              : "Sign In"}
           </button>
         </form>
 
-        <div className="mt-4 text-center text-xs text-muted-foreground">
+        <div className="mt-5 text-center text-xs text-slate-400">
           {mode === "forgot" ? (
-            <button onClick={() => setMode("signin")} className="text-primary hover:underline">
+            <button onClick={() => setMode("signin")} className="text-indigo-400 hover:underline">
               ← Back to Sign In
             </button>
           ) : mode === "signup" ? (
             <>
               Already have an account?{" "}
-              <button onClick={() => setMode("signin")} className="text-primary hover:underline">
+              <button onClick={() => setMode("signin")} className="text-indigo-400 hover:underline font-semibold">
                 Sign in
               </button>
             </>
           ) : (
             <>
-              New here?{" "}
-              <button onClick={() => setMode("signup")} className="text-primary hover:underline">
-                Create one
+              New to UniCircle?{" "}
+              <button onClick={() => setMode("signup")} className="text-indigo-400 hover:underline font-semibold">
+                Create an account
               </button>
             </>
           )}
@@ -231,4 +223,5 @@ function AuthPage() {
     </div>
   );
 }
+
 
