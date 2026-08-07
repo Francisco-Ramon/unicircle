@@ -84,9 +84,13 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#070A10] text-slate-100 font-sans flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className={`min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
+      themeMode === "light" ? "bg-[#F4F6F9] text-slate-800" : "bg-[#070A10] text-slate-100"
+    }`}>
       {/* 1. SLIM & LIGHTWEIGHT TOP HEADER */}
-      <header className="sticky top-0 z-40 bg-[#0B0F17]/90 border-b border-white/10 backdrop-blur-xl px-4 py-2.5">
+      <header className={`sticky top-0 z-40 backdrop-blur-xl px-4 py-2.5 border-b transition-colors duration-300 ${
+        themeMode === "light" ? "bg-white/90 border-slate-200 shadow-sm" : "bg-[#0B0F17]/90 border-white/10"
+      }`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Brand Logo */}
           <div
@@ -99,16 +103,20 @@ export const CampusConnectApp: React.FC = () => {
               className="w-8 h-8 object-contain filter drop-shadow-[0_0_8px_rgba(99,102,241,0.4)] group-hover:scale-105 transition-transform"
             />
             <div>
-              <h1 className="text-base font-black tracking-tight text-white flex items-center gap-0.5">
-                Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Circle</span>
+              <h1 className={`text-base font-black tracking-tight flex items-center gap-0.5 ${
+                themeMode === "light" ? "text-slate-900" : "text-white"
+              }`}>
+                Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">Circle</span>
               </h1>
-              <p className="text-[9px] text-slate-400 font-medium">Verified Campus Network</p>
+              <p className={`text-[9px] font-medium ${themeMode === "light" ? "text-slate-500" : "text-slate-400"}`}>Verified Campus Network</p>
             </div>
           </div>
 
           {/* Desktop Navigation Icons Bar */}
           {isRegistered && (
-            <nav className="hidden md:flex items-center gap-1 bg-slate-900/80 px-2 py-1 rounded-2xl border border-white/10">
+            <nav className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-2xl border transition-colors duration-300 ${
+              themeMode === "light" ? "bg-slate-100 border-slate-200" : "bg-slate-900/80 border-white/10"
+            }`}>
               {[
                 { id: "home", label: "Home", icon: Home },
                 { id: "discover", label: "Discover", icon: Search },
@@ -124,6 +132,8 @@ export const CampusConnectApp: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       isActive
                         ? "bg-gradient-to-r from-indigo-600 to-pink-600 text-white shadow-md shadow-indigo-600/20"
+                        : themeMode === "light"
+                        ? "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                         : "text-slate-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
@@ -307,7 +317,9 @@ export const CampusConnectApp: React.FC = () => {
 
       {/* 3. MOBILE BOTTOM NAVIGATION BAR (5 Core Items) */}
       {isRegistered && (
-        <div className="md:hidden sticky bottom-0 z-40 bg-[#0B0F17]/95 border-t border-white/10 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
+        <div className={`md:hidden sticky bottom-0 z-40 backdrop-blur-xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 ${
+          themeMode === "light" ? "bg-white/95 border-slate-200 shadow-lg" : "bg-[#0B0F17]/95 border-white/10"
+        }`}>
           {[
             { id: "home", label: "Home", icon: Home },
             { id: "discover", label: "Discover", icon: Search },

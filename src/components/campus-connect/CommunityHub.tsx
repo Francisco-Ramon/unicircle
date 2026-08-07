@@ -1,10 +1,21 @@
 import React, { useState } from "react";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
-  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight
+  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight
 } from "lucide-react";
 import { INSTITUTIONS_DATA, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
+
+interface PostComment {
+  id: string;
+  authorName: string;
+  authorAvatar: string;
+  authorCourse: string;
+  timeAgo: string;
+  content: string;
+  likes: number;
+  userLiked: boolean;
+}
 
 interface CommunityPost {
   id: string;
@@ -17,6 +28,7 @@ interface CommunityPost {
   likes: number;
   commentsCount: number;
   userLiked: boolean;
+  comments: PostComment[];
 }
 
 const INITIAL_POSTS: CommunityPost[] = [
@@ -28,8 +40,30 @@ const INITIAL_POSTS: CommunityPost[] = [
     timeAgo: "2 hours ago",
     content: "Setting up a weekend study group for 3rd & 4th year med students at the Chiromo Campus library. All verified students welcome! 🩺📚",
     likes: 42,
-    commentsCount: 18,
+    commentsCount: 2,
     userLiked: false,
+    comments: [
+      {
+        id: "c1-1",
+        authorName: "Mercy Mwangi",
+        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+        authorCourse: "Nursing • 3rd Year",
+        timeAgo: "1 hour ago",
+        content: "Count me in! What time are we meeting on Saturday?",
+        likes: 5,
+        userLiked: true,
+      },
+      {
+        id: "c1-2",
+        authorName: "Kevin Wafula",
+        authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+        authorCourse: "Computer Science • 3rd Year",
+        timeAgo: "30 mins ago",
+        content: "Can CS majors tag along for quiet study? Lib gets packed on weekends!",
+        likes: 2,
+        userLiked: false,
+      }
+    ]
   },
   {
     id: "p2",
@@ -40,8 +74,20 @@ const INITIAL_POSTS: CommunityPost[] = [
     content: "Inter-Hall Debate Competition next Tuesday at Taifa Hall! 🏆 Come support Hall 9 vs Hall 4. Registration closes Friday.",
     image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
     likes: 68,
-    commentsCount: 24,
+    commentsCount: 1,
     userLiked: true,
+    comments: [
+      {
+        id: "c2-1",
+        authorName: "Dennis Kipchumba",
+        authorAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80",
+        authorCourse: "Economics • 2nd Year",
+        timeAgo: "3 hours ago",
+        content: "Hall 9 taking the trophy home for sure 🔥🔥",
+        likes: 12,
+        userLiked: false,
+      }
+    ]
   },
   {
     id: "p3",
@@ -51,8 +97,30 @@ const INITIAL_POSTS: CommunityPost[] = [
     timeAgo: "8 hours ago",
     content: "Just finished my first AI project using TensorFlow! Looking for teammates for the upcoming East Africa AI Challenge. Drop a comment if interested 💡",
     likes: 35,
-    commentsCount: 12,
+    commentsCount: 2,
     userLiked: false,
+    comments: [
+      {
+        id: "c3-1",
+        authorName: "Alex Chen",
+        authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+        authorCourse: "Computer Science & AI • 3rd Year",
+        timeAgo: "6 hours ago",
+        content: "Definitely interested! I work with PyTorch and NLP models. Sent you a DM on UniCircle!",
+        likes: 8,
+        userLiked: true,
+      },
+      {
+        id: "c3-2",
+        authorName: "Fatuma Hassan",
+        authorAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
+        authorCourse: "Software Engineering • 4th Year",
+        timeAgo: "4 hours ago",
+        content: "Need a UI/UX designer for the project pitch presentation?",
+        likes: 4,
+        userLiked: false,
+      }
+    ]
   },
 ];
 
@@ -73,6 +141,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
   // Posts state
   const [posts, setPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
 
+  // Comments state: open post ID & comment text inputs map
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+
   // New post form
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
@@ -84,6 +156,47 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
         ? { ...p, userLiked: !p.userLiked, likes: p.userLiked ? p.likes - 1 : p.likes + 1 }
         : p
     ));
+  };
+
+  const handleToggleCommentLike = (postId: string, commentId: string) => {
+    setPosts(posts.map((p) => {
+      if (p.id !== postId) return p;
+      return {
+        ...p,
+        comments: p.comments.map((c) =>
+          c.id === commentId
+            ? { ...c, userLiked: !c.userLiked, likes: c.userLiked ? c.likes - 1 : c.likes + 1 }
+            : c
+        )
+      };
+    }));
+  };
+
+  const handleAddComment = (postId: string) => {
+    const text = commentInputs[postId]?.trim();
+    if (!text) return;
+
+    const newComment: PostComment = {
+      id: `comm-${Date.now()}`,
+      authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
+      authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+      authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+      timeAgo: "Just now",
+      content: text,
+      likes: 0,
+      userLiked: false,
+    };
+
+    setPosts(posts.map((p) => {
+      if (p.id !== postId) return p;
+      return {
+        ...p,
+        commentsCount: p.commentsCount + 1,
+        comments: [...p.comments, newComment],
+      };
+    }));
+
+    setCommentInputs({ ...commentInputs, [postId]: "" });
   };
 
   const handleCreatePost = () => {
@@ -99,6 +212,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
       likes: 0,
       commentsCount: 0,
       userLiked: false,
+      comments: [],
     };
     setPosts([newPost, ...posts]);
     setNewPostContent("");
@@ -246,53 +360,138 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
           )}
 
           {/* Posts List */}
-          {posts.map((post) => (
-            <div key={post.id} className="bg-slate-900/60 border border-white/[0.06] rounded-2xl overflow-hidden">
-              {/* Post header */}
-              <div className="flex items-center gap-3 p-4 pb-0">
-                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                    {post.authorName}
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  </h4>
-                  <p className="text-[11px] text-slate-500">{post.authorCourse} • {post.timeAgo}</p>
+          {posts.map((post) => {
+            const isCommentsOpen = activeCommentPostId === post.id;
+            return (
+              <div key={post.id} className="bg-slate-900/60 border border-white/[0.06] rounded-2xl overflow-hidden shadow-lg transition">
+                {/* Post header */}
+                <div className="flex items-center gap-3 p-4 pb-0">
+                  <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      {post.authorName}
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    </h4>
+                    <p className="text-[11px] text-slate-500">{post.authorCourse} • {post.timeAgo}</p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Post content */}
-              <div className="px-4 py-3">
-                <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
-              </div>
-
-              {/* Post image */}
-              {post.image && (
-                <div className="px-4 pb-3">
-                  <img src={post.image} alt="Post attachment" className="w-full rounded-xl object-cover max-h-72" />
+                {/* Post content */}
+                <div className="px-4 py-3">
+                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
                 </div>
-              )}
 
-              {/* Post actions */}
-              <div className="flex items-center gap-1 px-4 py-3 border-t border-white/5">
-                <button
-                  onClick={() => handleToggleLike(post.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                    post.userLiked
-                      ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/20"
-                      : "text-slate-400 hover:bg-white/5"
-                  }`}
-                >
-                  <ThumbsUp className={`w-3.5 h-3.5 ${post.userLiked ? "fill-indigo-400" : ""}`} />
-                  {post.likes}
-                </button>
+                {/* Post image */}
+                {post.image && (
+                  <div className="px-4 pb-3">
+                    <img src={post.image} alt="Post attachment" className="w-full rounded-xl object-cover max-h-72" />
+                  </div>
+                )}
 
-                <button className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:bg-white/5 transition">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  {post.commentsCount}
-                </button>
+                {/* Post actions */}
+                <div className="flex items-center justify-between px-4 py-3 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleLike(post.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                        post.userLiked
+                          ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/20"
+                          : "text-slate-400 hover:bg-white/5"
+                      }`}
+                    >
+                      <ThumbsUp className={`w-3.5 h-3.5 ${post.userLiked ? "fill-indigo-400 text-indigo-400" : ""}`} />
+                      {post.likes}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveCommentPostId(isCommentsOpen ? null : post.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                        isCommentsOpen
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-400 hover:bg-white/5"
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>{post.commentsCount} {post.commentsCount === 1 ? "Comment" : "Comments"}</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[11px] text-slate-500 font-medium">Campus Verified Thread</span>
+                </div>
+
+                {/* Interactive Comment / Chat Thread Section */}
+                {isCommentsOpen && (
+                  <div className="bg-slate-950/80 border-t border-white/10 p-4 space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                        <MessageSquare className="w-3.5 h-3.5 text-indigo-400" /> Post Comments & Chat Thread
+                      </h5>
+                      <span className="text-[10px] text-slate-500">{post.comments.length} replies</span>
+                    </div>
+
+                    {/* Comments List */}
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {post.comments.length === 0 ? (
+                        <p className="text-xs text-slate-500 text-center py-4">No comments yet. Start the conversation!</p>
+                      ) : (
+                        post.comments.map((comm) => (
+                          <div key={comm.id} className="flex gap-2.5 items-start bg-slate-900/60 p-3 rounded-xl border border-white/[0.04]">
+                            <img src={comm.authorAvatar} alt={comm.authorName} className="w-7 h-7 rounded-lg object-cover shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-white">{comm.authorName}</span>
+                                <span className="text-[10px] text-slate-500">{comm.timeAgo}</span>
+                              </div>
+                              <p className="text-xs text-slate-300 mt-1 leading-relaxed">{comm.content}</p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <button
+                                  onClick={() => handleToggleCommentLike(post.id, comm.id)}
+                                  className={`text-[10px] font-bold flex items-center gap-1 ${
+                                    comm.userLiked ? "text-pink-400" : "text-slate-500 hover:text-slate-300"
+                                  }`}
+                                >
+                                  <Heart className={`w-3 h-3 ${comm.userLiked ? "fill-pink-400" : ""}`} />
+                                  {comm.likes > 0 ? comm.likes : "Like"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add Comment Input */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                      <img
+                        src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                        alt="You"
+                        className="w-7 h-7 rounded-lg object-cover shrink-0"
+                      />
+                      <div className="flex-1 relative flex items-center">
+                        <input
+                          type="text"
+                          value={commentInputs[post.id] || ""}
+                          onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleAddComment(post.id);
+                          }}
+                          placeholder="Write a comment or chat..."
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl pl-3 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          onClick={() => handleAddComment(post.id)}
+                          disabled={!commentInputs[post.id]?.trim()}
+                          className="absolute right-1.5 p-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-30"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
