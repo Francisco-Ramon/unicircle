@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Calendar, MapPin, Users, Ticket, Sparkles, PlusCircle, CheckCircle2,
-  Search, Filter, X, ArrowLeft, Send, Heart, MessageSquare, Clock, Building
+  Search, Filter, X, ArrowLeft, Send, Heart, MessageSquare, Clock, Building, ExternalLink, Link2
 } from "lucide-react";
 
 export interface EventComment {
@@ -30,6 +30,7 @@ export interface CampusEvent {
   description: string;
   attendees: string[];
   comments: EventComment[];
+  redirectUrl?: string;
 }
 
 const SAMPLE_EVENTS: CampusEvent[] = [
@@ -47,6 +48,7 @@ const SAMPLE_EVENTS: CampusEvent[] = [
     userRsvpd: false,
     image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
     description: "The biggest neon glow cultural gala on campus! Live DJ sets, food stalls, speed friending, and acoustic lounge. Come dressed in vibrant colors and represent your culture!",
+    redirectUrl: "https://mookh.com/event/uon-cultural-gala",
     attendees: [
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
@@ -87,6 +89,7 @@ const SAMPLE_EVENTS: CampusEvent[] = [
     userRsvpd: true,
     image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
     description: "Build groundbreaking AI applications in 10 hours. $5,000 in startup prizes, free catering, and mentor matching with top tech leaders across East Africa.",
+    redirectUrl: "https://forms.gle/strathmore-ai-summit",
     attendees: [
       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
@@ -145,6 +148,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
   const [newEventTime, setNewEventTime] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
+  const [newEventRedirectUrl, setNewEventRedirectUrl] = useState("");
 
   const toggleRsvp = (id: string) => {
     setEvents(
@@ -197,6 +201,11 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
   const handleCreateEvent = () => {
     if (!newEventTitle.trim() || !newEventLocation.trim()) return;
 
+    let formattedUrl = newEventRedirectUrl.trim();
+    if (formattedUrl && !formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+      formattedUrl = `https://${formattedUrl}`;
+    }
+
     const newEvt: CampusEvent = {
       id: `evt-${Date.now()}`,
       title: newEventTitle,
@@ -211,6 +220,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
       userRsvpd: true,
       image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
       description: newEventDesc || "Join us for an exciting campus meetup!",
+      redirectUrl: formattedUrl || undefined,
       attendees: [userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"],
       comments: [],
     };
@@ -220,6 +230,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
     setNewEventTitle("");
     setNewEventLocation("");
     setNewEventDesc("");
+    setNewEventRedirectUrl("");
   };
 
   const filteredEvents = events.filter((e) => {
@@ -239,7 +250,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
             <Sparkles className="w-3.5 h-3.5" /> Verified Campus Gatherings
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Campus Events & Social Meetups</h2>
-          <p className="text-xs text-slate-400 mt-1">RSVP, comment, and discover who from your campus is attending live events.</p>
+          <p className="text-xs text-slate-400 mt-1">RSVP, comment, and set up external ticket/registration redirect links.</p>
         </div>
 
         <button
@@ -298,9 +309,16 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
                 <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-indigo-300 text-xs font-bold border border-white/10">
                   {evt.category}
                 </span>
-                <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-emerald-950/80 backdrop-blur-md text-emerald-400 text-[11px] font-bold border border-emerald-500/30">
-                  {evt.rsvpCount} Attending
-                </span>
+
+                {evt.redirectUrl ? (
+                  <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-indigo-950/90 backdrop-blur-md text-indigo-300 text-[10px] font-bold border border-indigo-500/40 flex items-center gap-1">
+                    <ExternalLink className="w-3 h-3" /> Ticket Link
+                  </span>
+                ) : (
+                  <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-emerald-950/80 backdrop-blur-md text-emerald-400 text-[11px] font-bold border border-emerald-500/30">
+                    {evt.rsvpCount} Attending
+                  </span>
+                )}
               </div>
 
               <div className="p-5 space-y-3">
@@ -328,27 +346,38 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
                 <span>{evt.comments.length} comments</span>
               </div>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRsvp(evt.id);
-                }}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                  evt.userRsvpd
-                    ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20"
-                }`}
-              >
-                {evt.userRsvpd ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Going
-                  </>
-                ) : (
-                  <>
-                    <Ticket className="w-3.5 h-3.5" /> RSVP Spot
-                  </>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                {evt.redirectUrl && (
+                  <a
+                    href={evt.redirectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/40 hover:bg-purple-600 hover:text-white transition"
+                    title="Open External Ticket/Registration Link"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 )}
-              </button>
+
+                <button
+                  onClick={() => toggleRsvp(evt.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    evt.userRsvpd
+                      ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20"
+                  }`}
+                >
+                  {evt.userRsvpd ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Going
+                    </>
+                  ) : (
+                    <>
+                      <Ticket className="w-3.5 h-3.5" /> RSVP
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -375,31 +404,61 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
 
             {/* Event Info */}
             <div className="p-6 space-y-4 flex-1">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-extrabold text-white leading-tight">{selectedEvent.title}</h2>
                   <p className="text-xs text-slate-400 mt-1">Hosted by <span className="text-indigo-400 font-semibold">{selectedEvent.organizer}</span></p>
                 </div>
 
-                <button
-                  onClick={() => toggleRsvp(selectedEvent.id)}
-                  className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
-                    selectedEvent.userRsvpd
-                      ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
-                  }`}
-                >
-                  {selectedEvent.userRsvpd ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> You're Attending
-                    </>
-                  ) : (
-                    <>
-                      <Ticket className="w-4 h-4" /> RSVP Spot ({selectedEvent.rsvpCount} Going)
-                    </>
+                <div className="flex items-center gap-2">
+                  {selectedEvent.redirectUrl && (
+                    <a
+                      href={selectedEvent.redirectUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-purple-600/30"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Get Tickets
+                    </a>
                   )}
-                </button>
+
+                  <button
+                    onClick={() => toggleRsvp(selectedEvent.id)}
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+                      selectedEvent.userRsvpd
+                        ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40"
+                        : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
+                    }`}
+                  >
+                    {selectedEvent.userRsvpd ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" /> You're Attending
+                      </>
+                    ) : (
+                      <>
+                        <Ticket className="w-4 h-4" /> RSVP ({selectedEvent.rsvpCount} Going)
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {selectedEvent.redirectUrl && (
+                <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between text-xs text-purple-300">
+                  <div className="flex items-center gap-2 truncate pr-2">
+                    <Link2 className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span className="truncate">Redirect Link: {selectedEvent.redirectUrl}</span>
+                  </div>
+                  <a
+                    href={selectedEvent.redirectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-500 transition shrink-0"
+                  >
+                    Open Link ↗
+                  </a>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] text-xs">
                 <div className="flex items-center gap-2.5 text-slate-300">
@@ -549,6 +608,19 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
                     className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  External Ticket / Registration Link <span className="text-[10px] text-slate-500">(Optional Redirect URL)</span>
+                </label>
+                <input
+                  type="text"
+                  value={newEventRedirectUrl}
+                  onChange={(e) => setNewEventRedirectUrl(e.target.value)}
+                  placeholder="e.g. https://forms.gle/... or https://eventbrite.com/..."
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
               </div>
 
               <div>
