@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Calendar, MapPin, Users, Ticket, Sparkles, PlusCircle, CheckCircle2,
-  Search, Filter, X, ArrowLeft, Send, Heart, MessageSquare, Clock, Building, ExternalLink, Link2
+  Search, Filter, X, ArrowLeft, Send, Heart, MessageSquare, Clock, Building, ExternalLink, Link2, Upload, Image as ImageIcon, Trash2
 } from "lucide-react";
 
 export interface EventComment {
@@ -150,6 +150,38 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
   const [newEventDesc, setNewEventDesc] = useState("");
   const [newEventRedirectUrl, setNewEventRedirectUrl] = useState("");
 
+  // Event Placard / Poster State (File Upload or Drag & Drop)
+  const [eventPoster, setEventPoster] = useState<string>("");
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleImageFileUpload = (file: File) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setEventPoster(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
   const toggleRsvp = (id: string) => {
     setEvents(
       events.map((e) => {
@@ -206,6 +238,8 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    const defaultImage = "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80";
+
     const newEvt: CampusEvent = {
       id: `evt-${Date.now()}`,
       title: newEventTitle,
@@ -218,7 +252,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
       rsvpCount: 1,
       maxCapacity: 100,
       userRsvpd: true,
-      image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
+      image: eventPoster || defaultImage,
       description: newEventDesc || "Join us for an exciting campus meetup!",
       redirectUrl: formattedUrl || undefined,
       attendees: [userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"],
@@ -231,6 +265,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
     setNewEventLocation("");
     setNewEventDesc("");
     setNewEventRedirectUrl("");
+    setEventPoster("");
   };
 
   const filteredEvents = events.filter((e) => {
@@ -250,7 +285,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
             <Sparkles className="w-3.5 h-3.5" /> Verified Campus Gatherings
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Campus Events & Social Meetups</h2>
-          <p className="text-xs text-slate-400 mt-1">RSVP, comment, and set up external ticket/registration redirect links.</p>
+          <p className="text-xs text-slate-400 mt-1">RSVP, comment, upload event placards/posters, and redirect to external links.</p>
         </div>
 
         <button
@@ -387,7 +422,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl">
-            {/* Hero Image */}
+            {/* Hero Image / Placard */}
             <div className="relative h-64 shrink-0">
               <img src={selectedEvent.image} alt={selectedEvent.title} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
@@ -418,7 +453,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
                       rel="noopener noreferrer"
                       className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-purple-600/30"
                     >
-                      <ExternalLink className="w-4 h-4" /> Get Tickets
+                      <ExternalLink className="w-4 h-4" /> Redirect Link
                     </a>
                   )}
 
@@ -447,7 +482,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
                 <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between text-xs text-purple-300">
                   <div className="flex items-center gap-2 truncate pr-2">
                     <Link2 className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span className="truncate">Redirect Link: {selectedEvent.redirectUrl}</span>
+                    <span className="truncate">External Ticket / Registration Link: {selectedEvent.redirectUrl}</span>
                   </div>
                   <a
                     href={selectedEvent.redirectUrl}
@@ -533,10 +568,10 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
         </div>
       )}
 
-      {/* HOST CAMPUS EVENT MODAL */}
+      {/* HOST CAMPUS EVENT MODAL WITH DRAG & DROP POSTER UPLOAD */}
       {showHostModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-indigo-400" /> Host Campus Event
@@ -547,6 +582,60 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
             </div>
 
             <div className="space-y-3 text-xs">
+              {/* Event Poster Upload / Drag & Drop Zone */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                  <span>Event Poster / Placard Image</span>
+                  {eventPoster && (
+                    <button
+                      onClick={() => setEventPoster("")}
+                      className="text-red-400 hover:text-red-300 font-normal flex items-center gap-1 text-[10px]"
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove Poster
+                    </button>
+                  )}
+                </label>
+
+                {eventPoster ? (
+                  <div className="relative h-40 rounded-2xl overflow-hidden border border-white/20 group">
+                    <img src={eventPoster} alt="Poster preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <button
+                        onClick={() => setEventPoster("")}
+                        className="px-3 py-1.5 rounded-xl bg-red-600 text-white font-bold text-xs flex items-center gap-1 shadow-lg"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Change Poster
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`relative border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
+                      isDragging
+                        ? "border-indigo-400 bg-indigo-500/10"
+                        : "border-white/15 bg-slate-950/60 hover:border-indigo-500/50 hover:bg-slate-950"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleImageFileUpload(e.target.files[0])}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center text-indigo-400">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-xs">Drag & drop your event poster here</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">or click to browse from device (JPEG, PNG, WEBP)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-slate-400 mb-1 font-semibold">Event Title</label>
                 <input

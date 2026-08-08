@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
-  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, Link2
+  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, Link2, Upload, Trash2
 } from "lucide-react";
 import { INSTITUTIONS_DATA, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
@@ -191,6 +191,38 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
   const [eventDesc, setEventDesc] = useState("");
   const [eventRedirectUrl, setEventRedirectUrl] = useState("");
 
+  // Placard Poster Drag & Drop State
+  const [eventPoster, setEventPoster] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleImageFileUpload = (file: File) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setEventPoster(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
   // Comments state: open post ID & comment text inputs map
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -297,6 +329,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    const defaultImg = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
+
     const newEvt: CampusEvent = {
       id: `cevt-${Date.now()}`,
       title: eventTitle,
@@ -309,7 +343,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
       rsvpCount: 1,
       maxCapacity: 100,
       userRsvpd: true,
-      image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
+      image: eventPoster || defaultImg,
       description: eventDesc || "Community event hosted on UniCircle.",
       redirectUrl: formattedUrl || undefined,
       attendees: [userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"],
@@ -322,6 +356,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
     setEventLocation("");
     setEventDesc("");
     setEventRedirectUrl("");
+    setEventPoster("");
   };
 
   const handleAddCommunityEventComment = () => {
@@ -624,7 +659,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
         </div>
       )}
 
-      {/* EVENTS TAB (Community Events with Redirect Links & Hosting) */}
+      {/* EVENTS TAB (Community Events with Poster Upload & Redirect Links) */}
       {activeTab === "events" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -765,10 +800,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
         </div>
       )}
 
-      {/* CREATE EVENT MODAL UNDER COMMUNITY */}
+      {/* CREATE EVENT MODAL UNDER COMMUNITY WITH DRAG & DROP POSTER */}
       {showCreateEventModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-indigo-400" /> Create Event for {activeInst.shortName}
@@ -779,6 +814,60 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
             </div>
 
             <div className="space-y-3 text-xs">
+              {/* Event Poster / Placard Drag & Drop Upload Zone */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                  <span>Event Placard / Poster Image</span>
+                  {eventPoster && (
+                    <button
+                      onClick={() => setEventPoster("")}
+                      className="text-red-400 hover:text-red-300 font-normal flex items-center gap-1 text-[10px]"
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove Poster
+                    </button>
+                  )}
+                </label>
+
+                {eventPoster ? (
+                  <div className="relative h-40 rounded-2xl overflow-hidden border border-white/20 group">
+                    <img src={eventPoster} alt="Poster preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <button
+                        onClick={() => setEventPoster("")}
+                        className="px-3 py-1.5 rounded-xl bg-red-600 text-white font-bold text-xs flex items-center gap-1 shadow-lg"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Change Poster
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`relative border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
+                      isDragging
+                        ? "border-indigo-400 bg-indigo-500/10"
+                        : "border-white/15 bg-slate-950/60 hover:border-indigo-500/50 hover:bg-slate-950"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleImageFileUpload(e.target.files[0])}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center text-indigo-400">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-xs">Drag & drop your event poster here</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">or click to browse from device (JPEG, PNG, WEBP)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-slate-400 mb-1 font-semibold">Event Title</label>
                 <input
@@ -890,7 +979,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl">
-            {/* Hero Image */}
+            {/* Hero Image / Placard */}
             <div className="relative h-64 shrink-0">
               <img src={selectedEvent.image} alt={selectedEvent.title} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
