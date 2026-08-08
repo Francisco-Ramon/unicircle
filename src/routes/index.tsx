@@ -37,15 +37,7 @@ function LandingPage() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            to="/app"
-            className="px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-[1.02] transition-all flex items-center gap-2"
-          >
-            Open App
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+
       </header>
 
       {/* Main One-Screen Hero Content */}
