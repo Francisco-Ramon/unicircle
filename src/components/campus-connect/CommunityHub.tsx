@@ -231,15 +231,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setSelectedInst(inst);
     setShowSwitcher(false);
 
-    if (onUpdateProfile && userProfile) {
-      onUpdateProfile({
-        ...userProfile,
-        campus: inst.name,
-        country: inst.country,
-        institutionId: inst.id,
-      });
-    }
-
     if (onNavigate) {
       onNavigate({ tab: "communities", communityId: inst.id });
     }
