@@ -197,7 +197,6 @@ export const CampusConnectApp: React.FC = () => {
                 { id: "discover", label: "Discover", icon: Search },
                 { id: "communities", label: "Communities", icon: Users },
                 { id: "events", label: "Events", icon: Calendar },
-                { id: "chart", label: "Analytics", icon: BarChart3 },
                 { id: "chat", label: `Chats (${matches.length})`, icon: MessageSquare },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -283,6 +282,13 @@ export const CampusConnectApp: React.FC = () => {
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <Palette className="w-4 h-4 text-pink-400" /> Personalize Theme
+                  </button>
+
+                  <button
+                    onClick={() => { handleTabChange("chart"); setShowUserDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
                   </button>
 
                   <button
@@ -435,11 +441,10 @@ export const CampusConnectApp: React.FC = () => {
           {[
             { id: "home", label: "Home", icon: Home },
             { id: "discover", label: "Discover", icon: Search },
+            { id: "communities", label: "Communities", icon: Users },
             { id: "events", label: "Events", icon: Calendar },
             { id: "chart", label: "Analytics", icon: BarChart3 },
             { id: "chat", label: "Chats", icon: MessageSquare },
-            { id: "notifications", label: "Alerts", icon: Bell },
-            { id: "profile", label: "Profile", icon: User },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
