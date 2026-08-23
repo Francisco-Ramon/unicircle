@@ -43,11 +43,20 @@ export const UserProfileStudio: React.FC<Props> = ({
 
   const handleRemovePhoto = (idx: number) => {
     if (photos.length <= 1) {
-      alert("Account requires at least 1 photo for verified student profiles.");
+      alert("At least 1 photo is required for your student profile.");
       return;
     }
     const updated = photos.filter((_, i) => i !== idx);
     setPhotos(updated);
+
+    if (activeViewerIndex !== null) {
+      if (updated.length === 0) {
+        setActiveViewerIndex(null);
+      } else if (activeViewerIndex >= updated.length) {
+        setActiveViewerIndex(updated.length - 1);
+      }
+    }
+
     onUpdateProfile({ ...profile, photos: updated });
   };
 
@@ -163,11 +172,11 @@ export const UserProfileStudio: React.FC<Props> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-white">Profile Photos ({photos.length})</h3>
-            <p className="text-xs text-slate-400">Tap any photo to view full size, or add new ones</p>
+            <p className="text-xs text-slate-400">Tap any photo to view or remove (minimum 1 photo required)</p>
           </div>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/30"
           >
             <Plus className="w-4 h-4" /> Add Photo
           </button>
@@ -181,14 +190,22 @@ export const UserProfileStudio: React.FC<Props> = ({
               className="relative aspect-[3/4] rounded-2xl overflow-hidden group border border-white/10 cursor-pointer shadow-md"
             >
               <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRemovePhoto(idx); }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 transition"
-                title="Remove Photo"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+
+              {/* Remove Photo Trash Button */}
+              {photos.length > 1 ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRemovePhoto(idx); }}
+                  className="absolute top-2 right-2 p-2 rounded-xl bg-slate-950/80 hover:bg-red-600 text-white transition border border-white/15 cursor-pointer shadow-lg"
+                  title="Remove Photo"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400 group-hover:text-white" />
+                </button>
+              ) : (
+                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-slate-950/80 text-[9px] font-bold text-slate-400 border border-white/10">
+                  Primary 1/1
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -209,17 +226,16 @@ export const UserProfileStudio: React.FC<Props> = ({
               onClick={() => setActiveViewerIndex(null)}
               className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/60 hover:bg-white/20 text-white transition"
             >
-              <Trash2 className="w-0 h-0 hidden" /> {/* dummy for import */}
               ✕
             </button>
 
             {/* Photo Counter */}
-            <div className="absolute top-3 left-3 z-20 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-xs font-bold text-white">
-              Photo {activeViewerIndex + 1} of {photos.length}
+            <div className="absolute top-3 left-3 z-20 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-xs font-bold text-white flex items-center gap-2">
+              <span>Photo {activeViewerIndex + 1} of {photos.length}</span>
             </div>
 
             {/* Main Image */}
-            <div className="aspect-[3/4] max-h-[70vh] w-full bg-black relative flex items-center justify-center">
+            <div className="aspect-[3/4] max-h-[65vh] w-full bg-black relative flex items-center justify-center">
               <img
                 src={photos[activeViewerIndex]}
                 alt={`Photo ${activeViewerIndex + 1}`}
@@ -230,7 +246,7 @@ export const UserProfileStudio: React.FC<Props> = ({
               {activeViewerIndex > 0 && (
                 <button
                   onClick={() => setActiveViewerIndex(activeViewerIndex - 1)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/80 text-white transition"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition"
                 >
                   ◀
                 </button>
@@ -238,26 +254,40 @@ export const UserProfileStudio: React.FC<Props> = ({
               {activeViewerIndex < photos.length - 1 && (
                 <button
                   onClick={() => setActiveViewerIndex(activeViewerIndex + 1)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/80 text-white transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition"
                 >
                   ▶
                 </button>
               )}
             </div>
 
-            {/* Thumbnail Navigation Bar */}
-            <div className="p-3 bg-slate-950 flex gap-2 overflow-x-auto justify-center">
-              {photos.map((url, i) => (
+            {/* Lightbox Footer controls with Remove option */}
+            <div className="p-4 bg-slate-950 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10">
+              <div className="flex gap-2 overflow-x-auto">
+                {photos.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveViewerIndex(i)}
+                    className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 border-2 transition ${
+                      i === activeViewerIndex ? "border-indigo-500 scale-105" : "border-transparent opacity-50"
+                    }`}
+                  >
+                    <img src={url} alt="Thumb" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+
+              {/* Delete / Remove button */}
+              {photos.length > 1 ? (
                 <button
-                  key={i}
-                  onClick={() => setActiveViewerIndex(i)}
-                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition ${
-                    i === activeViewerIndex ? "border-indigo-500 scale-105" : "border-transparent opacity-50"
-                  }`}
+                  onClick={() => handleRemovePhoto(activeViewerIndex)}
+                  className="px-3.5 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
-                  <img src={url} alt="Thumb" className="w-full h-full object-cover" />
+                  <Trash2 className="w-4 h-4" /> Remove Photo
                 </button>
-              ))}
+              ) : (
+                <span className="text-[11px] font-bold text-slate-500">At least 1 photo required</span>
+              )}
             </div>
           </div>
         </div>
