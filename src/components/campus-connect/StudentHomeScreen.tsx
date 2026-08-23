@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2 } from "lucide-react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 
 interface Props {
@@ -16,6 +16,19 @@ export const StudentHomeScreen: React.FC<Props> = ({
   onNavigateToCommunity,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const activeFriends = TWENTY_STUDENT_PROFILES.slice(0, 5);
   const communityPosts = [
@@ -64,6 +77,42 @@ export const StudentHomeScreen: React.FC<Props> = ({
     },
   ];
 
+  // ─── Search Logic ───
+  const q = searchQuery.trim().toLowerCase();
+  const hasQuery = q.length > 0;
+
+  const searchResults = useMemo(() => {
+    if (!hasQuery) return { students: [], posts: [], events: [] };
+
+    const students = TWENTY_STUDENT_PROFILES.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.campus.toLowerCase().includes(q) ||
+        s.course.toLowerCase().includes(q) ||
+        s.interests.some((i) => i.toLowerCase().includes(q))
+    ).slice(0, 6);
+
+    const posts = communityPosts.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.content.toLowerCase().includes(q) ||
+        p.authorName.toLowerCase().includes(q) ||
+        p.campus.toLowerCase().includes(q)
+    );
+
+    const events = upcomingEvents.filter(
+      (e) =>
+        e.title.toLowerCase().includes(q) ||
+        e.venue.toLowerCase().includes(q) ||
+        e.organizer.toLowerCase().includes(q)
+    );
+
+    return { students, posts, events };
+  }, [q]);
+
+  const totalResults = searchResults.students.length + searchResults.posts.length + searchResults.events.length;
+  const showDropdown = isSearchFocused && hasQuery;
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8 py-2">
       {/* 1. Welcome Header */}
@@ -86,16 +135,131 @@ export const StudentHomeScreen: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 2. Simple Search Bar */}
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+      {/* 2. Search Bar with Live Results */}
+      <div className="relative" ref={searchRef}>
+        <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 z-10" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onFocus={() => setIsSearchFocused(true)}
           placeholder="Search students, events, or community posts..."
-          className="w-full bg-slate-900/90 border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-lg"
+          className="w-full bg-slate-900/90 border border-white/10 rounded-2xl pl-11 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-lg"
         />
+        {hasQuery && (
+          <button
+            onClick={() => { setSearchQuery(""); setIsSearchFocused(false); }}
+            className="absolute right-3 top-3 p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* ─── Live Search Results Dropdown ─── */}
+        {showDropdown && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40 z-30 max-h-[60vh] overflow-y-auto">
+            {totalResults === 0 ? (
+              <div className="p-6 text-center">
+                <Search className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400 font-medium">No results for "{searchQuery}"</p>
+                <p className="text-xs text-slate-500 mt-1">Try searching by name, campus, course, or interest</p>
+              </div>
+            ) : (
+              <div className="py-2">
+                {/* Student Results */}
+                {searchResults.students.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Students</span>
+                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.students.length} found</span>
+                    </div>
+                    {searchResults.students.map((student) => (
+                      <button
+                        key={student.id}
+                        onClick={() => { onNavigateToDiscover(); setSearchQuery(""); setIsSearchFocused(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
+                      >
+                        <img src={student.photos[0]} alt={student.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs font-bold text-white truncate">{student.name}, {student.age}</h4>
+                            {student.verified && <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />}
+                            {student.online && <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />}
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                            <GraduationCap className="w-3 h-3 shrink-0" /> {student.course}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                            <MapPin className="w-2.5 h-2.5 shrink-0" /> {student.campus}
+                          </p>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Community Post Results */}
+                {searchResults.posts.length > 0 && (
+                  <div className={searchResults.students.length > 0 ? "border-t border-white/5" : ""}>
+                    <div className="px-4 py-2 flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-pink-400" />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Community Posts</span>
+                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.posts.length} found</span>
+                    </div>
+                    {searchResults.posts.map((post) => (
+                      <button
+                        key={post.id}
+                        onClick={() => { onNavigateToCommunity(); setSearchQuery(""); setIsSearchFocused(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
+                      >
+                        <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-white truncate">{post.title}</h4>
+                          <p className="text-[11px] text-slate-400 truncate">{post.authorName} • {post.campus}</p>
+                          <p className="text-[10px] text-slate-500">❤️ {post.likes} • 💬 {post.comments}</p>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Event Results */}
+                {searchResults.events.length > 0 && (
+                  <div className={(searchResults.students.length > 0 || searchResults.posts.length > 0) ? "border-t border-white/5" : ""}>
+                    <div className="px-4 py-2 flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Events</span>
+                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.events.length} found</span>
+                    </div>
+                    {searchResults.events.map((event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => { onNavigateToEvents(); setSearchQuery(""); setIsSearchFocused(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
+                      >
+                        <img src={event.image} alt={event.title} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-white truncate">{event.title}</h4>
+                          <p className="text-[11px] text-slate-400 truncate">{event.venue} • {event.date}</p>
+                          <p className="text-[10px] text-slate-500">{event.attendeesCount} Going</p>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* View All footer */}
+                <div className="border-t border-white/5 px-4 py-2.5 flex items-center justify-center">
+                  <span className="text-[11px] text-slate-500">{totalResults} result{totalResults !== 1 ? "s" : ""} for "<span className="text-indigo-400 font-semibold">{searchQuery}</span>"</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 3. Recently Active Friends */}
