@@ -29,6 +29,7 @@ export const ACCENT_THEMES: { id: AccentTheme; name: string; icon: string; color
 
 interface Props {
   userProfile?: any;
+  onUpdateProfile?: (updated: any) => void;
   onNavigateToTab?: (tab: string) => void;
   accentTheme?: AccentTheme;
   onSelectAccentTheme?: (accent: AccentTheme) => void;
@@ -40,6 +41,7 @@ interface Props {
 
 export const SettingsScreen: React.FC<Props> = ({
   userProfile,
+  onUpdateProfile,
   onNavigateToTab,
   accentTheme = "blue",
   onSelectAccentTheme,

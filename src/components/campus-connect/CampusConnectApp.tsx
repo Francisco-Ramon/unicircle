@@ -42,31 +42,52 @@ export const CampusConnectApp: React.FC = () => {
   const [isBiometricVerified, setIsBiometricVerified] = useState(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
 
-  // User Profile
-  const [userProfile, setUserProfile] = useState<StudentProfileData>({
-    email: "student@uonbi.ac.ke",
-    firstName: "Alex",
-    lastName: "Chen",
-    nickname: "Lex",
-    dob: "2003-05-14",
-    gender: "Male",
-    orientation: "Straight",
-    interestedIn: "Female",
-    relationshipGoal: "Dating",
-    country: "Kenya",
-    institutionType: "University",
-    campus: "University of Nairobi",
-    institutionId: "uon",
-    faculty: "School of Computing & Informatics",
-    course: "Computer Science & AI",
-    yearOfStudy: "3rd Year",
-    height: "178 cm",
-    lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Dog lover", religion: "Christian" },
-    interests: ["AI & Coding", "Gym & Fitness", "Coffee & Cafes", "Indie Rock"],
-    bio: "CS major passionate about neural networks, late night coffee runs, and weekend hiking trips. Looking for genuine campus connections!",
-    photos: ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80"],
-    verified: true,
+  // User Profile with localStorage persistence
+  const [userProfile, setUserProfile] = useState<StudentProfileData>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_user_profile");
+        if (saved) return JSON.parse(saved);
+      } catch (err) {
+        console.warn("Failed to load user profile from localStorage:", err);
+      }
+    }
+    return {
+      email: "student@uonbi.ac.ke",
+      firstName: "Alex",
+      lastName: "Chen",
+      nickname: "Lex",
+      dob: "2003-05-14",
+      gender: "Male",
+      orientation: "Straight",
+      interestedIn: "Female",
+      relationshipGoal: "Dating",
+      country: "Kenya",
+      institutionType: "University",
+      campus: "University of Nairobi",
+      institutionId: "uon",
+      faculty: "School of Computing & Informatics",
+      course: "Computer Science & AI",
+      yearOfStudy: "3rd Year",
+      height: "178 cm",
+      lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Dog lover", religion: "Christian" },
+      interests: ["AI & Coding", "Gym & Fitness", "Coffee & Cafes", "Indie Rock"],
+      bio: "CS major passionate about neural networks, late night coffee runs, and weekend hiking trips. Looking for genuine campus connections!",
+      photos: ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80"],
+      verified: true,
+    };
   });
+
+  const handleUpdateProfile = (updated: StudentProfileData) => {
+    setUserProfile(updated);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("unicircle_user_profile", JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Failed to save user profile to localStorage:", err);
+      }
+    }
+  };
 
   // Centralized Navigation History State
   const [navState, setNavState] = useState<AppNavState>(() => {
@@ -442,7 +463,7 @@ export const CampusConnectApp: React.FC = () => {
               {activeTab === "profile" && (
                 <UserProfileStudio
                   profile={userProfile}
-                  onUpdateProfile={(up) => setUserProfile(up)}
+                  onUpdateProfile={handleUpdateProfile}
                   onLaunchLivenessScan={() => setShowVerificationStudio(true)}
                   onNavigateToSettings={() => handleTabChange("settings")}
                 />
@@ -451,6 +472,7 @@ export const CampusConnectApp: React.FC = () => {
               {activeTab === "settings" && (
                 <SettingsScreen
                   userProfile={userProfile}
+                  onUpdateProfile={handleUpdateProfile}
                   onNavigateToTab={(tab) => handleTabChange(tab as any)}
                   accentTheme={accentTheme}
                   onSelectAccentTheme={(acc) => setAccentTheme(acc)}
