@@ -16,6 +16,8 @@ import { NotificationsScreen } from "./NotificationsScreen";
 import { CampusAnalyticsChartScreen } from "./CampusAnalyticsChartScreen";
 import { SettingsScreen, AccentTheme, ThemeMode } from "./SettingsScreen";
 import { StudentHomeScreen } from "./StudentHomeScreen";
+import { CampusDesktopSidebar } from "./CampusDesktopSidebar";
+import { CampusRightPanel } from "./CampusRightPanel";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 import {
   NotificationPreferences,
@@ -159,11 +161,27 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
+  return (
+    <div className={`min-h-screen font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
       themeMode === "light" ? "bg-[#F4F6F9] text-slate-800" : "bg-[#070A10] text-slate-100"
     }`}>
-      {/* 1. SLIM & LIGHTWEIGHT TOP HEADER */}
-      <header className={`sticky top-0 z-40 backdrop-blur-xl px-4 py-2.5 border-b transition-colors duration-300 ${
+      {/* 1. DESKTOP LEFT SIDEBAR NAVIGATION (Visible on lg >= 1024px) */}
+      {isRegistered && (
+        <div className="hidden lg:flex h-screen sticky top-0 shrink-0 z-30">
+          <CampusDesktopSidebar
+            activeTab={activeTab}
+            onTabChange={(tab) => handleTabChange(tab)}
+            userProfile={userProfile}
+            unreadNotifCount={unreadNotifCount}
+            activeMatchesCount={matches.length}
+            themeMode={themeMode}
+            onSignOut={() => setIsRegistered(false)}
+          />
+        </div>
+      )}
+
+      {/* 2. MOBILE & TABLET TOP HEADER (Visible on < 1024px) */}
+      <header className={`lg:hidden sticky top-0 z-40 backdrop-blur-xl px-4 py-2.5 border-b transition-colors duration-300 ${
         themeMode === "light" ? "bg-white/90 border-slate-200 shadow-sm" : "bg-[#0B0F17]/90 border-white/10"
       }`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -187,9 +205,9 @@ export const CampusConnectApp: React.FC = () => {
             </div>
           </div>
 
-          {/* Desktop Navigation Icons Bar */}
+          {/* Desktop Navigation Icons Bar (Tablet fallback) */}
           {isRegistered && (
-            <nav className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-2xl border transition-colors duration-300 ${
+            <nav className={`hidden md:flex lg:hidden items-center gap-1 px-2 py-1 rounded-2xl border transition-colors duration-300 ${
               themeMode === "light" ? "bg-slate-100 border-slate-200" : "bg-slate-900/80 border-white/10"
             }`}>
               {[
@@ -320,146 +338,159 @@ export const CampusConnectApp: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. MAIN SINGLE-TASK SCREEN */}
-      <main className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full">
-        {!isRegistered ? (
-          <RegistrationWizard
-            onComplete={(profile) => {
-              setUserProfile(profile);
-              setIsRegistered(true);
-              setShowVerificationStudio(true);
-            }}
-          />
-        ) : showVerificationStudio ? (
-          <LiveFaceVerification
-            onVerified={() => {
-              setIsBiometricVerified(true);
-              setShowVerificationStudio(false);
-              setActiveTab("home");
-            }}
-            onSkipDemo={() => {
-              setIsBiometricVerified(true);
-              setShowVerificationStudio(false);
-            }}
-          />
-        ) : (
-          <>
-            {activeTab === "home" && (
-              <StudentHomeScreen
-                userProfile={userProfile}
-                onNavigateToDiscover={() => handleTabChange("discover")}
-                onNavigateToEvents={() => handleTabChange("events")}
-                onNavigateToCommunity={() => handleTabChange("communities")}
-                onNavigate={handleNavigate}
-              />
-            )}
+      {/* 3. CENTER COLUMN MAIN CONTENT WRAPPER */}
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
+        <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0">
+          {!isRegistered ? (
+            <RegistrationWizard
+              onComplete={(profile) => {
+                setUserProfile(profile);
+                setIsRegistered(true);
+                setShowVerificationStudio(true);
+              }}
+            />
+          ) : showVerificationStudio ? (
+            <LiveFaceVerification
+              onVerified={() => {
+                setIsBiometricVerified(true);
+                setShowVerificationStudio(false);
+                setActiveTab("home");
+              }}
+              onSkipDemo={() => {
+                setIsBiometricVerified(true);
+                setShowVerificationStudio(false);
+              }}
+            />
+          ) : (
+            <>
+              {activeTab === "home" && (
+                <StudentHomeScreen
+                  userProfile={userProfile}
+                  onNavigateToDiscover={() => handleTabChange("discover")}
+                  onNavigateToEvents={() => handleTabChange("events")}
+                  onNavigateToCommunity={() => handleTabChange("communities")}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {activeTab === "discover" && (
-              <DiscoverDeck
-                currentProfile={userProfile}
-                profiles={TWENTY_STUDENT_PROFILES}
-                onSwipeLike={handleSwipeLike}
-                onSwipePass={handleSwipePass}
-                onSwipeSuperLike={handleSwipeSuperLike}
-                onOpenFilters={() => setShowFilterDrawer(true)}
-                intentMode={intentMode}
-                navState={navState}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {activeTab === "discover" && (
+                <DiscoverDeck
+                  currentProfile={userProfile}
+                  profiles={TWENTY_STUDENT_PROFILES}
+                  onSwipeLike={handleSwipeLike}
+                  onSwipePass={handleSwipePass}
+                  onSwipeSuperLike={handleSwipeSuperLike}
+                  onOpenFilters={() => setShowFilterDrawer(true)}
+                  intentMode={intentMode}
+                  navState={navState}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {activeTab === "communities" && (
-              <CommunityHub
-                userProfile={userProfile}
-                navState={navState}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {activeTab === "communities" && (
+                <CommunityHub
+                  userProfile={userProfile}
+                  navState={navState}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {activeTab === "events" && (
-              <CampusEventsHub
-                userProfile={userProfile}
-                navState={navState}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {activeTab === "events" && (
+                <CampusEventsHub
+                  userProfile={userProfile}
+                  navState={navState}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {activeTab === "chat" && (
-              <RealTimeChatSuite
-                activeMatch={activeChatMatch}
-                matches={matches}
-                onSelectMatch={(m) => setActiveChatMatch(m)}
-                navState={navState}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {activeTab === "chat" && (
+                <RealTimeChatSuite
+                  activeMatch={activeChatMatch}
+                  matches={matches}
+                  onSelectMatch={(m) => setActiveChatMatch(m)}
+                  navState={navState}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {(activeTab === "notifications" || activeTab === "alerts") && (
-              <NotificationsScreen
-                userProfile={userProfile}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {(activeTab === "notifications" || activeTab === "alerts") && (
+                <NotificationsScreen
+                  userProfile={userProfile}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {(activeTab === "chart" || activeTab === "analytics") && (
-              <CampusAnalyticsChartScreen
-                userProfile={userProfile}
-                onNavigate={handleNavigate}
-              />
-            )}
+              {(activeTab === "chart" || activeTab === "analytics") && (
+                <CampusAnalyticsChartScreen
+                  userProfile={userProfile}
+                  onNavigate={handleNavigate}
+                />
+              )}
 
-            {activeTab === "profile" && (
-              <UserProfileStudio
-                profile={userProfile}
-                onUpdateProfile={(up) => setUserProfile(up)}
-                onLaunchLivenessScan={() => setShowVerificationStudio(true)}
-                onNavigateToSettings={() => handleTabChange("settings")}
-              />
-            )}
+              {activeTab === "profile" && (
+                <UserProfileStudio
+                  profile={userProfile}
+                  onUpdateProfile={(up) => setUserProfile(up)}
+                  onLaunchLivenessScan={() => setShowVerificationStudio(true)}
+                  onNavigateToSettings={() => handleTabChange("settings")}
+                />
+              )}
 
-            {activeTab === "settings" && (
-              <SettingsScreen
-                userProfile={userProfile}
-                onNavigateToTab={(tab) => handleTabChange(tab as any)}
-                accentTheme={accentTheme}
-                onSelectAccentTheme={(acc) => setAccentTheme(acc)}
-                themeMode={themeMode}
-                onSelectThemeMode={(mode) => setThemeMode(mode)}
-                notificationPrefs={notifPrefs}
-                onUpdateNotificationPrefs={(p) => setNotifPrefs(p)}
-              />
-            )}
-          </>
+              {activeTab === "settings" && (
+                <SettingsScreen
+                  userProfile={userProfile}
+                  onNavigateToTab={(tab) => handleTabChange(tab as any)}
+                  accentTheme={accentTheme}
+                  onSelectAccentTheme={(acc) => setAccentTheme(acc)}
+                  themeMode={themeMode}
+                  onSelectThemeMode={(mode) => setThemeMode(mode)}
+                  notificationPrefs={notifPrefs}
+                  onUpdateNotificationPrefs={(p) => setNotifPrefs(p)}
+                />
+              )}
+            </>
+          )}
+        </main>
+
+        {/* 4. MOBILE BOTTOM NAVIGATION BAR (< 768px) */}
+        {isRegistered && (
+          <div className={`md:hidden sticky bottom-0 z-40 backdrop-blur-xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 ${
+            themeMode === "light" ? "bg-white/95 border-slate-200 shadow-lg" : "bg-[#0B0F17]/95 border-white/10"
+          }`}>
+            {[
+              { id: "home", label: "Home", icon: Home },
+              { id: "discover", label: "Discover", icon: Search },
+              { id: "communities", label: "Communities", icon: Users },
+              { id: "events", label: "Events", icon: Calendar },
+              { id: "chat", label: "Chats", icon: MessageSquare },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id as any)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition ${
+                    isActive ? "text-indigo-400 font-extrabold" : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? "text-indigo-400" : ""}`} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         )}
-      </main>
+      </div>
 
-      {/* 3. MOBILE BOTTOM NAVIGATION BAR */}
+      {/* 5. DESKTOP RIGHT CONTEXTUAL PANEL (Visible on xl >= 1280px) */}
       {isRegistered && (
-        <div className={`md:hidden sticky bottom-0 z-40 backdrop-blur-xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 ${
-          themeMode === "light" ? "bg-white/95 border-slate-200 shadow-lg" : "bg-[#0B0F17]/95 border-white/10"
-        }`}>
-          {[
-            { id: "home", label: "Home", icon: Home },
-            { id: "discover", label: "Discover", icon: Search },
-            { id: "communities", label: "Communities", icon: Users },
-            { id: "events", label: "Events", icon: Calendar },
-            { id: "chat", label: "Chats", icon: MessageSquare },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id as any)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition ${
-                  isActive ? "text-indigo-400 font-extrabold" : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? "text-indigo-400" : ""}`} />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="hidden xl:flex h-screen sticky top-0 shrink-0 z-30">
+          <CampusRightPanel
+            onNavigate={handleNavigate}
+            userProfile={userProfile}
+            themeMode={themeMode}
+          />
         </div>
       )}
 
