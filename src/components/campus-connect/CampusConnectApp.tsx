@@ -161,7 +161,6 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   return (
-  return (
     <div className={`min-h-screen font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
       themeMode === "light" ? "bg-[#F4F6F9] text-slate-800" : "bg-[#070A10] text-slate-100"
     }`}>
