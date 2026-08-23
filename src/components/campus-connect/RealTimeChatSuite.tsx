@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft } from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
 import {
@@ -42,12 +42,33 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
 };
 
 export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && currentMatch) {
+      const fileUrl = URL.createObjectURL(files[0]);
+      const imgMsg: ChatMessage = {
+        id: `img-${Date.now()}`,
+        senderId: "me",
+        text: "Shared a photo",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isRead: true,
+        type: "image",
+        mediaUrl: fileUrl,
+      };
+      setMessagesMap((prev) => ({
+        ...prev,
+        [currentMatch.id]: [...(prev[currentMatch.id] || []), imgMsg],
+      }));
+    }
+  };
 
   const currentMatch = (navState?.tab === "chat" && navState.matchId)
     ? (matches.find((m) => m.id === navState.matchId) || activeMatch)
@@ -277,7 +298,12 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
                             : "bg-slate-950 border border-white/10 text-slate-200 rounded-bl-none"
                         }`}
                       >
-                        {msg.type === "voice" ? (
+                        {msg.type === "image" && msg.mediaUrl ? (
+                          <div className="space-y-1">
+                            <img src={msg.mediaUrl} alt="Shared photo" className="rounded-xl max-h-56 w-full object-cover border border-white/10" />
+                            {msg.text && msg.text !== "Shared a photo" && <p className="pt-1">{msg.text}</p>}
+                          </div>
+                        ) : msg.type === "voice" ? (
                           <div className="flex items-center gap-3 min-w-[180px]">
                             <button
                               onClick={() => setPlayingVoiceId(playingVoiceId === msg.id ? null : msg.id)}
@@ -313,6 +339,14 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
 
             {/* Input Bar */}
             <div className="p-3 border-t border-white/10 bg-slate-950 shrink-0">
+              <input
+                type="file"
+                ref={chatFileInputRef}
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+
               {isRecording ? (
                 <div className="flex items-center justify-between px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-2xl animate-pulse">
                   <div className="flex items-center gap-2 text-xs font-bold text-red-300 truncate pr-2">
@@ -331,6 +365,15 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0"
+                    title="Attach Photo"
+                  >
+                    <Image className="w-4 h-4 text-pink-400" />
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsRecording(true);
                       setRecordingSeconds(4);
@@ -338,7 +381,7 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
                     className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0"
                     title="Voice Note"
                   >
-                    <Mic className="w-4 h-4" />
+                    <Mic className="w-4 h-4 text-indigo-400" />
                   </button>
 
                   <input
