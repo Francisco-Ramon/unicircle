@@ -238,7 +238,7 @@ export const CampusConnectApp: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <img
-              src="/unicircle-logo.png"
+              src="/unicircle-icon.png"
               alt="UniCircle Logo"
               className="w-8 h-8 object-contain filter drop-shadow-[0_0_8px_rgba(99,102,241,0.4)] group-hover:scale-105 transition-transform"
             />

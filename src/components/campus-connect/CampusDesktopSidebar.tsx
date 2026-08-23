@@ -47,7 +47,7 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
           className="flex items-center gap-3 px-2 py-1 cursor-pointer group"
         >
           <img
-            src="/unicircle-logo.png"
+            src="/unicircle-icon.png"
             alt="UniCircle Logo"
             className="w-9 h-9 object-contain filter drop-shadow-[0_0_10px_rgba(99,102,241,0.5)] group-hover:scale-105 transition-transform"
           />
