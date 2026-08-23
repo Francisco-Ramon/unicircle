@@ -142,6 +142,31 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
 
   // Host Event Modal
   const [showHostModal, setShowHostModal] = useState(false);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (selectedEvent || showHostModal) {
+        setSelectedEvent(null);
+        setShowHostModal(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedEvent, showHostModal]);
+
+  const openEventDetail = (event: CampusEvent) => {
+    setSelectedEvent(event);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "event-detail", eventId: event.id, tab: "events" }, "", "#events");
+    }
+  };
+
+  const openHostEventModal = () => {
+    setShowHostModal(true);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "host-event", tab: "events" }, "", "#events");
+    }
+  };
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventCategory, setNewEventCategory] = useState<CampusEvent["category"]>("Party");
   const [newEventDate, setNewEventDate] = useState("");
@@ -289,7 +314,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
         </div>
 
         <button
-          onClick={() => setShowHostModal(true)}
+          onClick={openHostEventModal}
           className="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 self-start sm:self-auto"
         >
           <PlusCircle className="w-4 h-4" /> Host Campus Event
@@ -331,7 +356,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
         {filteredEvents.map((evt) => (
           <div
             key={evt.id}
-            onClick={() => setSelectedEvent(evt)}
+            onClick={() => openEventDetail(evt)}
             className="bg-slate-900/80 border border-white/10 rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group hover:border-indigo-500/50 cursor-pointer transition duration-300"
           >
             <div>

@@ -44,12 +44,29 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
   // Mobile navigation state: "list" shows conversations, "chat" shows selected thread
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
-  const currentMatch = activeMatch || matches[0];
-  const activeMessages = currentMatch ? messagesMap[currentMatch.id] || [] : [];
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (mobileView === "chat") {
+        setMobileView("list");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [mobileView]);
 
   const handleSelectMatchInternal = (m: StudentProfile) => {
     onSelectMatch(m);
     setMobileView("chat");
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "chat-thread", matchId: m.id, tab: "chat" }, "", "#chat");
+    }
+  };
+
+  const handleMobileBack = () => {
+    setMobileView("list");
+    if (typeof window !== "undefined" && window.history.state?.modal === "chat-thread") {
+      window.history.back();
+    }
   };
 
   const handleSendMessage = () => {
@@ -196,7 +213,7 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
               <div className="flex items-center gap-2.5">
                 {/* Back Arrow for Mobile Screen */}
                 <button
-                  onClick={() => setMobileView("list")}
+                  onClick={handleMobileBack}
                   className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition"
                   title="Back to messages"
                 >

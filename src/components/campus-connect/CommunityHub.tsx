@@ -183,6 +183,18 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
 
   // Create Event Modal under Community
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (selectedEvent || showCreateEventModal || showSwitcher) {
+        setSelectedEvent(null);
+        setShowCreateEventModal(false);
+        setShowSwitcher(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedEvent, showCreateEventModal, showSwitcher]);
   const [eventTitle, setEventTitle] = useState("");
   const [eventCategory, setEventCategory] = useState<CampusEvent["category"]>("Party");
   const [eventDate, setEventDate] = useState("");

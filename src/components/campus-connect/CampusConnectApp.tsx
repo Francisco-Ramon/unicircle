@@ -50,8 +50,17 @@ export const CampusConnectApp: React.FC = () => {
     verified: true,
   });
 
-  // Active Screen State
-  const [activeTab, setActiveTab] = useState<"home" | "discover" | "communities" | "events" | "chat" | "notifications" | "profile" | "settings">("home");
+  // Active Screen State with History Sync
+  const VALID_TABS = ["home", "discover", "communities", "events", "chat", "notifications", "profile", "settings"] as const;
+  type TabType = typeof VALID_TABS[number];
+
+  const getTabFromHash = (): TabType => {
+    if (typeof window === "undefined") return "home";
+    const hash = window.location.hash.replace("#", "").split("?")[0];
+    return VALID_TABS.includes(hash as TabType) ? (hash as TabType) : "home";
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getTabFromHash);
   const [intentMode, setIntentMode] = useState<string>("Dating");
   const [discoveryRadius, setDiscoveryRadius] = useState<"MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL">("NATIONWIDE");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -67,6 +76,40 @@ export const CampusConnectApp: React.FC = () => {
   const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
   const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(TWENTY_STUDENT_PROFILES[0]);
   const [celebratedMatch, setCelebratedMatch] = useState<StudentProfile | null>(null);
+
+  // Synchronize URL hash and browser history (popstate / back button)
+  React.useEffect(() => {
+    const currentHashTab = getTabFromHash();
+    if (!window.history.state || !window.history.state.tab) {
+      window.history.replaceState({ tab: currentHashTab }, "", `#${currentHashTab}`);
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.tab && VALID_TABS.includes(e.state.tab)) {
+        setActiveTab(e.state.tab);
+      } else {
+        const hashTab = getTabFromHash();
+        setActiveTab(hashTab);
+      }
+      setShowFilterDrawer(false);
+      setShowUserDropdown(false);
+      setCelebratedMatch(null);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleTabChange = (newTab: TabType) => {
+    if (newTab === activeTab) return;
+    setActiveTab(newTab);
+    setShowUserDropdown(false);
+
+    // Update history state smoothly without creating duplicate entries for identical tab
+    if (window.location.hash !== `#${newTab}`) {
+      window.history.pushState({ tab: newTab }, "", `#${newTab}`);
+    }
+  };
 
   const handleSwipeLike = (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
@@ -94,7 +137,7 @@ export const CampusConnectApp: React.FC = () => {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Brand Logo */}
           <div
-            onClick={() => setActiveTab("home")}
+            onClick={() => handleTabChange("home")}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <img
@@ -128,7 +171,7 @@ export const CampusConnectApp: React.FC = () => {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => handleTabChange(tab.id as any)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       isActive
                         ? "bg-gradient-to-r from-indigo-600 to-pink-600 text-white shadow-md shadow-indigo-600/20"
@@ -149,7 +192,7 @@ export const CampusConnectApp: React.FC = () => {
           <div className="flex items-center gap-2">
             {/* Notifications Bell */}
             <button
-              onClick={() => setActiveTab("notifications")}
+              onClick={() => handleTabChange("notifications")}
               className={`relative p-2 rounded-xl border transition ${
                 activeTab === "notifications"
                   ? "bg-indigo-600 text-white border-indigo-500"
@@ -184,35 +227,35 @@ export const CampusConnectApp: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => { setActiveTab("profile"); setShowUserDropdown(false); }}
+                    onClick={() => { handleTabChange("profile"); setShowUserDropdown(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <User className="w-4 h-4 text-indigo-400" /> My Profile
                   </button>
 
                   <button
-                    onClick={() => { setActiveTab("settings"); setShowUserDropdown(false); }}
+                    onClick={() => { handleTabChange("settings"); setShowUserDropdown(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
                   </button>
 
                   <button
-                    onClick={() => { setActiveTab("settings"); setShowUserDropdown(false); }}
+                    onClick={() => { handleTabChange("settings"); setShowUserDropdown(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <Palette className="w-4 h-4 text-pink-400" /> Personalize Theme
                   </button>
 
                   <button
-                    onClick={() => { setActiveTab("communities"); setShowUserDropdown(false); }}
+                    onClick={() => { handleTabChange("communities"); setShowUserDropdown(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <Users className="w-4 h-4 text-emerald-400" /> Communities
                   </button>
 
                   <button
-                    onClick={() => { setActiveTab("events"); setShowUserDropdown(false); }}
+                    onClick={() => { handleTabChange("events"); setShowUserDropdown(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     <Calendar className="w-4 h-4 text-amber-400" /> Events
@@ -260,9 +303,9 @@ export const CampusConnectApp: React.FC = () => {
             {activeTab === "home" && (
               <StudentHomeScreen
                 userProfile={userProfile}
-                onNavigateToDiscover={() => setActiveTab("discover")}
-                onNavigateToEvents={() => setActiveTab("events")}
-                onNavigateToCommunity={() => setActiveTab("communities")}
+                onNavigateToDiscover={() => handleTabChange("discover")}
+                onNavigateToEvents={() => handleTabChange("events")}
+                onNavigateToCommunity={() => handleTabChange("communities")}
               />
             )}
 
@@ -297,14 +340,14 @@ export const CampusConnectApp: React.FC = () => {
                 profile={userProfile}
                 onUpdateProfile={(up) => setUserProfile(up)}
                 onLaunchLivenessScan={() => setShowVerificationStudio(true)}
-                onNavigateToSettings={() => setActiveTab("settings")}
+                onNavigateToSettings={() => handleTabChange("settings")}
               />
             )}
 
             {activeTab === "settings" && (
               <SettingsScreen
                 userProfile={userProfile}
-                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                onNavigateToTab={(tab) => handleTabChange(tab as any)}
                 accentTheme={accentTheme}
                 onSelectAccentTheme={(acc) => setAccentTheme(acc)}
                 themeMode={themeMode}
@@ -332,7 +375,7 @@ export const CampusConnectApp: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => handleTabChange(tab.id as any)}
                 className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition ${
                   isActive ? "text-indigo-400 font-extrabold" : "text-slate-500 hover:text-slate-300"
                 }`}

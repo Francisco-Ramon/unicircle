@@ -70,7 +70,26 @@ export const DiscoverDeck: React.FC<Props> = ({
   const openProfile = (student: StudentProfile) => {
     setSelectedProfile(student);
     setActivePhotoIndex(0);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "profile", profileId: student.id, tab: "discover" }, "", "#discover");
+    }
   };
+
+  const closeProfile = () => {
+    setSelectedProfile(null);
+    setShowReportModal(false);
+    setShowBlockConfirm(false);
+  };
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (selectedProfile || showReportModal || showBlockConfirm) {
+        closeProfile();
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedProfile, showReportModal, showBlockConfirm]);
 
   const photoCount = selectedProfile?.photos?.length || 0;
 
