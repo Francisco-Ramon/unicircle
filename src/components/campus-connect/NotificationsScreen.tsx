@@ -103,6 +103,44 @@ export const NotificationsScreen: React.FC<Props> = ({ userProfile, onNavigate }
     saveStoredNotifications(updated);
   };
 
+  const handleNotificationClick = (notif: Notification, e?: React.MouseEvent) => {
+    if ((e?.target as HTMLElement)?.closest("button")) return;
+
+    // 1. Mark notification as read
+    const updated = safeNotifications.map((n) =>
+      n.id === notif.id ? { ...n, read: true } : n
+    );
+    setNotifications(updated);
+    saveStoredNotifications(updated);
+    window.dispatchEvent(new Event("unicircle-notifications-updated"));
+
+    // 2. Smart Redirection to target source
+    if (!onNavigate) return;
+
+    const targetId = notif.entityId || "sp-1";
+    const msgLower = (notif.message || "").toLowerCase();
+
+    if (notif.type === "direct_message" || msgLower.includes("message") || msgLower.includes("chat") || msgLower.includes("sent you")) {
+      onNavigate({ tab: "chat", matchId: targetId, chatView: "chat" });
+    } else if (notif.type === "event_reminder" || msgLower.includes("event") || msgLower.includes("gathering") || msgLower.includes("meetup")) {
+      onNavigate({ tab: "events", eventId: targetId });
+    } else if (notif.type === "community_post" || msgLower.includes("community") || msgLower.includes("post") || msgLower.includes("group")) {
+      onNavigate({ tab: "communities" });
+    } else if (
+      notif.type === "connection_accepted" ||
+      notif.type === "friend_request" ||
+      notif.type === "relationship_interest" ||
+      notif.type === "study_invite" ||
+      msgLower.includes("accepted") ||
+      msgLower.includes("request") ||
+      msgLower.includes("match")
+    ) {
+      onNavigate({ tab: "discover", matchId: targetId });
+    } else {
+      onNavigate({ tab: "discover" });
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 py-2">
       {/* Header */}
@@ -212,10 +250,11 @@ export const NotificationsScreen: React.FC<Props> = ({ userProfile, onNavigate }
               return (
                 <div
                   key={notif.id}
-                  className={`flex items-start gap-3.5 p-4 rounded-2xl transition ${
+                  onClick={(e) => handleNotificationClick(notif, e)}
+                  className={`flex items-start gap-3.5 p-4 rounded-2xl transition cursor-pointer group border ${
                     notif.read
-                      ? "bg-slate-900/40"
-                      : "bg-slate-900/90 border border-indigo-500/30 shadow-lg shadow-indigo-950/20"
+                      ? "bg-slate-900/40 border-white/5 hover:border-indigo-500/40 hover:bg-slate-900/80"
+                      : "bg-slate-900/90 border-indigo-500/40 shadow-lg shadow-indigo-950/20 hover:border-indigo-400"
                   }`}
                 >
                   {/* Avatar */}
@@ -223,7 +262,7 @@ export const NotificationsScreen: React.FC<Props> = ({ userProfile, onNavigate }
                     <img
                       src={notif.fromAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"}
                       alt={notif.fromName || "User"}
-                      className="w-11 h-11 rounded-xl object-cover"
+                      className="w-11 h-11 rounded-xl object-cover group-hover:scale-105 transition-transform"
                     />
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-slate-950 flex items-center justify-center border border-white/10">
                       {getNotificationIcon(notif.type)}
@@ -233,25 +272,36 @@ export const NotificationsScreen: React.FC<Props> = ({ userProfile, onNavigate }
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-slate-200 leading-snug">
-                      <span className="font-bold text-white">{notif.fromName}</span>{" "}
+                      <span className="font-bold text-white group-hover:text-indigo-300 transition">{notif.fromName}</span>{" "}
                       {notif.message}
                     </p>
                     {notif.fromUniversity && (
                       <p className="text-[11px] text-slate-500 mt-0.5">{notif.fromUniversity}</p>
                     )}
-                    <p className="text-[11px] text-slate-500 mt-0.5">{notif.timeAgo || "Recently"}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-slate-500">{notif.timeAgo || "Recently"}</span>
+                      <span className="text-[10px] text-indigo-400 font-semibold opacity-0 group-hover:opacity-100 transition">
+                        Tap to view →
+                      </span>
+                    </div>
 
                     {/* Action buttons for requests */}
                     {isUnacted && (
                       <div className="flex items-center gap-2 mt-2.5">
                         <button
-                          onClick={() => handleAccept(notif.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAccept(notif.id);
+                          }}
                           className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md shadow-indigo-600/30"
                         >
                           Accept
                         </button>
                         <button
-                          onClick={() => handleDecline(notif.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDecline(notif.id);
+                          }}
                           className="px-4 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-bold transition"
                         >
                           Decline
