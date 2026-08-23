@@ -52,6 +52,7 @@ export const DiscoverDeck: React.FC<Props> = ({
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [reportedProfiles, setReportedProfiles] = useState<Set<string>>(new Set());
   const [blockedProfiles, setBlockedProfiles] = useState<Set<string>>(new Set());
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [reportReason, setReportReason] = useState("");
@@ -350,33 +351,58 @@ export const DiscoverDeck: React.FC<Props> = ({
 
               {/* Connection Actions */}
               <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
-                  className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <UserPlus className="w-3.5 h-3.5" /> Friend Request
-                </button>
+                {sentRequests.has(selectedProfile.id) ? (
+                  <div className="col-span-2 py-3 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" /> Connection Request Sent / Connected
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
+                        setActionFeedback(`Friend request sent to ${selectedProfile.name}!`);
+                        setTimeout(() => setActionFeedback(null), 3000);
+                      }}
+                      className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" /> Friend Request
+                    </button>
 
-                <button
-                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
-                  className="py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <Heart className="w-3.5 h-3.5 fill-white" /> Relationship Interest
-                </button>
+                    <button
+                      onClick={() => {
+                        setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
+                        onSwipeLike(selectedProfile);
+                        setActionFeedback(`Expressed relationship interest to ${selectedProfile.name}!`);
+                        setTimeout(() => setActionFeedback(null), 3000);
+                      }}
+                      className="py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
+                    >
+                      <Heart className="w-3.5 h-3.5 fill-white" /> Relationship Interest
+                    </button>
 
-                <button
-                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
-                  className="py-3 rounded-xl bg-white/5 hover:bg-blue-600/20 border border-white/10 text-slate-300 hover:text-blue-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <BookOpen className="w-3.5 h-3.5" /> Study Together
-                </button>
+                    <button
+                      onClick={() => {
+                        setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
+                        setActionFeedback(`Study invite sent to ${selectedProfile.name}!`);
+                        setTimeout(() => setActionFeedback(null), 3000);
+                      }}
+                      className="py-3 rounded-xl bg-white/5 hover:bg-blue-600/20 border border-white/10 text-slate-300 hover:text-blue-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" /> Study Together
+                    </button>
 
-                <button
-                  onClick={() => { onSwipeLike(selectedProfile); setSelectedProfile(null); }}
-                  className="py-3 rounded-xl bg-white/5 hover:bg-amber-600/20 border border-white/10 text-slate-300 hover:text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <Briefcase className="w-3.5 h-3.5" /> Network
-                </button>
+                    <button
+                      onClick={() => {
+                        setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
+                        setActionFeedback(`Networking invite sent to ${selectedProfile.name}!`);
+                        setTimeout(() => setActionFeedback(null), 3000);
+                      }}
+                      className="py-3 rounded-xl bg-white/5 hover:bg-amber-600/20 border border-white/10 text-slate-300 hover:text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                    >
+                      <Briefcase className="w-3.5 h-3.5" /> Network
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Action Feedback Toast */}

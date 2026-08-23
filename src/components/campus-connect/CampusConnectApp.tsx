@@ -71,16 +71,16 @@ export const CampusConnectApp: React.FC = () => {
   const handleSwipeLike = (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
+      setCelebratedMatch(profile);
     }
-    setCelebratedMatch(profile);
   };
 
   const handleSwipePass = (profile: StudentProfile) => {};
   const handleSwipeSuperLike = (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
+      setCelebratedMatch(profile);
     }
-    setCelebratedMatch(profile);
   };
 
   return (
