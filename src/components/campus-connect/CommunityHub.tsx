@@ -463,13 +463,12 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
       {/* Community Sub-tabs */}
       <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/[0.06]">
         {[
-          { id: "feed", label: "Feed", icon: MessageSquare },
-          { id: "events", label: "Events", icon: Calendar },
-          { id: "members", label: "Members", icon: Users },
-          { id: "about", label: "About", icon: Info },
+          { id: "feed", label: "School Feed", icon: MessageSquare },
+          { id: "members", label: "Verified Students", icon: Users },
+          { id: "about", label: "About School", icon: Info },
         ].map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
+          const isActive = activeTab === tab.id || (tab.id === "feed" && activeTab === ("events" as any));
           return (
             <button
               key={tab.id}
@@ -488,8 +487,48 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
       </div>
 
       {/* FEED TAB */}
-      {activeTab === "feed" && (
+      {(activeTab === "feed" || (activeTab as any) === "events") && (
         <div className="space-y-4">
+          {/* School-Associated Events Section */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 border border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                Upcoming Events at {activeInst.shortName || activeInst.name}
+              </h3>
+              <button
+                onClick={() => onNavigate && onNavigate({ tab: "events" })}
+                className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1 cursor-pointer"
+              >
+                View Events Hub <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {communityEvents
+                .filter((evt) => !evt.campus || evt.campus.toLowerCase().includes(activeInst.name.toLowerCase()) || activeInst.name.toLowerCase().includes((evt.campus || "").toLowerCase()))
+                .slice(0, 2)
+                .map((evt) => (
+                  <div
+                    key={evt.id}
+                    onClick={() => {
+                      if (onNavigate) {
+                        onNavigate({ tab: "events", category: evt.category, eventId: evt.id, eventView: "details" });
+                      }
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5 hover:border-indigo-500/30 cursor-pointer transition group"
+                  >
+                    <img src={evt.image} alt={evt.title} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-white truncate group-hover:text-indigo-300 transition">{evt.title}</h4>
+                      <p className="text-[10px] text-slate-400 truncate">{evt.date} • {evt.location}</p>
+                      <span className="text-[9px] font-bold text-emerald-400 mt-0.5 inline-block">{evt.rsvpCount} going</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
           {/* Post Composer */}
           {!showNewPost ? (
             <button
