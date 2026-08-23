@@ -134,71 +134,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
 
         {/* Search Results Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-          {showAddCustom ? (
-            /* Custom Add Institution Form */
-            <form onSubmit={handleCreateCustomInstitution} className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <PlusCircle className="w-4 h-4 text-indigo-400" /> Add Custom Institution
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCustom(false)}
-                  className="text-xs text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">University / College Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="e.g. Mount Kenya University"
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Country *</label>
-                  <input
-                    type="text"
-                    required
-                    value={customCountry}
-                    onChange={(e) => setCustomCountry(e.target.value)}
-                    placeholder="e.g. Kenya"
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">City</label>
-                  <input
-                    type="text"
-                    value={customCity}
-                    onChange={(e) => setCustomCity(e.target.value)}
-                    placeholder="e.g. Thika"
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-2">
-                <Clock className="w-4 h-4 shrink-0 text-amber-400" />
-                <span>Submitted institutions are added immediately with <strong>pending verification</strong> badge.</span>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
-              >
-                Submit & Select Institution
-              </button>
-            </form>
-          ) : isQueryEmpty ? (
+          {isQueryEmpty ? (
             /* 1. INITIAL EMPTY SEARCH STATE (No static list!) */
             <div className="py-12 px-4 text-center space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
@@ -207,7 +143,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
               <div>
                 <h3 className="text-base font-bold text-white">Search your university</h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-                  Start typing the name of your university above to search 22,000+ institutions worldwide.
+                  Start typing the name of your university above to search 22,000+ accredited institutions worldwide.
                 </p>
               </div>
 
@@ -219,7 +155,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                     <button
                       key={term}
                       onClick={() => setQuery(term)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 hover:border-indigo-500/40 text-slate-300 hover:text-white text-xs font-semibold transition"
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 hover:border-indigo-500/40 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
                     >
                       {term}
                     </button>
@@ -231,25 +167,18 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
             /* 2. LOADING STATE */
             <div className="py-12 text-center space-y-3">
               <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
-              <p className="text-xs font-medium text-slate-300">Searching universities worldwide for "{query}"...</p>
+              <p className="text-xs font-medium text-slate-300">Searching global universities database for "{query}"...</p>
             </div>
           ) : results.length === 0 ? (
             /* 3. NO RESULTS STATE */
             <div className="p-8 text-center space-y-3">
               <Building2 className="w-10 h-10 text-slate-600 mx-auto" />
               <div>
-                <h4 className="text-sm font-bold text-white">No university found for "{query}"</h4>
-                <p className="text-xs text-slate-400 mt-1">Can't find your university in the worldwide database?</p>
+                <h4 className="text-sm font-bold text-white">No accredited university found for "{query}"</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                  Check your spelling or search by city / country name. Only official higher education institutions are listed.
+                </p>
               </div>
-              <button
-                onClick={() => {
-                  setCustomName(query);
-                  setShowAddCustom(true);
-                }}
-                className="px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30 text-xs font-bold transition flex items-center gap-1.5 mx-auto cursor-pointer"
-              >
-                <PlusCircle className="w-4 h-4" /> Add Your University Manually
-              </button>
             </div>
           ) : (
             /* 4. RESULTS LIST */
@@ -319,17 +248,6 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                   </div>
                 );
               })}
-
-              {/* Bottom Custom Add Button */}
-              <div className="pt-2">
-                <button
-                  onClick={() => setShowAddCustom(true)}
-                  className="w-full py-3 rounded-2xl bg-slate-950/40 border border-dashed border-white/15 hover:border-indigo-500/40 text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4 text-indigo-400" />
-                  <span>Can't find your university? Add it manually</span>
-                </button>
-              </div>
             </div>
           )}
         </div>
