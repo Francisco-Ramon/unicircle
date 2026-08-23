@@ -37,7 +37,7 @@ export interface CampusEvent {
   redirectUrl?: string;
 }
 
-const SAMPLE_EVENTS: CampusEvent[] = [
+export const SAMPLE_EVENTS: CampusEvent[] = [
   {
     id: "e1",
     title: "Annual Nairobi Inter-Campus Cultural Gala 🎉",
