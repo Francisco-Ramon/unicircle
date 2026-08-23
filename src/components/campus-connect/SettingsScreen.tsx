@@ -12,6 +12,7 @@ import {
   fetchNotificationPreferences,
   saveNotificationPreferenceToDatabase,
 } from "@/lib/notificationService";
+import { CampusAnalyticsChartScreen } from "./CampusAnalyticsChartScreen";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type AccentTheme = "blue" | "purple" | "emerald" | "sunset" | "ocean" | "rose";
@@ -360,6 +361,16 @@ export const SettingsScreen: React.FC<Props> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* CAMPUS ANALYTICS CATEGORY */}
+          {activeCategory === "analytics" && (
+            <CampusAnalyticsChartScreen
+              userProfile={userProfile}
+              onNavigate={(state) => {
+                if (onNavigateToTab) onNavigateToTab(state.tab);
+              }}
+            />
           )}
 
           {/* 3. NOTIFICATIONS CATEGORY */}
