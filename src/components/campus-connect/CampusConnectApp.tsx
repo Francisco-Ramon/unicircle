@@ -443,7 +443,6 @@ export const CampusConnectApp: React.FC = () => {
             { id: "discover", label: "Discover", icon: Search },
             { id: "communities", label: "Communities", icon: Users },
             { id: "events", label: "Events", icon: Calendar },
-            { id: "chart", label: "Analytics", icon: BarChart3 },
             { id: "chat", label: "Chats", icon: MessageSquare },
           ].map((tab) => {
             const Icon = tab.icon;
