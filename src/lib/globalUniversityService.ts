@@ -272,20 +272,28 @@ export function saveCustomInstitution(inst: Institution) {
  */
 export async function searchGlobalUniversities(query: string): Promise<Institution[]> {
   const q = query.trim().toLowerCase();
+  if (!q) {
+    return [];
+  }
+
+  // Normalize search term for common typos / shorthand
+  let normalizedQuery = q;
+  if (q.includes("stathmore") || q.includes("strath")) normalizedQuery = "strathmore";
+  if (q.includes("mku") || q.includes("mount kenya")) normalizedQuery = "mount kenya";
+  if (q.includes("karat")) normalizedQuery = "karatina";
+  if (q === "nyu") normalizedQuery = "new york university";
+  if (q === "mit") normalizedQuery = "massachusetts institute of technology";
+
   const customList = getCustomInstitutions();
   const allLocal = [...customList, ...EXTENDED_GLOBAL_INSTITUTIONS];
-
-  if (!q) {
-    return allLocal;
-  }
 
   // First check local matches immediately for fast response
   const localMatches = allLocal.filter(
     (i) =>
-      i.name.toLowerCase().includes(q) ||
-      i.shortName.toLowerCase().includes(q) ||
-      i.country.toLowerCase().includes(q) ||
-      i.city.toLowerCase().includes(q)
+      i.name.toLowerCase().includes(normalizedQuery) ||
+      i.shortName.toLowerCase().includes(normalizedQuery) ||
+      i.country.toLowerCase().includes(normalizedQuery) ||
+      i.city.toLowerCase().includes(normalizedQuery)
   );
 
   // Query Hipolabs & GitHub Open-Source Global Universities API concurrently
@@ -294,8 +302,8 @@ export async function searchGlobalUniversities(query: string): Promise<Instituti
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const [nameRes, countryRes] = await Promise.allSettled([
-      fetch(`https://universities.hipolabs.com/search?name=${encodeURIComponent(query)}`, { signal: controller.signal }),
-      fetch(`https://universities.hipolabs.com/search?country=${encodeURIComponent(query)}`, { signal: controller.signal }),
+      fetch(`https://universities.hipolabs.com/search?name=${encodeURIComponent(normalizedQuery)}`, { signal: controller.signal }),
+      fetch(`https://universities.hipolabs.com/search?country=${encodeURIComponent(normalizedQuery)}`, { signal: controller.signal }),
     ]);
     clearTimeout(timeoutId);
 

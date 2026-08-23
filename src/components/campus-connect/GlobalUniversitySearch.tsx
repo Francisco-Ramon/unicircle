@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Globe, X, PlusCircle, Check, Building2, ShieldCheck, Clock, MapPin, Sparkles } from "lucide-react";
+import { Search, Globe, X, PlusCircle, Check, Building2, ShieldCheck, Clock, MapPin, Sparkles, Loader2 } from "lucide-react";
 import { Institution } from "./UniversityDatabase";
 import { searchGlobalUniversities, getCountryFlag, saveCustomInstitution } from "@/lib/globalUniversityService";
 
@@ -13,7 +13,7 @@ interface Props {
 export const GlobalUniversitySearch: React.FC<Props> = ({
   onSelectInstitution,
   onClose,
-  title = "Select University / Institution",
+  title = "Change University",
   currentUniversityName,
 }) => {
   const [query, setQuery] = useState("");
@@ -26,18 +26,25 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
   const [customCountry, setCustomCountry] = useState("");
   const [customCity, setCustomCity] = useState("");
 
-  // Live search effect with debounce
+  // Live search effect with 300ms debounce
   useEffect(() => {
     let isMounted = true;
-    setIsSearching(true);
+    const trimmed = query.trim();
 
+    if (!trimmed) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
     const timer = setTimeout(async () => {
-      const res = await searchGlobalUniversities(query);
+      const res = await searchGlobalUniversities(trimmed);
       if (isMounted) {
         setResults(res);
         setIsSearching(false);
       }
-    }, 200);
+    }, 300);
 
     return () => {
       isMounted = false;
@@ -73,6 +80,8 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
     if (onClose) onClose();
   };
 
+  const isQueryEmpty = !query.trim();
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-white/15 rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -80,7 +89,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
         <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950/80">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-1">
-              <Globe className="w-3 h-3 text-indigo-400" /> Worldwide University Access
+              <Globe className="w-3 h-3 text-indigo-400" /> Global Live Search
             </div>
             <h2 className="text-lg font-black text-white">{title}</h2>
             {currentUniversityName && (
@@ -100,7 +109,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Search Bar Input */}
+        {/* Search Input Box */}
         <div className="p-4 bg-slate-950 border-b border-white/10 space-y-2">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 z-10" />
@@ -108,7 +117,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search any university worldwide (e.g. Oxford, Toronto, NYU, Nairobi, Tokyo)..."
+              placeholder="🔍 Search your university worldwide..."
               autoFocus
               className="w-full bg-slate-900 border border-white/10 rounded-2xl pl-10 pr-10 py-3 text-xs md:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
             />
@@ -121,9 +130,6 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
               </button>
             )}
           </div>
-          <p className="text-[10px] text-slate-500 px-1">
-            Search institutions globally across USA, UK, Canada, Australia, Kenya, Nigeria, Europe, Asia, and worldwide.
-          </p>
         </div>
 
         {/* Search Results Body */}
@@ -151,7 +157,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                   required
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="e.g. Imperial Institute of Technology"
+                  placeholder="e.g. Mount Kenya University"
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -164,7 +170,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                     required
                     value={customCountry}
                     onChange={(e) => setCustomCountry(e.target.value)}
-                    placeholder="e.g. Canada"
+                    placeholder="e.g. Kenya"
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -174,7 +180,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                     type="text"
                     value={customCity}
                     onChange={(e) => setCustomCity(e.target.value)}
-                    placeholder="e.g. Toronto"
+                    placeholder="e.g. Thika"
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -192,12 +198,47 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                 Submit & Select Institution
               </button>
             </form>
-          ) : results.length === 0 && !isSearching ? (
-            /* No Results Empty State */
+          ) : isQueryEmpty ? (
+            /* 1. INITIAL EMPTY SEARCH STATE (No static list!) */
+            <div className="py-12 px-4 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
+                <Search className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Search your university</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
+                  Start typing the name of your university above to search 22,000+ institutions worldwide.
+                </p>
+              </div>
+
+              {/* Quick suggestion chips */}
+              <div className="pt-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Try searching:</p>
+                <div className="flex flex-wrap items-center justify-center gap-2 max-w-md mx-auto">
+                  {["Mount Kenya", "Strathmore", "New York", "Oxford", "Harvard", "Toronto", "Karatina"].map((term) => (
+                    <button
+                      key={term}
+                      onClick={() => setQuery(term)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 hover:border-indigo-500/40 text-slate-300 hover:text-white text-xs font-semibold transition"
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : isSearching ? (
+            /* 2. LOADING STATE */
+            <div className="py-12 text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
+              <p className="text-xs font-medium text-slate-300">Searching universities worldwide for "{query}"...</p>
+            </div>
+          ) : results.length === 0 ? (
+            /* 3. NO RESULTS STATE */
             <div className="p-8 text-center space-y-3">
               <Building2 className="w-10 h-10 text-slate-600 mx-auto" />
               <div>
-                <h4 className="text-sm font-bold text-white">No institution found for "{query}"</h4>
+                <h4 className="text-sm font-bold text-white">No university found for "{query}"</h4>
                 <p className="text-xs text-slate-400 mt-1">Can't find your university in the worldwide database?</p>
               </div>
               <button
@@ -211,8 +252,13 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
               </button>
             </div>
           ) : (
-            /* Results List */
-            <>
+            /* 4. RESULTS LIST */
+            <div className="space-y-2">
+              <div className="px-1 pb-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>{results.length} universities found</span>
+                <span>Tap to select</span>
+              </div>
+
               {results.map((inst) => {
                 const flag = getCountryFlag(inst.country);
                 const isSelected = currentUniversityName && (
@@ -240,10 +286,9 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                       <div className="min-w-0">
                         <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate flex items-center gap-1.5">
                           {inst.name}
-                          <span className="text-[10px] font-semibold text-slate-400">({inst.shortName})</span>
                         </h4>
                         <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {flag} {inst.country} {inst.city ? `• ${inst.city}` : ""}
+                          {flag} {inst.country} {inst.city && inst.city !== inst.country ? `• ${inst.city}` : ""}
                         </p>
                       </div>
                     </div>
@@ -273,7 +318,7 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
                   <span>Can't find your university? Add it manually</span>
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
