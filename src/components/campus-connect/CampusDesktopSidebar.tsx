@@ -25,6 +25,7 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
   onSignOut,
 }) => {
   const isLight = themeMode === "light";
+  const [showProfileMenu, setShowProfileMenu] = React.useState(false);
 
   const navItems = [
     { id: "home", label: "Home", icon: Home },
@@ -33,9 +34,6 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
     { id: "events", label: "Campus Events", icon: Calendar },
     { id: "chat", label: "Chats & Messages", icon: MessageSquare, badge: activeMatchesCount > 0 ? activeMatchesCount : undefined },
     { id: "notifications", label: "Notifications", icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
-    { id: "profile", label: "My Profile", icon: User },
-    { id: "settings", label: "Settings", icon: Settings },
-    { id: "chart", label: "Campus Analytics", icon: BarChart3 },
   ];
 
   return (
@@ -69,7 +67,7 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id || (item.id === "chart" && activeTab === "analytics") || (item.id === "notifications" && activeTab === "alerts");
+            const isActive = activeTab === item.id || (item.id === "notifications" && activeTab === "alerts");
 
             return (
               <button
@@ -103,41 +101,86 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
         </nav>
       </div>
 
-      {/* User Profile Pill at Bottom */}
-      <div className={`p-3 rounded-2xl border transition-colors flex items-center justify-between gap-2.5 ${
-        isLight ? "bg-slate-100 border-slate-200" : "bg-slate-950/80 border-white/10"
-      }`}>
-        <div
-          onClick={() => onTabChange("profile")}
-          className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
-        >
-          <div className="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10">
-            <img
-              src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-              alt="User"
-              className="w-full h-full object-cover"
-            />
-            <span className="absolute bottom-0 right-0 p-0.5 bg-emerald-500 rounded-full text-slate-950">
-              <ShieldCheck className="w-2.5 h-2.5" />
-            </span>
-          </div>
-          <div className="min-w-0">
-            <h4 className={`text-xs font-bold truncate ${isLight ? "text-slate-900" : "text-white"}`}>
-              {userProfile?.firstName || "Student"} {userProfile?.lastName || ""}
-            </h4>
-            <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University"}</p>
-          </div>
-        </div>
+      {/* User Profile Pill at Bottom with Popup Menu */}
+      <div className="relative">
+        {/* Profile Dropup Menu */}
+        {showProfileMenu && (
+          <div className={`absolute bottom-full mb-2 left-0 right-0 p-2 rounded-2xl border shadow-2xl space-y-1 z-50 ${
+            isLight ? "bg-white border-slate-200 shadow-xl" : "bg-slate-900 border-white/15"
+          }`}>
+            <button
+              onClick={() => { onTabChange("profile"); setShowProfileMenu(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                activeTab === "profile"
+                  ? "bg-indigo-600 text-white"
+                  : isLight ? "text-slate-700 hover:bg-slate-100" : "text-slate-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <User className="w-4 h-4 text-indigo-400" /> My Profile
+            </button>
 
-        {onSignOut && (
-          <button
-            onClick={onSignOut}
-            className="p-1.5 rounded-xl hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition shrink-0 cursor-pointer"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+            <button
+              onClick={() => { onTabChange("settings"); setShowProfileMenu(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                activeTab === "settings"
+                  ? "bg-indigo-600 text-white"
+                  : isLight ? "text-slate-700 hover:bg-slate-100" : "text-slate-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
+            </button>
+
+            <button
+              onClick={() => { onTabChange("chart"); setShowProfileMenu(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                activeTab === "chart" || activeTab === "analytics"
+                  ? "bg-indigo-600 text-white"
+                  : isLight ? "text-slate-700 hover:bg-slate-100" : "text-slate-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
+            </button>
+
+            {onSignOut && (
+              <div className="pt-1 border-t border-white/10">
+                <button
+                  onClick={() => { onSignOut(); setShowProfileMenu(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         )}
+
+        <div
+          onClick={() => setShowProfileMenu(!showProfileMenu)}
+          className={`p-3 rounded-2xl border transition-colors flex items-center justify-between gap-2.5 cursor-pointer ${
+            isLight ? "bg-slate-100 border-slate-200 hover:border-slate-300" : "bg-slate-950/80 border-white/10 hover:border-white/20"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10">
+              <img
+                src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                alt="User"
+                className="w-full h-full object-cover"
+              />
+              <span className="absolute bottom-0 right-0 p-0.5 bg-emerald-500 rounded-full text-slate-950">
+                <ShieldCheck className="w-2.5 h-2.5" />
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h4 className={`text-xs font-bold truncate ${isLight ? "text-slate-900" : "text-white"}`}>
+                {userProfile?.firstName || "Student"} {userProfile?.lastName || ""}
+              </h4>
+              <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University"}</p>
+            </div>
+          </div>
+
+          <ChevronDown className={`w-4 h-4 transition-transform ${showProfileMenu ? "rotate-180 text-indigo-400" : "text-slate-400"}`} />
+        </div>
       </div>
     </aside>
   );
