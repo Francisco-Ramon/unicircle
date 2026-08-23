@@ -54,6 +54,8 @@ export const UserProfileStudio: React.FC<Props> = ({
     setIsEditing(false);
   };
 
+  const [activeViewerIndex, setActiveViewerIndex] = useState<number | null>(null);
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6 py-2">
       <input
@@ -67,9 +69,12 @@ export const UserProfileStudio: React.FC<Props> = ({
       {/* Profile Overview Card */}
       <div className="p-6 bg-slate-900/90 border border-white/10 rounded-3xl backdrop-blur-2xl shadow-xl space-y-5">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-          {/* Avatar with Verified Badge */}
-          <div className="relative w-24 h-24 rounded-2xl p-1 bg-gradient-to-tr from-indigo-500 to-pink-500 shadow-xl shrink-0">
-            <img src={photos[0]} alt={profile.firstName} className="w-full h-full object-cover rounded-xl" />
+          {/* Avatar with Verified Badge — tap to view full size */}
+          <div
+            onClick={() => setActiveViewerIndex(0)}
+            className="relative w-24 h-24 rounded-2xl p-1 bg-gradient-to-tr from-indigo-500 to-pink-500 shadow-xl shrink-0 cursor-pointer group"
+          >
+            <img src={photos[0]} alt={profile.firstName} className="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition" />
             <div className="absolute -bottom-1.5 -right-1.5 p-1.5 bg-emerald-500 rounded-xl text-slate-950 shadow-lg" title="Verified Student Account">
               <ShieldCheck className="w-4 h-4" />
             </div>
@@ -147,8 +152,8 @@ export const UserProfileStudio: React.FC<Props> = ({
       <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 backdrop-blur-2xl shadow-xl space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-white">Profile Photos</h3>
-            <p className="text-xs text-slate-400">Add photos to show your campus lifestyle</p>
+            <h3 className="text-sm font-bold text-white">Profile Photos ({photos.length})</h3>
+            <p className="text-xs text-slate-400">Tap any photo to view full size, or add new ones</p>
           </div>
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -160,11 +165,17 @@ export const UserProfileStudio: React.FC<Props> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {photos.map((url, idx) => (
-            <div key={idx} className="relative aspect-[3/4] rounded-2xl overflow-hidden group border border-white/10">
-              <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+            <div
+              key={idx}
+              onClick={() => setActiveViewerIndex(idx)}
+              className="relative aspect-[3/4] rounded-2xl overflow-hidden group border border-white/10 cursor-pointer shadow-md"
+            >
+              <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
               <button
-                onClick={() => handleRemovePhoto(idx)}
+                onClick={(e) => { e.stopPropagation(); handleRemovePhoto(idx); }}
                 className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 transition"
+                title="Remove Photo"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -172,6 +183,75 @@ export const UserProfileStudio: React.FC<Props> = ({
           ))}
         </div>
       </div>
+
+      {/* Photo Lightbox / Viewer Modal */}
+      {activeViewerIndex !== null && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setActiveViewerIndex(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-slate-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setActiveViewerIndex(null)}
+              className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/60 hover:bg-white/20 text-white transition"
+            >
+              <Trash2 className="w-0 h-0 hidden" /> {/* dummy for import */}
+              ✕
+            </button>
+
+            {/* Photo Counter */}
+            <div className="absolute top-3 left-3 z-20 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-xs font-bold text-white">
+              Photo {activeViewerIndex + 1} of {photos.length}
+            </div>
+
+            {/* Main Image */}
+            <div className="aspect-[3/4] max-h-[70vh] w-full bg-black relative flex items-center justify-center">
+              <img
+                src={photos[activeViewerIndex]}
+                alt={`Photo ${activeViewerIndex + 1}`}
+                className="w-full h-full object-contain"
+              />
+
+              {/* Prev / Next buttons */}
+              {activeViewerIndex > 0 && (
+                <button
+                  onClick={() => setActiveViewerIndex(activeViewerIndex - 1)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/80 text-white transition"
+                >
+                  ◀
+                </button>
+              )}
+              {activeViewerIndex < photos.length - 1 && (
+                <button
+                  onClick={() => setActiveViewerIndex(activeViewerIndex + 1)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/80 text-white transition"
+                >
+                  ▶
+                </button>
+              )}
+            </div>
+
+            {/* Thumbnail Navigation Bar */}
+            <div className="p-3 bg-slate-950 flex gap-2 overflow-x-auto justify-center">
+              {photos.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveViewerIndex(i)}
+                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition ${
+                    i === activeViewerIndex ? "border-indigo-500 scale-105" : "border-transparent opacity-50"
+                  }`}
+                >
+                  <img src={url} alt="Thumb" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
