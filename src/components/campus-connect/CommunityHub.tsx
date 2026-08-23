@@ -549,17 +549,35 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
 
           {/* Post Composer */}
           {!showNewPost ? (
-            <button
-              onClick={() => setShowNewPost(true)}
-              className="w-full flex items-center gap-3 p-4 rounded-2xl bg-slate-900/60 border border-white/[0.06] hover:border-white/10 transition text-left"
-            >
-              <img
-                src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-                alt="You"
-                className="w-9 h-9 rounded-xl object-cover"
-              />
-              <span className="text-sm text-slate-500">What's happening on campus?</span>
-            </button>
+            <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-white/[0.06] hover:border-white/10 transition">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <img
+                  src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                  alt="You"
+                  className="w-9 h-9 rounded-xl object-cover shrink-0"
+                />
+                <button
+                  onClick={() => setShowNewPost(true)}
+                  className="flex-1 text-left text-sm text-slate-400 hover:text-white transition truncate"
+                >
+                  What's happening on campus?
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setShowNewPost(true);
+                    setTimeout(() => postFileInputRef.current?.click(), 100);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  title="Upload photo from device"
+                >
+                  <Image className="w-4 h-4 text-indigo-400" />
+                  <span>Upload Photo</span>
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 space-y-3">
               <div className="flex items-start gap-3">
