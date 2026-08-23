@@ -49,7 +49,7 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
           <img
             src="/unicircle-icon.png"
             alt="UniCircle Logo"
-            className="w-9 h-9 object-contain filter drop-shadow-[0_0_10px_rgba(99,102,241,0.5)] group-hover:scale-105 transition-transform"
+            className="w-9 h-9 object-contain group-hover:scale-105 transition-transform"
           />
           <div>
             <h1 className={`text-lg font-black tracking-tight flex items-center gap-0.5 ${
