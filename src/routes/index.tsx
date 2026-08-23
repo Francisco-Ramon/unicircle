@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { SplashScreen } from "@/components/campus-connect/SplashScreen";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -11,6 +12,9 @@ function LandingPage() {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden bg-[#070A10] text-white selection:bg-indigo-500 selection:text-white">
+      {/* UniCircle X-Style Launch Splash Screen */}
+      <SplashScreen />
+
       {/* Background Campus Lifestyle Image with Dual Gradient Overlay */}
       <div className="absolute inset-0 z-0">
         <img
@@ -28,16 +32,14 @@ function LandingPage() {
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
-            src="/unicircle-logo.png"
+            src="/unicircle-icon.png"
             alt="UniCircle Logo"
-            className="w-12 h-12 md:w-14 md:h-14 object-contain filter drop-shadow-[0_0_15px_rgba(99,102,241,0.5)] hover:scale-105 transition-transform duration-300"
+            className="w-10 h-10 md:w-12 md:h-12 object-contain hover:scale-105 transition-transform duration-300"
           />
           <span className="text-xl md:text-2xl font-black tracking-tight text-white">
             Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-pink-500">Circle</span>
           </span>
         </div>
-
-
       </header>
 
       {/* Main One-Screen Hero Content */}
