@@ -589,14 +589,14 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
                       📊 Event Registration Analytics & Velocity
                     </h4>
                     <span className="text-[10px] text-emerald-400 font-bold">
-                      {Math.round((selectedEvent.rsvpCount / selectedEvent.maxCapacity) * 100)}% Capacity Filled
+                      {Math.round((selectedEvent.rsvpCount / (selectedEvent.maxCapacity || 100)) * 100)}% Capacity Filled
                     </span>
                   </div>
 
                   {/* Progress bar */}
                   <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden border border-white/5">
                     <div
-                      style={{ width: `${Math.min(100, Math.round((selectedEvent.rsvpCount / selectedEvent.maxCapacity) * 100))}%` }}
+                      style={{ width: `${Math.min(100, Math.round((selectedEvent.rsvpCount / (selectedEvent.maxCapacity || 100)) * 100))}%` }}
                       className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"
                     />
                   </div>
@@ -608,11 +608,11 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
                       <p className="text-[10px] text-slate-500 uppercase font-bold">Spots Remaining</p>
-                      <p className="text-base font-black text-emerald-400 mt-0.5">{Math.max(0, selectedEvent.maxCapacity - selectedEvent.rsvpCount)}</p>
+                      <p className="text-base font-black text-emerald-400 mt-0.5">{Math.max(0, (selectedEvent.maxCapacity || 100) - selectedEvent.rsvpCount)}</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
                       <p className="text-[10px] text-slate-500 uppercase font-bold">Max Capacity</p>
-                      <p className="text-base font-black text-pink-400 mt-0.5">{selectedEvent.maxCapacity}</p>
+                      <p className="text-base font-black text-pink-400 mt-0.5">{selectedEvent.maxCapacity || 100}</p>
                     </div>
                   </div>
                 </div>
