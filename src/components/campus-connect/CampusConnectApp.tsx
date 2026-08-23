@@ -89,9 +89,36 @@ export const CampusConnectApp: React.FC = () => {
   // User Profile Avatar "More" Dropdown State
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  // Theme & Personalization State
-  const [accentTheme, setAccentTheme] = useState<AccentTheme>("blue");
-  const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
+  // Theme & Personalization State (persisted to localStorage)
+  const [accentTheme, setAccentThemeState] = useState<AccentTheme>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("unicircle_accent_theme");
+      if (saved) return saved as AccentTheme;
+    }
+    return "blue";
+  });
+
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("unicircle_theme_mode");
+      if (saved === "light" || saved === "dark" || saved === "system") return saved as ThemeMode;
+    }
+    return "dark";
+  });
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("unicircle_theme_mode", mode);
+    }
+  };
+
+  const setAccentTheme = (acc: AccentTheme) => {
+    setAccentThemeState(acc);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("unicircle_accent_theme", acc);
+    }
+  };
 
   // Connections State
   const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
@@ -161,8 +188,8 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
-      themeMode === "light" ? "bg-[#F4F6F9] text-slate-800" : "bg-[#070A10] text-slate-100"
+    <div data-theme={themeMode} className={`min-h-screen font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
+      themeMode === "light" ? "bg-white text-slate-900" : "bg-[#070A10] text-slate-100"
     }`}>
       {/* 1. DESKTOP LEFT SIDEBAR NAVIGATION (Visible on lg >= 1024px) */}
       {isRegistered && (

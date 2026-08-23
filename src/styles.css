@@ -159,3 +159,13 @@ html, body {
     border: 1px solid oklch(1 0 0 / 0.08);
   }
 }
+
+/* Light Theme Pure White Override */
+[data-theme='light'] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] body::before {
+  display: none !important;
+}
