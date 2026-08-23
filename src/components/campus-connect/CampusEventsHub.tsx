@@ -581,10 +581,47 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">About Event</h4>
-                <p className="text-sm text-slate-200 leading-relaxed">{selectedEvent.description}</p>
-              </div>
+              {/* Conditional View: Chart / Analytics vs Description */}
+              {eventViewMode === "chart" ? (
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-4 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+                      📊 Event Registration Analytics & Velocity
+                    </h4>
+                    <span className="text-[10px] text-emerald-400 font-bold">
+                      {Math.round((selectedEvent.rsvpCount / selectedEvent.maxCapacity) * 100)}% Capacity Filled
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden border border-white/5">
+                    <div
+                      style={{ width: `${Math.min(100, Math.round((selectedEvent.rsvpCount / selectedEvent.maxCapacity) * 100))}%` }}
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Confirmed RSVPs</p>
+                      <p className="text-base font-black text-indigo-400 mt-0.5">{selectedEvent.rsvpCount}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Spots Remaining</p>
+                      <p className="text-base font-black text-emerald-400 mt-0.5">{Math.max(0, selectedEvent.maxCapacity - selectedEvent.rsvpCount)}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Max Capacity</p>
+                      <p className="text-base font-black text-pink-400 mt-0.5">{selectedEvent.maxCapacity}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">About Event</h4>
+                  <p className="text-sm text-slate-200 leading-relaxed">{selectedEvent.description}</p>
+                </div>
+              )}
 
               {/* Event Comments Section */}
               <div className="pt-4 border-t border-white/10 space-y-3">

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
-  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, Link2, Upload, Trash2
+  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
 } from "lucide-react";
 import { INSTITUTIONS_DATA, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
