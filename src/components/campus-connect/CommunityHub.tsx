@@ -256,10 +256,28 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
-  // New post form
+  // New post form & file upload
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostImage, setNewPostImage] = useState("");
+  const postFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handlePostImageFile = (file: File) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setNewPostImage(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePostFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handlePostImageFile(e.target.files[0]);
+    }
+  };
 
   const handleToggleLike = (postId: string) => {
     setPosts(posts.map((p) =>
@@ -561,25 +579,45 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
               </div>
 
               {newPostImage && (
-                <div className="relative">
-                  <img src={newPostImage} alt="Attached" className="w-full h-40 object-cover rounded-xl" />
-                  <button onClick={() => setNewPostImage("")} className="absolute top-2 right-2 p-1 rounded-full bg-black/60">
-                    <X className="w-3.5 h-3.5 text-white" />
-                  </button>
+                <div className="relative group rounded-xl overflow-hidden border border-white/10">
+                  <img src={newPostImage} alt="Attached preview" className="w-full max-h-56 object-cover rounded-xl" />
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => postFileInputRef.current?.click()}
+                      className="px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black/90 text-xs font-bold text-white transition backdrop-blur-md cursor-pointer"
+                    >
+                      Change Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewPostImage("")}
+                      className="p-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition backdrop-blur-md cursor-pointer"
+                      title="Remove image"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
 
               <div className="flex items-center justify-between pt-2 border-t border-white/5">
                 <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={postFileInputRef}
+                    accept="image/*"
+                    onChange={handlePostFileChange}
+                    className="hidden"
+                  />
                   <button
-                    onClick={() => setNewPostImage("https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80")}
-                    className="p-2 rounded-lg hover:bg-white/5 text-slate-400 transition"
-                    title="Add image"
+                    type="button"
+                    onClick={() => postFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    title="Upload Photo from Device"
                   >
-                    <Image className="w-4 h-4" />
-                  </button>
-                  <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 transition" title="Add chart/poll">
-                    <BarChart3 className="w-4 h-4" />
+                    <Image className="w-4 h-4 text-indigo-400" />
+                    <span>Upload Photo</span>
                   </button>
                 </div>
 
