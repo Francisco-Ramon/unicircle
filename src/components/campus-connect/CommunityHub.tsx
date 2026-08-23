@@ -207,10 +207,11 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     };
   };
 
+  const [selectedInst, setSelectedInst] = useState<any>(null);
   const userInst = findInst(userCampus) || INSTITUTIONS_DATA[0];
-  const activeInst = (navState?.tab === "communities" && navState.communityId)
+  const activeInst = selectedInst || (navState?.tab === "communities" && navState.communityId
     ? (findInst(navState.communityId) || userInst)
-    : userInst;
+    : userInst);
 
   const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
   const [showSwitcher, setShowSwitcher] = useState(false);
@@ -227,7 +228,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const [eventCommentInput, setEventCommentInput] = useState("");
 
   const handleSelectInstitution = (inst: any) => {
+    setSelectedInst(inst);
     setShowSwitcher(false);
+
     if (onUpdateProfile && userProfile) {
       onUpdateProfile({
         ...userProfile,
@@ -236,6 +239,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         institutionId: inst.id,
       });
     }
+
     if (onNavigate) {
       onNavigate({ tab: "communities", communityId: inst.id });
     }
@@ -1305,18 +1309,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         <GlobalUniversitySearch
           title="Change University Worldwide"
           currentUniversityName={activeInst.name}
-          onSelectInstitution={(inst) => {
-            setActiveInst(inst);
-            if (userProfile) {
-              userProfile.campus = inst.name;
-              userProfile.country = inst.country;
-              userProfile.institutionId = inst.id;
-            }
-            setShowSwitcher(false);
-            if (onNavigate) {
-              onNavigate({ tab: "communities", communityId: inst.id });
-            }
-          }}
+          onSelectInstitution={handleSelectInstitution}
           onClose={() => setShowSwitcher(false)}
         />
       )}
