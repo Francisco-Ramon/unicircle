@@ -9,9 +9,13 @@ function NotFoundComponent() {
         <h1 className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500">404</h1>
         <h2 className="mt-4 text-xl font-semibold">Page not found</h2>
         <p className="mt-2 text-sm text-slate-400">This page doesn't exist on UniCircle.</p>
-        <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 text-sm font-bold shadow-lg shadow-indigo-600/30 hover:opacity-90 transition-opacity">
-            Back to UniCircle
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Link
+            to="/app"
+            hash="home"
+            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 text-sm font-bold shadow-lg shadow-indigo-600/30 hover:opacity-90 transition-opacity"
+          >
+            Back to UniCircle Home
           </Link>
         </div>
       </div>

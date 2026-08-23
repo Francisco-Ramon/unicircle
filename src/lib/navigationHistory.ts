@@ -1,4 +1,4 @@
-export type TabType = "home" | "discover" | "communities" | "events" | "chat" | "notifications" | "profile" | "settings";
+export type TabType = "home" | "discover" | "communities" | "events" | "chat" | "notifications" | "profile" | "settings" | "chart" | "analytics" | "alerts";
 
 export interface AppNavState {
   tab: TabType;
@@ -19,7 +19,7 @@ export const DEFAULT_NAV_STATE: AppNavState = {
   tab: "home",
 };
 
-const VALID_TABS: TabType[] = ["home", "discover", "communities", "events", "chat", "notifications", "profile", "settings"];
+const VALID_TABS: TabType[] = ["home", "discover", "communities", "events", "chat", "notifications", "profile", "settings", "chart", "analytics", "alerts"];
 
 /**
  * Encodes an AppNavState object into a URL hash string.
@@ -51,7 +51,11 @@ export function decodeNavState(hash: string): AppNavState {
   if (!hash || hash === "#") return DEFAULT_NAV_STATE;
 
   const rawHash = hash.startsWith("#") ? hash.slice(1) : hash;
-  const [tabPart, queryPart] = rawHash.split("?");
+  const [tabPartRaw, queryPart] = rawHash.split("?");
+
+  let tabPart = tabPartRaw;
+  if (tabPart === "analytics") tabPart = "chart";
+  if (tabPart === "alerts") tabPart = "notifications";
 
   const tab = (VALID_TABS.includes(tabPart as TabType) ? tabPart : "home") as TabType;
   const state: AppNavState = { tab };

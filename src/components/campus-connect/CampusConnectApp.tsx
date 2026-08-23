@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Home, Search, Users, MessageSquare, Calendar, User, ShieldCheck,
-  Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles
+  Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles, BarChart3
 } from "lucide-react";
 import { RegistrationWizard, StudentProfileData } from "./RegistrationWizard";
 import { LiveFaceVerification } from "./LiveFaceVerification";
@@ -13,6 +13,7 @@ import { CampusEventsHub } from "./CampusEventsHub";
 import { CommunityHub } from "./CommunityHub";
 import { UserProfileStudio } from "./UserProfileStudio";
 import { NotificationsScreen } from "./NotificationsScreen";
+import { CampusAnalyticsChartScreen } from "./CampusAnalyticsChartScreen";
 import { SettingsScreen, AccentTheme, ThemeMode } from "./SettingsScreen";
 import { StudentHomeScreen } from "./StudentHomeScreen";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
@@ -195,6 +196,8 @@ export const CampusConnectApp: React.FC = () => {
                 { id: "home", label: "Home", icon: Home },
                 { id: "discover", label: "Discover", icon: Search },
                 { id: "communities", label: "Communities", icon: Users },
+                { id: "events", label: "Events", icon: Calendar },
+                { id: "chart", label: "Analytics", icon: BarChart3 },
                 { id: "chat", label: `Chats (${matches.length})`, icon: MessageSquare },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -385,7 +388,19 @@ export const CampusConnectApp: React.FC = () => {
               />
             )}
 
-            {activeTab === "notifications" && <NotificationsScreen />}
+            {(activeTab === "notifications" || activeTab === "alerts") && (
+              <NotificationsScreen
+                userProfile={userProfile}
+                onNavigate={handleNavigate}
+              />
+            )}
+
+            {(activeTab === "chart" || activeTab === "analytics") && (
+              <CampusAnalyticsChartScreen
+                userProfile={userProfile}
+                onNavigate={handleNavigate}
+              />
+            )}
 
             {activeTab === "profile" && (
               <UserProfileStudio
@@ -412,7 +427,7 @@ export const CampusConnectApp: React.FC = () => {
         )}
       </main>
 
-      {/* 3. MOBILE BOTTOM NAVIGATION BAR (5 Core Items) */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR */}
       {isRegistered && (
         <div className={`md:hidden sticky bottom-0 z-40 backdrop-blur-xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 ${
           themeMode === "light" ? "bg-white/95 border-slate-200 shadow-lg" : "bg-[#0B0F17]/95 border-white/10"
@@ -420,6 +435,8 @@ export const CampusConnectApp: React.FC = () => {
           {[
             { id: "home", label: "Home", icon: Home },
             { id: "discover", label: "Discover", icon: Search },
+            { id: "events", label: "Events", icon: Calendar },
+            { id: "chart", label: "Analytics", icon: BarChart3 },
             { id: "chat", label: "Chats", icon: MessageSquare },
             { id: "notifications", label: "Alerts", icon: Bell },
             { id: "profile", label: "Profile", icon: User },
