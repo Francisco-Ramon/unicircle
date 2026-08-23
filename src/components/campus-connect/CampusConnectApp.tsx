@@ -423,6 +423,7 @@ export const CampusConnectApp: React.FC = () => {
               {activeTab === "communities" && (
                 <CommunityHub
                   userProfile={userProfile}
+                  onUpdateProfile={handleUpdateProfile}
                   navState={navState}
                   onNavigate={handleNavigate}
                 />

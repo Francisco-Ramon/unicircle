@@ -168,17 +168,48 @@ import { AppNavState } from "@/lib/navigationHistory";
 
 interface Props {
   userProfile: any;
+  onUpdateProfile?: (updated: any) => void;
   navState?: AppNavState;
   onNavigate?: (state: AppNavState) => void;
 }
 
-export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigate }) => {
+export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, navState, onNavigate }) => {
   // Auto-select user's university or navState selected community
   const userCampus = userProfile?.campus || "University of Nairobi";
-  const userInst = INSTITUTIONS_DATA.find((i) => i.name === userCampus) || INSTITUTIONS_DATA[0];
+  const userCountry = userProfile?.country || "Kenya";
 
+  const findInst = (queryStr?: string) => {
+    if (!queryStr) return null;
+    const qLower = queryStr.toLowerCase();
+    const match = INSTITUTIONS_DATA.find(
+      (i) => i.name.toLowerCase() === qLower || i.id === queryStr || i.shortName.toLowerCase() === qLower
+    );
+    if (match) return match;
+
+    // Construct dynamic institution fallback for any searched school worldwide
+    return {
+      id: `inst-${qLower.replace(/[^a-z0-9]/g, "")}`,
+      name: queryStr,
+      shortName: queryStr.split(" ").map((w) => w[0]).join("").substring(0, 6).toUpperCase() || "UNI",
+      country: userCountry,
+      city: userCountry,
+      stateCounty: userCountry,
+      type: "University" as const,
+      domains: [`${qLower.replace(/[^a-z0-9]/g, "")}.edu`],
+      logoUrl: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=200&auto=format&fit=crop&q=80",
+      bannerUrl: "https://images.unsplash.com/photo-1562774053-701939374585?w=1200&auto=format&fit=crop&q=80",
+      location: `${userCountry}`,
+      verifiedStudentsCount: 5400,
+      activeUsersCount: 3200,
+      clubsCount: 24,
+      establishedYear: 2000,
+      popularMajors: ["Medicine & Health", "Computer Science", "Business Administration", "Engineering"],
+    };
+  };
+
+  const userInst = findInst(userCampus) || INSTITUTIONS_DATA[0];
   const activeInst = (navState?.tab === "communities" && navState.communityId)
-    ? (INSTITUTIONS_DATA.find((i) => i.id === navState.communityId) || userInst)
+    ? (findInst(navState.communityId) || userInst)
     : userInst;
 
   const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
@@ -195,8 +226,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
   const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
 
-  const handleSelectInstitution = (inst: typeof INSTITUTIONS_DATA[0]) => {
+  const handleSelectInstitution = (inst: any) => {
     setShowSwitcher(false);
+    if (onUpdateProfile && userProfile) {
+      onUpdateProfile({
+        ...userProfile,
+        campus: inst.name,
+        country: inst.country,
+        institutionId: inst.id,
+      });
+    }
     if (onNavigate) {
       onNavigate({ tab: "communities", communityId: inst.id });
     }
