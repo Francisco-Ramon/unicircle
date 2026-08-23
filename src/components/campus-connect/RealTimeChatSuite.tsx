@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft } from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
+import {
+  dispatchAppNotification,
+  fetchNotificationPreferences,
+} from "@/lib/notificationService";
 
 export interface ChatMessage {
   id: string;
@@ -85,16 +89,17 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
     setInputText("");
 
     // Simulate response after 1.5s
-    setTimeout(() => {
+    setTimeout(async () => {
       const autoReplies = [
         "That sounds awesome! Let me check my lecture schedule! 😊",
         "Haha totally agree! See you on campus!",
         "Definitely! Let's grab coffee at the student union! ☕",
       ];
+      const replyText = autoReplies[Math.floor(Math.random() * autoReplies.length)];
       const replyMsg: ChatMessage = {
         id: `msg-reply-${Date.now()}`,
         senderId: currentMatch.id,
-        text: autoReplies[Math.floor(Math.random() * autoReplies.length)],
+        text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isRead: true,
         type: "text",
@@ -103,6 +108,16 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
         ...prev,
         [currentMatch.id]: [...(prev[currentMatch.id] || []), replyMsg],
       }));
+
+      // Dispatch direct message notification if preference is ON
+      const prefs = await fetchNotificationPreferences();
+      dispatchAppNotification({
+        type: "direct_message",
+        fromName: currentMatch.name,
+        fromAvatar: currentMatch.photos[0],
+        fromUniversity: currentMatch.campus,
+        message: `sent you a message: "${replyText.substring(0, 35)}..."`,
+      }, prefs);
     }, 1500);
   };
 

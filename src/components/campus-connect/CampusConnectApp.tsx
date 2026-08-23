@@ -16,6 +16,13 @@ import { NotificationsScreen } from "./NotificationsScreen";
 import { SettingsScreen, AccentTheme, ThemeMode } from "./SettingsScreen";
 import { StudentHomeScreen } from "./StudentHomeScreen";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
+import {
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  fetchNotificationPreferences,
+  getStoredNotifications,
+  dispatchAppNotification,
+} from "@/lib/notificationService";
 
 
 export const CampusConnectApp: React.FC = () => {
@@ -65,6 +72,12 @@ export const CampusConnectApp: React.FC = () => {
   const [discoveryRadius, setDiscoveryRadius] = useState<"MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL">("NATIONWIDE");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
+  // Notification Preferences & Unread Count State
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(() => {
+    return getStoredNotifications().filter((n) => !n.read).length;
+  });
+
   // User Profile Avatar "More" Dropdown State
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
@@ -76,6 +89,19 @@ export const CampusConnectApp: React.FC = () => {
   const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
   const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(TWENTY_STUDENT_PROFILES[0]);
   const [celebratedMatch, setCelebratedMatch] = useState<StudentProfile | null>(null);
+
+  // Fetch notification preferences and listen for updates
+  React.useEffect(() => {
+    fetchNotificationPreferences().then(setNotifPrefs);
+
+    const handleNotifUpdate = () => {
+      const count = getStoredNotifications().filter((n) => !n.read).length;
+      setUnreadNotifCount(count);
+    };
+
+    window.addEventListener("unicircle-notifications-updated", handleNotifUpdate);
+    return () => window.removeEventListener("unicircle-notifications-updated", handleNotifUpdate);
+  }, []);
 
   // Synchronize URL hash and browser history (popstate / back button)
   React.useEffect(() => {
@@ -201,7 +227,11 @@ export const CampusConnectApp: React.FC = () => {
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-pink-500 border-2 border-slate-950" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-pink-500 border-2 border-slate-950 text-[9px] font-black text-white flex items-center justify-center min-w-[18px]">
+                  {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                </span>
+              )}
             </button>
 
             {/* Profile Avatar "More" Menu Dropdown */}
@@ -352,6 +382,8 @@ export const CampusConnectApp: React.FC = () => {
                 onSelectAccentTheme={(acc) => setAccentTheme(acc)}
                 themeMode={themeMode}
                 onSelectThemeMode={(mode) => setThemeMode(mode)}
+                notificationPrefs={notifPrefs}
+                onUpdateNotificationPrefs={(p) => setNotifPrefs(p)}
               />
             )}
           </>

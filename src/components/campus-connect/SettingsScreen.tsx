@@ -6,6 +6,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+import {
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  fetchNotificationPreferences,
+  saveNotificationPreferenceToDatabase,
+} from "@/lib/notificationService";
+
 export type ThemeMode = "light" | "dark" | "system";
 export type AccentTheme = "blue" | "purple" | "emerald" | "sunset" | "ocean" | "rose";
 
@@ -25,6 +32,8 @@ interface Props {
   onSelectAccentTheme?: (accent: AccentTheme) => void;
   themeMode?: ThemeMode;
   onSelectThemeMode?: (mode: ThemeMode) => void;
+  notificationPrefs?: NotificationPreferences;
+  onUpdateNotificationPrefs?: (prefs: NotificationPreferences) => void;
 }
 
 export const SettingsScreen: React.FC<Props> = ({
@@ -34,10 +43,55 @@ export const SettingsScreen: React.FC<Props> = ({
   onSelectAccentTheme,
   themeMode = "dark",
   onSelectThemeMode,
+  notificationPrefs: externalPrefs,
+  onUpdateNotificationPrefs,
 }) => {
   const [activeCategory, setActiveCategory] = useState<string>("account");
   const [currentAccent, setCurrentAccent] = useState<AccentTheme>(accentTheme);
   const [currentMode, setCurrentMode] = useState<ThemeMode>(themeMode);
+
+  // Notification Controls Preferences State
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(
+    externalPrefs || DEFAULT_NOTIFICATION_PREFERENCES
+  );
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetchNotificationPreferences().then((prefs) => {
+      setNotifPrefs(prefs);
+      if (onUpdateNotificationPrefs) onUpdateNotificationPrefs(prefs);
+    });
+  }, []);
+
+  const handleToggleNotificationPref = async (key: keyof NotificationPreferences, newValue: boolean) => {
+    setSavingKey(key);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    // Optimistic UI update
+    const previousValue = notifPrefs[key];
+    const optimisticPrefs = { ...notifPrefs, [key]: newValue };
+    setNotifPrefs(optimisticPrefs);
+    if (onUpdateNotificationPrefs) onUpdateNotificationPrefs(optimisticPrefs);
+
+    // Save to database / local cache
+    const res = await saveNotificationPreferenceToDatabase(key, newValue, notifPrefs);
+
+    if (!res.success) {
+      // Restore previous switch state and display error message
+      const revertedPrefs = { ...notifPrefs, [key]: previousValue };
+      setNotifPrefs(revertedPrefs);
+      if (onUpdateNotificationPrefs) onUpdateNotificationPrefs(revertedPrefs);
+      setSaveError(res.error || "Failed to save preference to database");
+      setTimeout(() => setSaveError(null), 4000);
+    } else {
+      setSaveSuccess("Saved to database ✓");
+      setTimeout(() => setSaveSuccess(null), 2500);
+    }
+    setSavingKey(null);
+  };
 
   // Appearance Local Settings
   const [fontSize, setFontSize] = useState<"Small" | "Default" | "Large" | "Extra Large">("Default");
@@ -281,26 +335,44 @@ export const SettingsScreen: React.FC<Props> = ({
           {/* 3. NOTIFICATIONS CATEGORY */}
           {activeCategory === "notifications" && (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-bold text-white">Notification Controls</h3>
-                <p className="text-xs text-slate-400">Granular control over push, email, and desktop alerts</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Notification Controls</h3>
+                  <p className="text-xs text-slate-400">Granular control over push, email, and in-app alerts</p>
+                </div>
+                {saveSuccess && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-pulse">
+                    {saveSuccess}
+                  </span>
+                )}
               </div>
+
+              {saveError && (
+                <div className="p-3.5 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  {saveError}
+                </div>
+              )}
 
               <div className="space-y-2.5">
                 {[
-                  { label: "Friend Requests", desc: "When another verified student sends a friend request", defaultOn: true },
-                  { label: "Direct Messages", desc: "When an accepted connection sends a message", defaultOn: true },
-                  { label: "Relationship Expressions", desc: "When someone expresses relationship interest", defaultOn: true },
-                  { label: "Study Invitations", desc: "Invites to join revision groups or project teams", defaultOn: true },
-                  { label: "Community Announcements", desc: "Official updates from your university community", defaultOn: true },
-                  { label: "Campus Event Reminders", desc: "Reminders for events you're attending", defaultOn: false },
+                  { key: "friendRequests" as const, label: "Friend Requests", desc: "When another verified student sends a friend request" },
+                  { key: "directMessages" as const, label: "Direct Messages", desc: "When an accepted connection sends a message" },
+                  { key: "relationshipExpressions" as const, label: "Relationship Expressions", desc: "When someone expresses relationship interest" },
+                  { key: "studyInvitations" as const, label: "Study Invitations", desc: "Invites to join revision groups or project teams" },
+                  { key: "communityAnnouncements" as const, label: "Community Announcements", desc: "Official updates from your university community" },
+                  { key: "campusEventReminders" as const, label: "Campus Event Reminders", desc: "Reminders for events you're attending" },
                 ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-white/5">
+                  <div key={item.key} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/60 border border-white/5">
                     <div>
                       <h4 className="text-xs font-bold text-white">{item.label}</h4>
                       <p className="text-[11px] text-slate-400">{item.desc}</p>
                     </div>
-                    <ToggleSwitch defaultOn={item.defaultOn} />
+                    <ToggleSwitch
+                      checked={notifPrefs[item.key]}
+                      disabled={savingKey === item.key}
+                      onChange={(newVal) => handleToggleNotificationPref(item.key, newVal)}
+                    />
                   </div>
                 ))}
               </div>
@@ -482,24 +554,37 @@ export const SettingsScreen: React.FC<Props> = ({
   );
 };
 
-function ToggleSwitch({ defaultOn, onChange }: { defaultOn: boolean; onChange?: (v: boolean) => void }) {
-  const [on, setOn] = useState(defaultOn);
+function ToggleSwitch({
+  defaultOn,
+  checked,
+  disabled,
+  onChange,
+}: {
+  defaultOn?: boolean;
+  checked?: boolean;
+  disabled?: boolean;
+  onChange?: (v: boolean) => void;
+}) {
+  const [internalOn, setInternalOn] = useState(defaultOn ?? true);
+  const isOn = checked !== undefined ? checked : internalOn;
+
   return (
     <button
+      disabled={disabled}
       onClick={() => {
-        const next = !on;
-        setOn(next);
+        const next = !isOn;
+        setInternalOn(next);
         if (onChange) onChange(next);
       }}
       className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${
-        on ? "bg-indigo-600" : "bg-slate-800"
-      }`}
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+      } ${isOn ? "bg-indigo-600" : "bg-slate-800"}`}
     >
       <span
         className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-          on ? "translate-x-5.5 left-0.5" : "left-0.5"
+          isOn ? "left-0.5" : "left-0.5"
         }`}
-        style={{ transform: on ? "translateX(22px)" : "translateX(0)" }}
+        style={{ transform: isOn ? "translateX(22px)" : "translateX(0)" }}
       />
     </button>
   );

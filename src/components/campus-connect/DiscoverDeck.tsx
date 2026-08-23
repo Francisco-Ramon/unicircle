@@ -1,9 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Heart, X, ShieldCheck, MapPin, GraduationCap,
   SlidersHorizontal, UserPlus, BookOpen, Briefcase,
   Bookmark, Flag, Ban, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle
 } from "lucide-react";
+import {
+  dispatchAppNotification,
+  fetchNotificationPreferences,
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from "@/lib/notificationService";
 
 export interface StudentProfile {
   id: string;
@@ -377,9 +383,17 @@ export const DiscoverDeck: React.FC<Props> = ({
                 ) : (
                   <>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
                         setActionFeedback(`Friend request sent to ${selectedProfile.name}!`);
+                        const prefs = await fetchNotificationPreferences();
+                        dispatchAppNotification({
+                          type: "friend_request",
+                          fromName: currentProfile?.firstName ? `${currentProfile.firstName} ${currentProfile.lastName || ""}`.trim() : "Verified Student",
+                          fromAvatar: currentProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+                          fromUniversity: currentProfile?.campus || "University of Nairobi",
+                          message: "sent you a friend request",
+                        }, prefs);
                         setTimeout(() => setActionFeedback(null), 3000);
                       }}
                       className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
@@ -388,10 +402,18 @@ export const DiscoverDeck: React.FC<Props> = ({
                     </button>
 
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
                         onSwipeLike(selectedProfile);
                         setActionFeedback(`Expressed relationship interest to ${selectedProfile.name}!`);
+                        const prefs = await fetchNotificationPreferences();
+                        dispatchAppNotification({
+                          type: "relationship_interest",
+                          fromName: currentProfile?.firstName ? `${currentProfile.firstName} ${currentProfile.lastName || ""}`.trim() : "Verified Student",
+                          fromAvatar: currentProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+                          fromUniversity: currentProfile?.campus || "University of Nairobi",
+                          message: "expressed relationship interest in you",
+                        }, prefs);
                         setTimeout(() => setActionFeedback(null), 3000);
                       }}
                       className="py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
@@ -400,9 +422,17 @@ export const DiscoverDeck: React.FC<Props> = ({
                     </button>
 
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSentRequests((prev) => new Set(prev).add(selectedProfile.id));
                         setActionFeedback(`Study invite sent to ${selectedProfile.name}!`);
+                        const prefs = await fetchNotificationPreferences();
+                        dispatchAppNotification({
+                          type: "study_invite",
+                          fromName: currentProfile?.firstName ? `${currentProfile.firstName} ${currentProfile.lastName || ""}`.trim() : "Verified Student",
+                          fromAvatar: currentProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+                          fromUniversity: currentProfile?.campus || "University of Nairobi",
+                          message: "invited you to study together",
+                        }, prefs);
                         setTimeout(() => setActionFeedback(null), 3000);
                       }}
                       className="py-3 rounded-xl bg-white/5 hover:bg-blue-600/20 border border-white/10 text-slate-300 hover:text-blue-300 font-bold text-xs transition flex items-center justify-center gap-1.5"

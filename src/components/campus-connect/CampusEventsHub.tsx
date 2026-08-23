@@ -3,6 +3,10 @@ import {
   Calendar, MapPin, Users, Ticket, Sparkles, PlusCircle, CheckCircle2,
   Search, Filter, X, ArrowLeft, Send, Heart, MessageSquare, Clock, Building, ExternalLink, Link2, Upload, Image as ImageIcon, Trash2
 } from "lucide-react";
+import {
+  dispatchAppNotification,
+  fetchNotificationPreferences,
+} from "@/lib/notificationService";
 
 export interface EventComment {
   id: string;
@@ -207,7 +211,10 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
     setIsDragging(false);
   };
 
-  const toggleRsvp = (id: string) => {
+  const toggleRsvp = async (id: string) => {
+    const target = events.find((e) => e.id === id);
+    const isNowAttending = target ? !target.userRsvpd : false;
+
     setEvents(
       events.map((e) => {
         if (e.id === id) {
@@ -221,12 +228,24 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
         return e;
       })
     );
+
     if (selectedEvent && selectedEvent.id === id) {
       setSelectedEvent((prev) => prev ? {
         ...prev,
         userRsvpd: !prev.userRsvpd,
         rsvpCount: prev.userRsvpd ? prev.rsvpCount - 1 : prev.rsvpCount + 1,
       } : null);
+    }
+
+    if (isNowAttending && target) {
+      const prefs = await fetchNotificationPreferences();
+      dispatchAppNotification({
+        type: "event_reminder",
+        fromName: target.title,
+        fromAvatar: target.image,
+        fromUniversity: target.campus,
+        message: `Reminder: You're attending ${target.title} on ${target.date}`,
+      }, prefs);
     }
   };
 

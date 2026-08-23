@@ -5,6 +5,10 @@ import {
 } from "lucide-react";
 import { INSTITUTIONS_DATA, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
+import {
+  dispatchAppNotification,
+  fetchNotificationPreferences,
+} from "@/lib/notificationService";
 import { CampusEvent, EventComment } from "./CampusEventsHub";
 
 interface PostComment {
@@ -293,8 +297,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
     setCommentInputs({ ...commentInputs, [postId]: "" });
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
+    const postTitle = newPostContent.substring(0, 45);
     const newPost: CommunityPost = {
       id: `post-${Date.now()}`,
       authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
@@ -312,6 +317,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
     setNewPostContent("");
     setNewPostImage("");
     setShowNewPost(false);
+
+    // Dispatch community_post notification if preference is ON
+    const prefs = await fetchNotificationPreferences();
+    dispatchAppNotification({
+      type: "community_post",
+      fromName: activeInst?.name || "Campus Community",
+      fromAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
+      fromUniversity: activeInst?.name || "University of Nairobi",
+      message: `posted: '${postTitle}${newPostContent.length > 45 ? "..." : ""}'`,
+    }, prefs);
   };
 
   const toggleEventRsvp = (eventId: string) => {

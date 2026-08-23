@@ -1,109 +1,53 @@
-import React from "react";
-import { Bell, UserPlus, Heart, MessageSquare, Calendar, BookOpen, Users, Check, X } from "lucide-react";
-import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-
-interface Notification {
-  id: string;
-  type: "friend_request" | "connection_accepted" | "community_post" | "event_reminder" | "study_invite" | "relationship_interest";
-  fromName: string;
-  fromAvatar: string;
-  fromUniversity: string;
-  message: string;
-  timeAgo: string;
-  read: boolean;
-}
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "n1",
-    type: "friend_request",
-    fromName: "Amani Wanjiru",
-    fromAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "University of Nairobi",
-    message: "sent you a friend request",
-    timeAgo: "2 min ago",
-    read: false,
-  },
-  {
-    id: "n2",
-    type: "connection_accepted",
-    fromName: "Brian Omondi",
-    fromAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "University of Nairobi",
-    message: "accepted your friend request. You can now chat!",
-    timeAgo: "15 min ago",
-    read: false,
-  },
-  {
-    id: "n3",
-    type: "relationship_interest",
-    fromName: "Stacy Muthoni",
-    fromAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "JKUAT",
-    message: "expressed relationship interest in you",
-    timeAgo: "1 hour ago",
-    read: false,
-  },
-  {
-    id: "n4",
-    type: "study_invite",
-    fromName: "Kevin Wafula",
-    fromAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "MMUST",
-    message: "invited you to study together",
-    timeAgo: "3 hours ago",
-    read: true,
-  },
-  {
-    id: "n5",
-    type: "community_post",
-    fromName: "UoN Tech Society",
-    fromAvatar: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "University of Nairobi",
-    message: "posted: 'Nairobi Student Tech Summit registration is now open!'",
-    timeAgo: "5 hours ago",
-    read: true,
-  },
-  {
-    id: "n6",
-    type: "event_reminder",
-    fromName: "Campus Events",
-    fromAvatar: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=100&auto=format&fit=crop&q=80",
-    fromUniversity: "",
-    message: "Reminder: Nairobi Student Tech Summit starts in 2 days",
-    timeAgo: "6 hours ago",
-    read: true,
-  },
-];
+import {
+  AppNotification as Notification,
+  getStoredNotifications,
+  saveStoredNotifications,
+} from "@/lib/notificationService";
 
 function getNotificationIcon(type: Notification["type"]) {
   switch (type) {
     case "friend_request": return <UserPlus className="w-4 h-4 text-indigo-400" />;
-    case "connection_accepted": return <Check className="w-4 h-4 text-emerald-400" />;
+    case "connection_accepted":
+    case "direct_message": return <MessageSquare className="w-4 h-4 text-emerald-400" />;
     case "relationship_interest": return <Heart className="w-4 h-4 text-pink-400" />;
     case "study_invite": return <BookOpen className="w-4 h-4 text-blue-400" />;
     case "community_post": return <Users className="w-4 h-4 text-purple-400" />;
     case "event_reminder": return <Calendar className="w-4 h-4 text-amber-400" />;
+    default: return <Bell className="w-4 h-4 text-indigo-400" />;
   }
 }
 
 export const NotificationsScreen: React.FC = () => {
-  const [notifications, setNotifications] = React.useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = React.useState<Notification[]>(getStoredNotifications);
+
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      setNotifications(getStoredNotifications());
+    };
+    window.addEventListener("unicircle-notifications-updated", handleUpdate);
+    return () => window.removeEventListener("unicircle-notifications-updated", handleUpdate);
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    const updated = notifications.map((n) => ({ ...n, read: true }));
+    setNotifications(updated);
+    saveStoredNotifications(updated);
   };
 
   const handleAccept = (id: string) => {
-    setNotifications(notifications.map((n) =>
+    const updated = notifications.map((n) =>
       n.id === id ? { ...n, read: true, message: n.message.replace("sent you a friend request", "is now your friend!").replace("invited you to study together", "is now your study partner!").replace("expressed relationship interest in you", "— you've matched!") } : n
-    ));
+    );
+    setNotifications(updated);
+    saveStoredNotifications(updated);
   };
 
   const handleDecline = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
+    const updated = notifications.filter((n) => n.id !== id);
+    setNotifications(updated);
+    saveStoredNotifications(updated);
   };
 
   return (
