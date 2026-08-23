@@ -131,44 +131,57 @@ const SAMPLE_EVENTS: CampusEvent[] = [
   },
 ];
 
+import { AppNavState } from "@/lib/navigationHistory";
+
 interface Props {
   userProfile?: any;
+  navState?: AppNavState;
+  onNavigate?: (state: AppNavState) => void;
 }
 
-export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
+export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavigate }) => {
   const [events, setEvents] = useState<CampusEvent[]>(SAMPLE_EVENTS);
-  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [localCategory, setLocalCategory] = useState<string>("All");
   const [search, setSearch] = useState("");
 
-  // Selected event modal/detail view
-  const [selectedEvent, setSelectedEvent] = useState<CampusEvent | null>(null);
+  const activeCategory = (navState?.tab === "events" && navState.category) ? navState.category : localCategory;
+
+  // Selected event derived from navState (or local fallback)
+  const selectedEventId = (navState?.tab === "events") ? navState.eventId : undefined;
+  const selectedEvent = events.find((e) => e.id === selectedEventId) || null;
+  const eventViewMode = (navState?.tab === "events" && navState.eventView) ? navState.eventView : "details";
+  const showHostModal = (navState?.tab === "events" && navState.modal === "host-event");
+
   const [eventCommentInput, setEventCommentInput] = useState("");
 
-  // Host Event Modal
-  const [showHostModal, setShowHostModal] = useState(false);
-
-  React.useEffect(() => {
-    const handlePopState = () => {
-      if (selectedEvent || showHostModal) {
-        setSelectedEvent(null);
-        setShowHostModal(false);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [selectedEvent, showHostModal]);
+  const setActiveCategory = (category: string) => {
+    setLocalCategory(category);
+    if (onNavigate) {
+      onNavigate({ tab: "events", category });
+    }
+  };
 
   const openEventDetail = (event: CampusEvent) => {
-    setSelectedEvent(event);
+    if (onNavigate) {
+      onNavigate({ tab: "events", category: activeCategory, eventId: event.id, eventView: "details" });
+    }
+  };
+
+  const openEventChart = (event: CampusEvent) => {
+    if (onNavigate) {
+      onNavigate({ tab: "events", category: activeCategory, eventId: event.id, eventView: "chart" });
+    }
+  };
+
+  const closeEventDetail = () => {
     if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "event-detail", eventId: event.id, tab: "events" }, "", "#events");
+      window.history.back();
     }
   };
 
   const openHostEventModal = () => {
-    setShowHostModal(true);
-    if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "host-event", tab: "events" }, "", "#events");
+    if (onNavigate) {
+      onNavigate({ tab: "events", category: activeCategory, modal: "host-event" });
     }
   };
   const [newEventTitle, setNewEventTitle] = useState("");
@@ -471,14 +484,26 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile }) => {
               <img src={selectedEvent.image} alt={selectedEvent.title} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
               <button
-                onClick={() => setSelectedEvent(null)}
+                onClick={closeEventDetail}
                 className="absolute top-4 left-4 p-2 rounded-full bg-slate-950/80 text-white hover:bg-white/20 transition backdrop-blur-md"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <span className="absolute bottom-4 left-4 px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-bold">
-                {selectedEvent.category}
-              </span>
+              <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-bold">
+                  {selectedEvent.category}
+                </span>
+                <button
+                  onClick={() => openEventChart(selectedEvent)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                    eventViewMode === "chart"
+                      ? "bg-pink-600 text-white border-pink-500"
+                      : "bg-slate-950/80 text-slate-200 border-white/10 hover:bg-white/20"
+                  }`}
+                >
+                  📊 Event Stats / Chart
+                </button>
+              </div>
             </div>
 
             {/* Event Info */}

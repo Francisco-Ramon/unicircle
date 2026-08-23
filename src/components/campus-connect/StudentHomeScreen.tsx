@@ -2,11 +2,14 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 
+import { AppNavState } from "@/lib/navigationHistory";
+
 interface Props {
   userProfile: any;
   onNavigateToDiscover: () => void;
   onNavigateToEvents: () => void;
   onNavigateToCommunity: () => void;
+  onNavigate?: (state: AppNavState) => void;
 }
 
 export const StudentHomeScreen: React.FC<Props> = ({
@@ -14,6 +17,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
   onNavigateToDiscover,
   onNavigateToEvents,
   onNavigateToCommunity,
+  onNavigate,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -177,7 +181,15 @@ export const StudentHomeScreen: React.FC<Props> = ({
                     {searchResults.students.map((student) => (
                       <button
                         key={student.id}
-                        onClick={() => { onNavigateToDiscover(); setSearchQuery(""); setIsSearchFocused(false); }}
+                        onClick={() => {
+                          if (onNavigate) {
+                            onNavigate({ tab: "discover", profileId: student.id, profileView: "details" });
+                          } else {
+                            onNavigateToDiscover();
+                          }
+                          setSearchQuery("");
+                          setIsSearchFocused(false);
+                        }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
                       >
                         <img src={student.photos[0]} alt={student.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
@@ -211,7 +223,15 @@ export const StudentHomeScreen: React.FC<Props> = ({
                     {searchResults.posts.map((post) => (
                       <button
                         key={post.id}
-                        onClick={() => { onNavigateToCommunity(); setSearchQuery(""); setIsSearchFocused(false); }}
+                        onClick={() => {
+                          if (onNavigate) {
+                            onNavigate({ tab: "communities", postId: post.id });
+                          } else {
+                            onNavigateToCommunity();
+                          }
+                          setSearchQuery("");
+                          setIsSearchFocused(false);
+                        }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
                       >
                         <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover shrink-0" />

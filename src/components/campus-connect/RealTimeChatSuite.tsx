@@ -17,10 +17,14 @@ export interface ChatMessage {
   durationSec?: number;
 }
 
+import { AppNavState } from "@/lib/navigationHistory";
+
 interface Props {
   activeMatch: StudentProfile | null;
   matches: StudentProfile[];
   onSelectMatch: (match: StudentProfile) => void;
+  navState?: AppNavState;
+  onNavigate?: (state: AppNavState) => void;
 }
 
 const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
@@ -37,7 +41,7 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
   ],
 };
 
-export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSelectMatch }) => {
+export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -45,30 +49,21 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Mobile navigation state: "list" shows conversations, "chat" shows selected thread
-  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const currentMatch = (navState?.tab === "chat" && navState.matchId)
+    ? (matches.find((m) => m.id === navState.matchId) || activeMatch)
+    : activeMatch;
 
-  React.useEffect(() => {
-    const handlePopState = () => {
-      if (mobileView === "chat") {
-        setMobileView("list");
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [mobileView]);
+  const mobileView = (navState?.tab === "chat" && (navState.chatView === "chat" || navState.matchId)) ? "chat" : "list";
 
   const handleSelectMatchInternal = (m: StudentProfile) => {
     onSelectMatch(m);
-    setMobileView("chat");
-    if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "chat-thread", matchId: m.id, tab: "chat" }, "", "#chat");
+    if (onNavigate) {
+      onNavigate({ tab: "chat", matchId: m.id, chatView: "chat" });
     }
   };
 
   const handleMobileBack = () => {
-    setMobileView("list");
-    if (typeof window !== "undefined" && window.history.state?.modal === "chat-thread") {
+    if (typeof window !== "undefined") {
       window.history.back();
     }
   };

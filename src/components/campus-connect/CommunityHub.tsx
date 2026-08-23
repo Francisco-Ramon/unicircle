@@ -163,16 +163,23 @@ const INITIAL_COMMUNITY_EVENTS: CampusEvent[] = [
   }
 ];
 
+import { AppNavState } from "@/lib/navigationHistory";
+
 interface Props {
   userProfile: any;
+  navState?: AppNavState;
+  onNavigate?: (state: AppNavState) => void;
 }
 
-export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
-  // Auto-select user's university
+export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigate }) => {
+  // Auto-select user's university or navState selected community
   const userCampus = userProfile?.campus || "University of Nairobi";
   const userInst = INSTITUTIONS_DATA.find((i) => i.name === userCampus) || INSTITUTIONS_DATA[0];
 
-  const [activeInst, setActiveInst] = useState(userInst);
+  const activeInst = (navState?.tab === "communities" && navState.communityId)
+    ? (INSTITUTIONS_DATA.find((i) => i.id === navState.communityId) || userInst)
+    : userInst;
+
   const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [switcherSearch, setSwitcherSearch] = useState("");
@@ -182,23 +189,29 @@ export const CommunityHub: React.FC<Props> = ({ userProfile }) => {
 
   // Community Events state
   const [communityEvents, setCommunityEvents] = useState<CampusEvent[]>(INITIAL_COMMUNITY_EVENTS);
-  const [selectedEvent, setSelectedEvent] = useState<CampusEvent | null>(null);
+  const selectedEventId = (navState?.tab === "communities") ? navState.eventId : undefined;
+  const selectedEvent = communityEvents.find((e) => e.id === selectedEventId) || null;
+  const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
 
-  // Create Event Modal under Community
-  const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const handleSelectInstitution = (inst: typeof INSTITUTIONS_DATA[0]) => {
+    setShowSwitcher(false);
+    if (onNavigate) {
+      onNavigate({ tab: "communities", communityId: inst.id });
+    }
+  };
 
-  React.useEffect(() => {
-    const handlePopState = () => {
-      if (selectedEvent || showCreateEventModal || showSwitcher) {
-        setSelectedEvent(null);
-        setShowCreateEventModal(false);
-        setShowSwitcher(false);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [selectedEvent, showCreateEventModal, showSwitcher]);
+  const openCommunityEventDetail = (evt: CampusEvent) => {
+    if (onNavigate) {
+      onNavigate({ tab: "communities", communityId: activeInst.id, eventId: evt.id, eventView: "details" });
+    }
+  };
+
+  const openCreateEventModal = () => {
+    if (onNavigate) {
+      onNavigate({ tab: "communities", communityId: activeInst.id, modal: "host-event" });
+    }
+  };
   const [eventTitle, setEventTitle] = useState("");
   const [eventCategory, setEventCategory] = useState<CampusEvent["category"]>("Party");
   const [eventDate, setEventDate] = useState("");

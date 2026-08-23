@@ -34,6 +34,8 @@ export interface StudentProfile {
   lifestyle: { smoking: string; drinking: string; pets?: string; religion?: string };
 }
 
+import { AppNavState } from "@/lib/navigationHistory";
+
 interface Props {
   currentProfile: any;
   profiles: StudentProfile[];
@@ -42,6 +44,8 @@ interface Props {
   onSwipeSuperLike: (profile: StudentProfile) => void;
   onOpenFilters: () => void;
   intentMode: string;
+  navState?: AppNavState;
+  onNavigate?: (state: AppNavState) => void;
 }
 
 export const DiscoverDeck: React.FC<Props> = ({
@@ -52,15 +56,20 @@ export const DiscoverDeck: React.FC<Props> = ({
   onSwipeSuperLike,
   onOpenFilters,
   intentMode,
+  navState,
+  onNavigate,
 }) => {
-  const [selectedProfile, setSelectedProfile] = useState<StudentProfile | null>(null);
+  const selectedProfileId = (navState?.tab === "discover") ? navState.profileId : undefined;
+  const selectedProfile = profiles.find((p) => p.id === selectedProfileId) || null;
+  const photoLightboxActive = (navState?.tab === "discover" && navState.profileView === "photos");
+  const showReportModal = (navState?.tab === "discover" && navState.modal === "report");
+  const showBlockConfirm = (navState?.tab === "discover" && navState.modal === "block");
+
   const [savedProfiles, setSavedProfiles] = useState<Set<string>>(new Set());
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [reportedProfiles, setReportedProfiles] = useState<Set<string>>(new Set());
   const [blockedProfiles, setBlockedProfiles] = useState<Set<string>>(new Set());
   const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
@@ -74,28 +83,35 @@ export const DiscoverDeck: React.FC<Props> = ({
   };
 
   const openProfile = (student: StudentProfile) => {
-    setSelectedProfile(student);
     setActivePhotoIndex(0);
-    if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "profile", profileId: student.id, tab: "discover" }, "", "#discover");
+    if (onNavigate) {
+      onNavigate({ tab: "discover", profileId: student.id, profileView: "details" });
+    }
+  };
+
+  const openReport = () => {
+    if (selectedProfile && onNavigate) {
+      onNavigate({ tab: "discover", profileId: selectedProfile.id, modal: "report" });
+    }
+  };
+
+  const openBlock = () => {
+    if (selectedProfile && onNavigate) {
+      onNavigate({ tab: "discover", profileId: selectedProfile.id, modal: "block" });
+    }
+  };
+
+  const openPhotosLightbox = () => {
+    if (selectedProfile && onNavigate) {
+      onNavigate({ tab: "discover", profileId: selectedProfile.id, profileView: "photos" });
     }
   };
 
   const closeProfile = () => {
-    setSelectedProfile(null);
-    setShowReportModal(false);
-    setShowBlockConfirm(false);
+    if (typeof window !== "undefined") {
+      window.history.back();
+    }
   };
-
-  React.useEffect(() => {
-    const handlePopState = () => {
-      if (selectedProfile || showReportModal || showBlockConfirm) {
-        closeProfile();
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [selectedProfile, showReportModal, showBlockConfirm]);
 
   const photoCount = selectedProfile?.photos?.length || 0;
 
@@ -211,7 +227,7 @@ export const DiscoverDeck: React.FC<Props> = ({
       {selectedProfile && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center overflow-hidden"
-          onClick={() => setSelectedProfile(null)}
+          onClick={closeProfile}
         >
           <div
             className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[88vh] overflow-y-auto relative text-white"
@@ -219,7 +235,7 @@ export const DiscoverDeck: React.FC<Props> = ({
           >
             {/* Close Button */}
             <button
-              onClick={() => setSelectedProfile(null)}
+              onClick={closeProfile}
               className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-white/10 transition"
             >
               <X className="w-5 h-5" />

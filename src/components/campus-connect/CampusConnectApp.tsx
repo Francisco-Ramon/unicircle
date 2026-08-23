@@ -23,6 +23,14 @@ import {
   getStoredNotifications,
   dispatchAppNotification,
 } from "@/lib/notificationService";
+import {
+  AppNavState,
+  TabType,
+  decodeNavState,
+  pushNavState,
+  replaceNavState,
+  encodeNavState,
+} from "@/lib/navigationHistory";
 
 
 export const CampusConnectApp: React.FC = () => {
@@ -57,17 +65,14 @@ export const CampusConnectApp: React.FC = () => {
     verified: true,
   });
 
-  // Active Screen State with History Sync
-  const VALID_TABS = ["home", "discover", "communities", "events", "chat", "notifications", "profile", "settings"] as const;
-  type TabType = typeof VALID_TABS[number];
+  // Centralized Navigation History State
+  const [navState, setNavState] = useState<AppNavState>(() => {
+    if (typeof window === "undefined") return { tab: "home" };
+    return decodeNavState(window.location.hash);
+  });
 
-  const getTabFromHash = (): TabType => {
-    if (typeof window === "undefined") return "home";
-    const hash = window.location.hash.replace("#", "").split("?")[0];
-    return VALID_TABS.includes(hash as TabType) ? (hash as TabType) : "home";
-  };
+  const activeTab = navState.tab;
 
-  const [activeTab, setActiveTab] = useState<TabType>(getTabFromHash);
   const [intentMode, setIntentMode] = useState<string>("Dating");
   const [discoveryRadius, setDiscoveryRadius] = useState<"MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL">("NATIONWIDE");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -105,18 +110,17 @@ export const CampusConnectApp: React.FC = () => {
 
   // Synchronize URL hash and browser history (popstate / back button)
   React.useEffect(() => {
-    const currentHashTab = getTabFromHash();
-    if (!window.history.state || !window.history.state.tab) {
-      window.history.replaceState({ tab: currentHashTab }, "", `#${currentHashTab}`);
-    }
+    const initialDecoded = decodeNavState(window.location.hash);
+    replaceNavState(initialDecoded);
 
     const handlePopState = (e: PopStateEvent) => {
-      if (e.state && e.state.tab && VALID_TABS.includes(e.state.tab)) {
-        setActiveTab(e.state.tab);
+      let stateToApply: AppNavState;
+      if (e.state && e.state.unicircleNav) {
+        stateToApply = e.state.unicircleNav;
       } else {
-        const hashTab = getTabFromHash();
-        setActiveTab(hashTab);
+        stateToApply = decodeNavState(window.location.hash);
       }
+      setNavState(stateToApply);
       setShowFilterDrawer(false);
       setShowUserDropdown(false);
       setCelebratedMatch(null);
@@ -126,15 +130,16 @@ export const CampusConnectApp: React.FC = () => {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const handleTabChange = (newTab: TabType) => {
-    if (newTab === activeTab) return;
-    setActiveTab(newTab);
+  const handleNavigate = (newState: AppNavState) => {
+    setNavState(newState);
     setShowUserDropdown(false);
+    pushNavState(newState);
+  };
 
-    // Update history state smoothly without creating duplicate entries for identical tab
-    if (window.location.hash !== `#${newTab}`) {
-      window.history.pushState({ tab: newTab }, "", `#${newTab}`);
-    }
+  const handleTabChange = (newTab: TabType) => {
+    if (newTab === activeTab && !navState.category && !navState.eventId && !navState.profileId && !navState.matchId && !navState.communityId) return;
+    const newState: AppNavState = { tab: newTab };
+    handleNavigate(newState);
   };
 
   const handleSwipeLike = (profile: StudentProfile) => {
@@ -336,6 +341,7 @@ export const CampusConnectApp: React.FC = () => {
                 onNavigateToDiscover={() => handleTabChange("discover")}
                 onNavigateToEvents={() => handleTabChange("events")}
                 onNavigateToCommunity={() => handleTabChange("communities")}
+                onNavigate={handleNavigate}
               />
             )}
 
@@ -348,18 +354,34 @@ export const CampusConnectApp: React.FC = () => {
                 onSwipeSuperLike={handleSwipeSuperLike}
                 onOpenFilters={() => setShowFilterDrawer(true)}
                 intentMode={intentMode}
+                navState={navState}
+                onNavigate={handleNavigate}
               />
             )}
 
-            {activeTab === "communities" && <CommunityHub userProfile={userProfile} />}
+            {activeTab === "communities" && (
+              <CommunityHub
+                userProfile={userProfile}
+                navState={navState}
+                onNavigate={handleNavigate}
+              />
+            )}
 
-            {activeTab === "events" && <CampusEventsHub />}
+            {activeTab === "events" && (
+              <CampusEventsHub
+                userProfile={userProfile}
+                navState={navState}
+                onNavigate={handleNavigate}
+              />
+            )}
 
             {activeTab === "chat" && (
               <RealTimeChatSuite
                 activeMatch={activeChatMatch}
                 matches={matches}
                 onSelectMatch={(m) => setActiveChatMatch(m)}
+                navState={navState}
+                onNavigate={handleNavigate}
               />
             )}
 
