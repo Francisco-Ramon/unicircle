@@ -308,20 +308,6 @@ export const CampusConnectApp: React.FC = () => {
                     <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
                   </button>
 
-                  <button
-                    onClick={() => { handleTabChange("communities"); setShowUserDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
-                  >
-                    <Users className="w-4 h-4 text-emerald-400" /> Communities
-                  </button>
-
-                  <button
-                    onClick={() => { handleTabChange("events"); setShowUserDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
-                  >
-                    <Calendar className="w-4 h-4 text-amber-400" /> Events
-                  </button>
-
                   <div className="pt-1 border-t border-white/10">
                     <button
                       onClick={() => setIsRegistered(false)}
