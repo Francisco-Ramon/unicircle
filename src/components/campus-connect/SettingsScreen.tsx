@@ -13,6 +13,7 @@ import {
   saveNotificationPreferenceToDatabase,
 } from "@/lib/notificationService";
 import { CampusAnalyticsChartScreen } from "./CampusAnalyticsChartScreen";
+import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type AccentTheme = "blue" | "purple" | "emerald" | "sunset" | "ocean" | "rose";
@@ -50,6 +51,7 @@ export const SettingsScreen: React.FC<Props> = ({
   const [activeCategory, setActiveCategory] = useState<string>("account");
   const [currentAccent, setCurrentAccent] = useState<AccentTheme>(accentTheme);
   const [currentMode, setCurrentMode] = useState<ThemeMode>(themeMode);
+  const [showUniSearch, setShowUniSearch] = useState<boolean>(false);
 
   // Notification Controls Preferences State
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(
@@ -191,9 +193,18 @@ export const SettingsScreen: React.FC<Props> = ({
                     <label className="block text-[10px] font-bold text-slate-400 uppercase">University Email</label>
                     <p className="text-sm font-semibold text-white mt-1">{userProfile?.email || "student@uonbi.ac.ke"}</p>
                   </div>
-                  <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-white/5">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase">Campus & Country</label>
-                    <p className="text-sm font-semibold text-white mt-1">{userProfile?.campus || "University of Nairobi"} ({userProfile?.country || "Kenya"})</p>
+                  <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-white/5 flex items-center justify-between col-span-1 sm:col-span-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase">Campus & Country</label>
+                      <p className="text-sm font-semibold text-white mt-1">{userProfile?.campus || "University of Nairobi"} ({userProfile?.country || "Kenya"})</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowUniSearch(true)}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold hover:bg-indigo-600/30 transition cursor-pointer shrink-0 ml-2"
+                    >
+                      Change University
+                    </button>
                   </div>
                 </div>
 
@@ -591,6 +602,31 @@ export const SettingsScreen: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Worldwide University Search Modal */}
+      {showUniSearch && (
+        <GlobalUniversitySearch
+          title="Change University Worldwide"
+          currentUniversityName={userProfile?.campus}
+          onSelectInstitution={(inst) => {
+            if (userProfile) {
+              userProfile.campus = inst.name;
+              userProfile.country = inst.country;
+              userProfile.institutionId = inst.id;
+            }
+            if (onUpdateProfile && userProfile) {
+              onUpdateProfile({
+                ...userProfile,
+                campus: inst.name,
+                country: inst.country,
+                institutionId: inst.id,
+              });
+            }
+            setShowUniSearch(false);
+          }}
+          onClose={() => setShowUniSearch(false)}
+        />
+      )}
     </div>
   );
 };

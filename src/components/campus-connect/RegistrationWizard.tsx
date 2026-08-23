@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search } from "lucide-react";
+import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
+import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
+import { getCountryFlag } from "@/lib/globalUniversityService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -236,79 +238,45 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
         </div>
 
-        {/* Country & University Selection */}
-        <div className="space-y-4 pt-2 border-t border-white/10">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-indigo-400" /> Select Country
-            </label>
-            <select
-              value={selectedCountry}
-              onChange={(e) => handleCountryChange(e.target.value)}
-              className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 font-medium"
-            >
-              {SUPPORTED_COUNTRIES.map((c) => (
-                <option key={c.code} value={c.name} className="bg-slate-900">
-                  {c.flag} {c.name} ({c.region})
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Worldwide University Selection */}
+        <div className="space-y-3 pt-2 border-t border-white/10">
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-indigo-400" /> Select University / College
+            </span>
+            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider flex items-center gap-1">
+              <Globe className="w-3 h-3" /> Worldwide Search
+            </span>
+          </label>
 
-          {/* Searchable University Dropdown */}
-          <div className="relative">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-              <GraduationCap className="w-3.5 h-3.5 text-indigo-400" /> Select University ({selectedCountry})
-            </label>
-            
-            <div
-              onClick={() => setShowUniDropdown(!showUniDropdown)}
-              className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white cursor-pointer flex items-center justify-between hover:border-white/20 transition"
-            >
-              <span className="font-medium truncate">{selectedInstitution.name}</span>
-              <span className="text-xs text-indigo-400 font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 shrink-0 ml-2">
-                {selectedInstitution.shortName}
-              </span>
-            </div>
-
-            {showUniDropdown && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-3 z-30 space-y-2 max-h-60 overflow-y-auto">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    value={searchUni}
-                    onChange={(e) => setSearchUni(e.target.value)}
-                    placeholder={`Search ${selectedCountry} university...`}
-                    className="w-full bg-slate-950 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                {filteredUniversities.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-slate-400">
-                    No matching university found in {selectedCountry}.
-                  </div>
-                ) : (
-                  filteredUniversities.map((inst) => (
-                    <div
-                      key={inst.id}
-                      onClick={() => {
-                        setSelectedInstitution(inst);
-                        setShowUniDropdown(false);
-                      }}
-                      className={`p-2.5 rounded-xl cursor-pointer text-xs flex items-center justify-between transition ${
-                        selectedInstitution.id === inst.id
-                          ? "bg-indigo-600 text-white font-bold"
-                          : "text-slate-300 hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="truncate">{inst.name}</span>
-                      <span className="text-[10px] opacity-70 ml-2 shrink-0">{inst.city}</span>
-                    </div>
-                  ))
-                )}
+          <div
+            onClick={() => setShowUniDropdown(true)}
+            className="w-full bg-slate-950/60 border border-white/10 rounded-2xl p-4 text-sm text-white cursor-pointer flex items-center justify-between hover:border-indigo-500/40 transition group shadow-lg"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xl shrink-0">{getCountryFlag(selectedInstitution.country)}</span>
+              <div className="min-w-0">
+                <p className="font-bold text-white group-hover:text-indigo-300 transition truncate">{selectedInstitution.name}</p>
+                <p className="text-xs text-slate-400 truncate">{selectedInstitution.country} {selectedInstitution.city ? `• ${selectedInstitution.city}` : ""}</p>
               </div>
-            )}
+            </div>
+            <span className="px-3 py-1 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold shrink-0 ml-2 group-hover:bg-indigo-600 group-hover:text-white transition">
+              Search Worldwide ↗
+            </span>
           </div>
+
+          {showUniDropdown && (
+            <GlobalUniversitySearch
+              title="Search Universities Worldwide"
+              currentUniversityName={selectedInstitution.name}
+              onSelectInstitution={(inst) => {
+                setSelectedInstitution(inst);
+                setSelectedCountry(inst.country);
+                setShowUniDropdown(false);
+              }}
+              onClose={() => setShowUniDropdown(false)}
+            />
+          )}
         </div>
 
 

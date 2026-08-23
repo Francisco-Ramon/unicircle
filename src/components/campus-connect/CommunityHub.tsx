@@ -3,7 +3,8 @@ import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
   Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
 } from "lucide-react";
-import { INSTITUTIONS_DATA, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
+import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
+import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 import {
   dispatchAppNotification,
@@ -1260,59 +1261,25 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, navState, onNavigat
         </div>
       )}
 
-      {/* University Switcher Modal */}
+      {/* Worldwide University Switcher Modal */}
       {showSwitcher && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h3 className="text-base font-bold text-white">Change University</h3>
-              <button onClick={() => { setShowSwitcher(false); setSwitcherSearch(""); }} className="p-1.5 rounded-lg text-slate-400 hover:text-white transition">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 border-b border-white/10">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  value={switcherSearch}
-                  onChange={(e) => setSwitcherSearch(e.target.value)}
-                  placeholder="Search universities..."
-                  autoFocus
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2">
-              {filteredInstitutions.length === 0 ? (
-                <p className="text-center text-sm text-slate-500 py-8">No universities found.</p>
-              ) : (
-                filteredInstitutions.map((inst) => (
-                  <button
-                    key={inst.id}
-                    onClick={() => { setActiveInst(inst); setShowSwitcher(false); setSwitcherSearch(""); }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition ${
-                      activeInst.id === inst.id
-                        ? "bg-indigo-600/20 border border-indigo-500/30"
-                        : "hover:bg-white/5"
-                    }`}
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
-                      <Building2 className="w-4 h-4 text-indigo-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{inst.name}</p>
-                      <p className="text-[11px] text-slate-500">{inst.city}, {inst.country}</p>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono shrink-0">{inst.shortName}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        <GlobalUniversitySearch
+          title="Change University Worldwide"
+          currentUniversityName={activeInst.name}
+          onSelectInstitution={(inst) => {
+            setActiveInst(inst);
+            if (userProfile) {
+              userProfile.campus = inst.name;
+              userProfile.country = inst.country;
+              userProfile.institutionId = inst.id;
+            }
+            setShowSwitcher(false);
+            if (onNavigate) {
+              onNavigate({ tab: "communities", communityId: inst.id });
+            }
+          }}
+          onClose={() => setShowSwitcher(false)}
+        />
       )}
     </div>
   );
