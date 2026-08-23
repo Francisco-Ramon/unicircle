@@ -41,7 +41,7 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
   ],
 };
 
-export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
+const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState("");
@@ -71,9 +71,10 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
   };
 
   const currentMatch = (navState?.tab === "chat" && navState.matchId)
-    ? (matches.find((m) => m.id === navState.matchId) || activeMatch)
-    : activeMatch;
+    ? (matches.find((m) => m.id === navState.matchId) || activeMatch || matches[0] || null)
+    : (activeMatch || matches[0] || null);
 
+  const activeMessages = currentMatch ? (messagesMap[currentMatch.id] || []) : [];
   const mobileView = (navState?.tab === "chat" && (navState.chatView === "chat" || navState.matchId)) ? "chat" : "list";
 
   const handleSelectMatchInternal = (m: StudentProfile) => {
@@ -411,5 +412,50 @@ export const RealTimeChatSuite: React.FC<Props> = ({ activeMatch, matches, onSel
         )}
       </div>
     </div>
+  );
+};
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ChatSuiteErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    console.error("RealTimeChatSuite error caught:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full max-w-2xl mx-auto p-8 rounded-3xl bg-slate-900 border border-white/10 text-center space-y-4 my-8">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+            <MessageSquare className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-white">UniCircle Direct Messaging</h2>
+          <p className="text-xs text-slate-400 font-medium">Chat messages are loading. Tap below to reload.</p>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
+          >
+            Reload Direct Messages
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export const RealTimeChatSuite: React.FC<Props> = (props) => {
+  return (
+    <ChatSuiteErrorBoundary>
+      <RealTimeChatSuiteContent {...props} />
+    </ChatSuiteErrorBoundary>
   );
 };
