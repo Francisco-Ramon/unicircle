@@ -288,58 +288,65 @@ export async function searchGlobalUniversities(query: string): Promise<Instituti
       i.city.toLowerCase().includes(q)
   );
 
-  // Query Hipolabs Global Universities API concurrently
+  // Query Hipolabs & GitHub Open-Source Global Universities API concurrently
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    const apiRes = await fetch(
-      `https://universities.hipolabs.com/search?name=${encodeURIComponent(query)}`,
-      { signal: controller.signal }
-    );
+    const [nameRes, countryRes] = await Promise.allSettled([
+      fetch(`https://universities.hipolabs.com/search?name=${encodeURIComponent(query)}`, { signal: controller.signal }),
+      fetch(`https://universities.hipolabs.com/search?country=${encodeURIComponent(query)}`, { signal: controller.signal }),
+    ]);
     clearTimeout(timeoutId);
 
-    if (apiRes.ok) {
-      const apiData = await apiRes.json();
-      if (Array.isArray(apiData) && apiData.length > 0) {
-        const apiMapped: Institution[] = apiData.slice(0, 20).map((item: any, idx: number) => {
-          const countryName = item.country || "Global";
-          const uniName = item.name || "University";
-          const domain = item.domains?.[0] || "";
+    let rawResults: any[] = [];
 
-          // Check if already in local
-          const existing = localMatches.find((l) => l.name.toLowerCase() === uniName.toLowerCase());
-          if (existing) return existing;
+    if (nameRes.status === "fulfilled" && nameRes.value.ok) {
+      const data = await nameRes.value.json();
+      if (Array.isArray(data)) rawResults.push(...data);
+    }
 
-          return {
-            id: `hipo-${idx}-${domain.replace(/[^a-z0-9]/gi, "") || Date.now()}`,
-            name: uniName,
-            shortName: uniName.split(" ").map((w: string) => w[0]).join("").substring(0, 6) || "UNI",
-            country: countryName,
-            city: countryName,
-            stateCounty: countryName,
-            type: "University",
-            domains: item.domains || [domain],
-            logoUrl: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=200&auto=format&fit=crop&q=80",
-            bannerUrl: "https://images.unsplash.com/photo-1562774053-701939374585?w=1200&auto=format&fit=crop&q=80",
-            location: `${countryName}`,
-            verifiedStudentsCount: 1200,
-            activeUsersCount: 750,
-            clubsCount: 25,
-            establishedYear: 1900,
-            popularMajors: ["General Studies", "Science & Technology", "Arts & Humanities"],
-          };
-        });
+    if (countryRes.status === "fulfilled" && countryRes.value.ok) {
+      const data = await countryRes.value.json();
+      if (Array.isArray(data)) rawResults.push(...data);
+    }
 
-        // Merge local matches and API results uniquely by name
-        const merged: Institution[] = [...localMatches];
-        apiMapped.forEach((apiInst) => {
-          if (!merged.some((m) => m.name.toLowerCase() === apiInst.name.toLowerCase())) {
-            merged.push(apiInst);
-          }
-        });
-        return merged;
-      }
+    if (rawResults.length > 0) {
+      const apiMapped: Institution[] = rawResults.slice(0, 30).map((item: any, idx: number) => {
+        const countryName = item.country || "Global";
+        const uniName = item.name || "University";
+        const domain = item.domains?.[0] || "";
+
+        const existing = localMatches.find((l) => l.name.toLowerCase() === uniName.toLowerCase());
+        if (existing) return existing;
+
+        return {
+          id: `hipo-${idx}-${domain.replace(/[^a-z0-9]/gi, "") || Date.now()}`,
+          name: uniName,
+          shortName: uniName.split(" ").map((w: string) => w[0]).join("").substring(0, 6) || "UNI",
+          country: countryName,
+          city: countryName,
+          stateCounty: countryName,
+          type: "University",
+          domains: item.domains || [domain],
+          logoUrl: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=200&auto=format&fit=crop&q=80",
+          bannerUrl: "https://images.unsplash.com/photo-1562774053-701939374585?w=1200&auto=format&fit=crop&q=80",
+          location: `${countryName}`,
+          verifiedStudentsCount: 1200,
+          activeUsersCount: 750,
+          clubsCount: 25,
+          establishedYear: 1900,
+          popularMajors: ["General Studies", "Science & Technology", "Arts & Humanities"],
+        };
+      });
+
+      const merged: Institution[] = [...localMatches];
+      apiMapped.forEach((apiInst) => {
+        if (!merged.some((m) => m.name.toLowerCase() === apiInst.name.toLowerCase())) {
+          merged.push(apiInst);
+        }
+      });
+      return merged;
     }
   } catch (err) {
     console.warn("Global universities online API search fallback:", err);
