@@ -18,6 +18,7 @@ import { SettingsScreen, AccentTheme, ThemeMode } from "./SettingsScreen";
 import { StudentHomeScreen } from "./StudentHomeScreen";
 import { CampusDesktopSidebar } from "./CampusDesktopSidebar";
 import { CampusRightPanel } from "./CampusRightPanel";
+import { SplashScreen } from "./SplashScreen";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 import {
   NotificationPreferences,
@@ -212,6 +213,9 @@ export const CampusConnectApp: React.FC = () => {
     <div data-theme={themeMode} className={`min-h-screen font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
       themeMode === "light" ? "bg-white text-slate-900" : "bg-[#070A10] text-slate-100"
     }`}>
+      {/* UniCircle X-Style Launch Splash Screen */}
+      <SplashScreen />
+
       {/* 1. DESKTOP LEFT SIDEBAR NAVIGATION (Visible on lg >= 1024px) */}
       {isRegistered && (
         <div className="hidden lg:flex h-screen sticky top-0 shrink-0 z-30">
