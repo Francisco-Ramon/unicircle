@@ -295,13 +295,25 @@ export const GlobalUniversitySearch: React.FC<Props> = ({
 
                     <div className="flex items-center gap-2 shrink-0">
                       {isSelected ? (
-                        <span className="px-2.5 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Current
-                        </span>
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600/30 border border-indigo-500/50 text-indigo-200 text-xs font-bold flex items-center gap-1 cursor-default opacity-80"
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-400" /> Current University
+                        </button>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full bg-white/5 group-hover:bg-indigo-600 text-slate-400 group-hover:text-white text-[10px] font-bold transition">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectInstitution(inst);
+                            if (onClose) onClose();
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md shadow-indigo-600/30 flex items-center gap-1 cursor-pointer"
+                        >
                           Select ↗
-                        </span>
+                        </button>
                       )}
                     </div>
                   </div>
