@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Home, Search, Users, MessageSquare, Calendar, User, ShieldCheck,
   Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles, BarChart3
@@ -35,6 +35,8 @@ import {
   replaceNavState,
   encodeNavState,
 } from "@/lib/navigationHistory";
+import { supabase } from "@/integrations/supabase/client";
+import { getLiveProfile, upsertLiveProfile } from "@/lib/supabaseLiveService";
 
 
 export const CampusConnectApp: React.FC = () => {
@@ -43,7 +45,7 @@ export const CampusConnectApp: React.FC = () => {
   const [isBiometricVerified, setIsBiometricVerified] = useState(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
 
-  // User Profile with localStorage persistence
+  // User Profile with localStorage persistence and Supabase sync
   const [userProfile, setUserProfile] = useState<StudentProfileData>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -79,7 +81,60 @@ export const CampusConnectApp: React.FC = () => {
     };
   });
 
-  const handleUpdateProfile = (updated: StudentProfileData) => {
+  // Load and sync real logged-in user profile from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCurrentStudent() {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user && isMounted) {
+          const liveProf = await getLiveProfile(authData.user.id);
+          if (liveProf) {
+            setUserProfile((prev) => {
+              const updatedPhotos = (liveProf.photos && liveProf.photos.length > 0)
+                ? liveProf.photos
+                : prev.photos;
+
+              const merged: StudentProfileData = {
+                ...prev,
+                email: authData.user.email || liveProf.email || prev.email,
+                firstName: liveProf.first_name || prev.firstName,
+                lastName: liveProf.last_name || prev.lastName,
+                gender: (liveProf.gender as any) || prev.gender,
+                interestedIn: (liveProf.interested_in as any) || prev.interestedIn,
+                country: liveProf.country || prev.country,
+                campus: liveProf.campus || prev.campus,
+                course: liveProf.course || prev.course,
+                yearOfStudy: liveProf.year_of_study || prev.yearOfStudy,
+                bio: liveProf.bio || prev.bio,
+                interests: (liveProf.interests && liveProf.interests.length > 0) ? liveProf.interests : prev.interests,
+                photos: updatedPhotos,
+                verified: liveProf.verified ?? prev.verified,
+              };
+              if (typeof window !== "undefined") {
+                localStorage.setItem("unicircle_user_profile", JSON.stringify(merged));
+              }
+              return merged;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync live student profile from Supabase:", err);
+      }
+    }
+    loadCurrentStudent();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      loadCurrentStudent();
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleUpdateProfile = async (updated: StudentProfileData) => {
     setUserProfile(updated);
     if (typeof window !== "undefined") {
       try {
@@ -87,6 +142,29 @@ export const CampusConnectApp: React.FC = () => {
       } catch (err) {
         console.warn("Failed to save user profile to localStorage:", err);
       }
+    }
+
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        await upsertLiveProfile({
+          id: authData.user.id,
+          first_name: updated.firstName,
+          last_name: updated.lastName,
+          campus: updated.campus,
+          country: updated.country,
+          course: updated.course,
+          year_of_study: updated.yearOfStudy,
+          bio: updated.bio,
+          photos: updated.photos,
+          interests: updated.interests,
+          gender: updated.gender,
+          interested_in: updated.interestedIn,
+          verified: updated.verified,
+        });
+      }
+    } catch (err) {
+      console.warn("Could not push profile updates to Supabase:", err);
     }
   };
 
@@ -226,7 +304,13 @@ export const CampusConnectApp: React.FC = () => {
             unreadNotifCount={unreadNotifCount}
             activeMatchesCount={matches.length}
             themeMode={themeMode}
-            onSignOut={() => setIsRegistered(false)}
+            onSignOut={async () => {
+              await supabase.auth.signOut();
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("unicircle_user_profile");
+                window.location.href = "/auth";
+              }
+            }}
           />
         </div>
       )}
@@ -362,7 +446,13 @@ export const CampusConnectApp: React.FC = () => {
 
                   <div className="pt-1 border-t border-white/10">
                     <button
-                      onClick={() => setIsRegistered(false)}
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        if (typeof window !== "undefined") {
+                          localStorage.removeItem("unicircle_user_profile");
+                          window.location.href = "/auth";
+                        }
+                      }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
                     >
                       <LogOut className="w-4 h-4" /> Sign Out
