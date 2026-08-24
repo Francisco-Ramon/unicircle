@@ -22,6 +22,10 @@ import {
   getLocalUserId,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
+import { SocialController } from "@/lib/social/socialController";
+import { SocialGraphService } from "@/lib/social/socialGraphService";
+import { RealtimeDistributionService } from "@/lib/social/realtimeService";
+import { PostVisibility } from "@/lib/social/types";
 
 interface PostComment {
   id: string;
@@ -36,12 +40,14 @@ interface PostComment {
 
 interface CommunityPost {
   id: string;
+  authorId?: string;
   authorName: string;
   authorAvatar: string;
   authorCourse: string;
   timeAgo: string;
   content: string;
   image?: string;
+  visibility?: PostVisibility;
   likes: number;
   commentsCount: number;
   userLiked: boolean;
@@ -224,7 +230,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     ? (findInst(navState.communityId) || userInst)
     : userInst);
 
-  const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
+  const [activeTab, setActiveTab] = useState<"feed" | "following" | "events" | "members" | "about">("feed");
 
   // Posts state with localStorage initialization
   const [posts, setPosts] = useState<CommunityPost[]>(() => {
@@ -553,6 +559,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [postVisibility, setPostVisibility] = useState<PostVisibility>("PUBLIC");
 
   const handleCreatePost = async () => {
     if (!newPostContent.trim() || isSubmittingPost) return;
@@ -566,25 +573,52 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         if (liveUploaded) uploadedImageUrl = liveUploaded;
       }
 
-      const livePost = await createLivePost({
+      const authorProfile = {
+        id: userProfile?.id || getLocalUserId(),
+        email: userProfile?.email || "student@unicircle.app",
+        firstName: userProfile?.firstName || "Student",
+        lastName: userProfile?.lastName || "",
+        campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
+        course: userProfile?.course || "Student",
+        yearOfStudy: userProfile?.yearOfStudy || "3rd Year",
+        bio: userProfile?.bio || "",
+        photos: userProfile?.photos || ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"],
+        interests: userProfile?.interests || [],
+        gender: userProfile?.gender || "Female",
+        verified: true,
+        isOnline: true,
+      };
+
+      // 1. Authoritative Social Engine Post Creation (Validates, Events, Hybrid Fan-out)
+      const socialPost = await SocialController.createPost({
+        author: authorProfile,
+        content: newPostContent.trim(),
+        campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
+        imageUrl: uploadedImageUrl || null,
+        visibility: postVisibility,
+      });
+
+      // 2. Also write to Supabase
+      createLivePost({
+        authorId: authorProfile.id,
         content: newPostContent.trim(),
         campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
         imageUrl: uploadedImageUrl || undefined,
-      });
+      }).catch(() => {});
 
-      const studentName = userProfile?.firstName
-        ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
-        : "Verified Student";
-      const studentAvatar = userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+      const studentName = `${authorProfile.firstName} ${authorProfile.lastName}`.trim();
+      const studentAvatar = authorProfile.photos[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
 
       const formatted: CommunityPost = {
-        id: livePost?.id || `post-${Date.now()}`,
+        id: socialPost.id,
+        authorId: authorProfile.id,
         authorName: studentName,
         authorAvatar: studentAvatar,
-        authorCourse: `${userProfile?.course || "Student"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+        authorCourse: `${authorProfile.course} • ${authorProfile.yearOfStudy}`,
         timeAgo: "Just now",
         content: newPostContent.trim(),
         image: uploadedImageUrl || undefined,
+        visibility: postVisibility,
         likes: 0,
         commentsCount: 0,
         userLiked: false,
@@ -737,8 +771,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       {/* Community Sub-tabs */}
       <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/[0.06]">
         {[
-          { id: "feed", label: "School Feed", icon: MessageSquare },
-          { id: "members", label: "Verified Students", icon: Users },
+          { id: "feed", label: "Campus Feed", icon: MessageSquare },
+          { id: "following", label: "Following", icon: Users },
+          { id: "members", label: "Verified Students", icon: ShieldCheck },
           { id: "about", label: "About School", icon: Info },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -760,8 +795,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         })}
       </div>
 
-      {/* FEED TAB */}
-      {(activeTab === "feed" || (activeTab as any) === "events") && (
+      {/* FEED TAB (Campus Feed & Following Feed) */}
+      {(activeTab === "feed" || activeTab === "following" || (activeTab as any) === "events") && (
         <div className="space-y-4">
           {/* School-Associated Events Section */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 border border-white/10 space-y-3">
@@ -896,6 +931,15 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <select
+                    value={postVisibility}
+                    onChange={(e) => setPostVisibility(e.target.value as any)}
+                    className="bg-slate-950 border border-white/10 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="PUBLIC">🌍 Public</option>
+                    <option value="FOLLOWERS_ONLY">👥 Followers Only</option>
+                  </select>
+
                   <button
                     onClick={() => { setShowNewPost(false); setNewPostContent(""); setNewPostImage(""); }}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition"
@@ -904,10 +948,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                   </button>
                   <button
                     onClick={handleCreatePost}
-                    disabled={!newPostContent.trim()}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={!newPostContent.trim() || isSubmittingPost}
+                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
-                    Post
+                    {isSubmittingPost ? <span>Posting...</span> : <span>Post</span>}
                   </button>
                 </div>
               </div>
@@ -915,20 +959,75 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           )}
 
           {/* Posts List */}
-          {posts.map((post) => {
+          {posts
+            .filter((post) => {
+              const currentUserId = userProfile?.id || getLocalUserId();
+              if (activeTab === "following") {
+                if (post.authorId && post.authorId !== currentUserId) {
+                  return SocialGraphService.isFollowing(currentUserId, post.authorId);
+                }
+              }
+              if (post.visibility === "FOLLOWERS_ONLY" && post.authorId && post.authorId !== currentUserId) {
+                return SocialGraphService.isFollowing(currentUserId, post.authorId);
+              }
+              return true;
+            })
+            .map((post) => {
             const isCommentsOpen = activeCommentPostId === post.id;
+            const currentUserId = userProfile?.id || getLocalUserId();
+            const isFollowingAuthor = post.authorId ? SocialGraphService.isFollowing(currentUserId, post.authorId) : false;
+
             return (
               <div key={post.id} className="bg-slate-900/60 border border-white/[0.06] rounded-2xl overflow-hidden shadow-lg transition">
                 {/* Post header */}
-                <div className="flex items-center gap-3 p-4 pb-0">
-                  <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                      {post.authorName}
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    </h4>
-                    <p className="text-[11px] text-slate-500">{post.authorCourse} • {post.timeAgo}</p>
+                <div className="flex items-center justify-between p-4 pb-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                        {post.authorName}
+                        <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                        {post.visibility === "FOLLOWERS_ONLY" && (
+                          <span className="px-1.5 py-0.2 text-[9px] rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">Followers Only</span>
+                        )}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 truncate">{post.authorCourse} • {post.timeAgo}</p>
+                    </div>
                   </div>
+
+                  {post.authorId && post.authorId !== currentUserId && (
+                    <button
+                      onClick={async () => {
+                        if (isFollowingAuthor) {
+                          SocialGraphService.unfollowUser(currentUserId, post.authorId!);
+                        } else {
+                          await SocialController.followUser({
+                            id: currentUserId,
+                            email: userProfile?.email || "student@unicircle.app",
+                            firstName: userProfile?.firstName || "Student",
+                            lastName: userProfile?.lastName || "",
+                            campus: activeInst.name,
+                            course: userProfile?.course || "Student",
+                            yearOfStudy: userProfile?.yearOfStudy || "3rd Year",
+                            bio: userProfile?.bio || "",
+                            photos: userProfile?.photos || [],
+                            interests: userProfile?.interests || [],
+                            gender: userProfile?.gender || "Female",
+                            verified: true,
+                            isOnline: true,
+                          }, post.authorId!);
+                        }
+                        setPosts((prev) => [...prev]);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                        isFollowingAuthor
+                          ? "bg-white/10 text-slate-300 hover:bg-white/15"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+                      }`}
+                    >
+                      {isFollowingAuthor ? "Following" : "+ Follow"}
+                    </button>
+                  )}
                 </div>
 
                 {/* Post content */}
