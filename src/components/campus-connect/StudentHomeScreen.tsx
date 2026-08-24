@@ -104,6 +104,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
           image: lp.image_url,
           likes: lp.likes_count || 0,
           comments: lp.comments_count || 0,
+          commentsCount: lp.comments_count || 0,
+          authorId: lp.author_id,
         }));
         setCommunityPosts(formatted);
         if (typeof window !== "undefined") {
