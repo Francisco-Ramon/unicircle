@@ -1,3 +1,4 @@
+import { safeSetItem } from "../safeStorage";
 import { Post, FeedItem, FeedCursor, PaginatedFeedResponse, PostVisibility } from "./types";
 import { SocialGraphService } from "./socialGraphService";
 import { FeedRankingService } from "./rankingService";
@@ -38,13 +39,13 @@ function persistFeedStore() {
   if (typeof window === "undefined") return;
   try {
     const allPosts = Array.from(postRepository.values()).slice(0, 200);
-    localStorage.setItem(STORAGE_KEY_POSTS_REPO, JSON.stringify(allPosts));
+    safeSetItem(STORAGE_KEY_POSTS_REPO, JSON.stringify(allPosts));
 
     const allFeedItems: FeedItem[] = [];
     feedTimelineStore.forEach((items) => {
       allFeedItems.push(...items.slice(0, 100));
     });
-    localStorage.setItem(STORAGE_KEY_FEED_ITEMS, JSON.stringify(allFeedItems));
+    safeSetItem(STORAGE_KEY_FEED_ITEMS, JSON.stringify(allFeedItems));
   } catch (e) {}
 }
 

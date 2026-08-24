@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useRef } from "react";
 import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, AlertCircle, LogIn, UserPlus } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
@@ -164,9 +165,9 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       };
 
       if (typeof window !== "undefined") {
-        localStorage.setItem("unicircle_user_id", userId);
-        localStorage.setItem("unicircle_user_profile", JSON.stringify(resolvedProfile));
-        localStorage.setItem("unicircle_registered", "true");
+        safeSetItem("unicircle_user_id", userId);
+        safeSetItem("unicircle_user_profile", JSON.stringify(resolvedProfile));
+        safeSetItem("unicircle_registered", "true");
       }
 
       setAuthStatus("SUCCESS");
@@ -321,9 +322,9 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
 
       // 3. Save to localStorage
       if (typeof window !== "undefined") {
-        localStorage.setItem("unicircle_user_id", authUserId);
-        localStorage.setItem("unicircle_user_profile", JSON.stringify(fullProfile));
-        localStorage.setItem("unicircle_registered", "true");
+        safeSetItem("unicircle_user_id", authUserId);
+        safeSetItem("unicircle_user_profile", JSON.stringify(fullProfile));
+        safeSetItem("unicircle_registered", "true");
       }
 
       setAuthStatus("SUCCESS");

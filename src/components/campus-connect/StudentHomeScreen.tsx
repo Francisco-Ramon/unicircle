@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap, UserCheck } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
@@ -109,7 +110,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
         }));
         setCommunityPosts(formatted);
         if (typeof window !== "undefined") {
-          localStorage.setItem("unicircle_community_posts", JSON.stringify(formatted));
+          safeSetItem("unicircle_community_posts", JSON.stringify(formatted));
         }
       }
 

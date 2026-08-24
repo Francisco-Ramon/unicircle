@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft } from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
@@ -56,7 +57,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
       const next = updater(prev);
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem("unicircle_chat_messages", JSON.stringify(next));
+          safeSetItem("unicircle_chat_messages", JSON.stringify(next));
         } catch (e) {
           console.warn("Failed to save chat messages to localStorage:", e);
         }

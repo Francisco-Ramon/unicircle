@@ -1,3 +1,4 @@
+import { safeSetItem } from "./safeStorage";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface NotificationPreferences {
@@ -155,7 +156,7 @@ export async function fetchNotificationPreferences(): Promise<NotificationPrefer
       if (!error && data?.value) {
         const dbPrefs = normalizePreferences(data.value as any);
         if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(dbPrefs));
+          safeSetItem(STORAGE_KEY, JSON.stringify(dbPrefs));
         }
         return dbPrefs;
       }
@@ -180,7 +181,7 @@ export async function saveNotificationPreferenceToDatabase(
 
   // Update local storage cache immediately
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPrefs));
+    safeSetItem(STORAGE_KEY, JSON.stringify(nextPrefs));
   }
 
   // Save to Supabase preferences table
@@ -198,7 +199,7 @@ export async function saveNotificationPreferenceToDatabase(
         console.error("Failed to save notification preference to Supabase:", error);
         // Revert local cache on DB failure
         if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPrefs));
+          safeSetItem(STORAGE_KEY, JSON.stringify(currentPrefs));
         }
         return { success: false, updatedPrefs: currentPrefs, error: error.message || "Database update failed" };
       }
@@ -251,7 +252,7 @@ export function getStoredNotifications(): AppNotification[] {
 
 export function saveStoredNotifications(notifs: AppNotification[]) {
   if (typeof window !== "undefined") {
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifs));
+    safeSetItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifs));
     // Dispatch custom event for real-time badge count updates across components
     window.dispatchEvent(new CustomEvent("unicircle-notifications-updated"));
   }

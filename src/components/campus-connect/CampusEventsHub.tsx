@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState } from "react";
 import {
   Calendar, MapPin, Users, Ticket, Sparkles, PlusCircle, CheckCircle2,
@@ -158,7 +159,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
     setEvents(newEvents);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("unicircle_campus_events", JSON.stringify(newEvents));
+        safeSetItem("unicircle_campus_events", JSON.stringify(newEvents));
       } catch (e) {
         console.warn("Could not save campus events to localStorage:", e);
       }
@@ -197,7 +198,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
             const existingIds = new Set(formatted.map((f) => f.id));
             const merged = [...formatted, ...prev.filter((p) => !existingIds.has(p.id))];
             if (typeof window !== "undefined") {
-              localStorage.setItem("unicircle_campus_events", JSON.stringify(merged));
+              safeSetItem("unicircle_campus_events", JSON.stringify(merged));
             }
             return merged;
           });

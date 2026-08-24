@@ -1,3 +1,4 @@
+import { safeSetItem } from "../safeStorage";
 import { SocialNotification, UserProfile } from "./types";
 import { RealtimeDistributionService } from "./realtimeService";
 
@@ -18,7 +19,7 @@ function hydrateNotifications() {
 function persistNotifications() {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(notificationsStore.slice(0, 100)));
+    safeSetItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(notificationsStore.slice(0, 100)));
   } catch (e) {}
 }
 

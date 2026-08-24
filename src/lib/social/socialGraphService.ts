@@ -1,3 +1,4 @@
+import { safeSetItem } from "../safeStorage";
 import { Follow, Block, UserProfile } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -46,7 +47,7 @@ function persistLocalGraph() {
         allFollows.push({ followerId, followingId, createdAt: new Date().toISOString() });
       });
     });
-    localStorage.setItem(STORAGE_KEY_FOLLOWS, JSON.stringify(allFollows));
+    safeSetItem(STORAGE_KEY_FOLLOWS, JSON.stringify(allFollows));
 
     const allBlocks: Block[] = [];
     blocksStore.forEach((blockedSet, blockerId) => {
@@ -54,7 +55,7 @@ function persistLocalGraph() {
         allBlocks.push({ blockerId, blockedId, createdAt: new Date().toISOString() });
       });
     });
-    localStorage.setItem(STORAGE_KEY_BLOCKS, JSON.stringify(allBlocks));
+    safeSetItem(STORAGE_KEY_BLOCKS, JSON.stringify(allBlocks));
   } catch (e) {}
 }
 

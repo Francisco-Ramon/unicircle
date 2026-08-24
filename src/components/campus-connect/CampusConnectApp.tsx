@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useEffect } from "react";
 import {
   Home, Search, Users, MessageSquare, Calendar, User, ShieldCheck,
@@ -136,7 +137,7 @@ export const CampusConnectApp: React.FC = () => {
                 verified: liveProf.verified ?? prev?.verified ?? true,
               };
               if (typeof window !== "undefined") {
-                localStorage.setItem("unicircle_user_profile", JSON.stringify(merged));
+                safeSetItem("unicircle_user_profile", JSON.stringify(merged));
               }
               return merged;
             });
@@ -195,7 +196,7 @@ export const CampusConnectApp: React.FC = () => {
     setUserProfile(updated);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("unicircle_user_profile", JSON.stringify(updated));
+        safeSetItem("unicircle_user_profile", JSON.stringify(updated));
       } catch (err) {
         console.warn("Failed to save user profile to localStorage:", err);
       }
@@ -279,14 +280,14 @@ export const CampusConnectApp: React.FC = () => {
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
     if (typeof window !== "undefined") {
-      localStorage.setItem("unicircle_theme_mode", mode);
+      safeSetItem("unicircle_theme_mode", mode);
     }
   };
 
   const setAccentTheme = (acc: AccentTheme) => {
     setAccentThemeState(acc);
     if (typeof window !== "undefined") {
-      localStorage.setItem("unicircle_accent_theme", acc);
+      safeSetItem("unicircle_accent_theme", acc);
     }
   };
 
@@ -438,8 +439,8 @@ export const CampusConnectApp: React.FC = () => {
     if (typeof window !== "undefined") {
       const hash = encodeNavState(navState);
       try {
-        localStorage.setItem("unicircle_last_active_tab", navState.tab);
-        localStorage.setItem("unicircle_last_nav_hash", hash);
+        safeSetItem("unicircle_last_active_tab", navState.tab);
+        safeSetItem("unicircle_last_nav_hash", hash);
       } catch (e) {}
       if (window.location.hash !== hash) {
         replaceNavState(navState);

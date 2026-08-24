@@ -1,3 +1,4 @@
+import { safeSetItem } from "./safeStorage";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface LiveProfile {
@@ -81,7 +82,7 @@ export function getLocalUserId(): string {
     id = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    localStorage.setItem("unicircle_user_id", id);
+    safeSetItem("unicircle_user_id", id);
   }
   return id;
 }
@@ -96,7 +97,7 @@ export async function ensureAuthenticatedUser(): Promise<string> {
     const { data: authData } = await supabase.auth.getUser();
     if (authData?.user?.id) {
       if (typeof window !== "undefined") {
-        localStorage.setItem("unicircle_user_id", authData.user.id);
+        safeSetItem("unicircle_user_id", authData.user.id);
       }
       return authData.user.id;
     }
@@ -114,7 +115,7 @@ export async function ensureAuthenticatedUser(): Promise<string> {
 
     if (signInData?.user?.id) {
       if (typeof window !== "undefined") {
-        localStorage.setItem("unicircle_user_id", signInData.user.id);
+        safeSetItem("unicircle_user_id", signInData.user.id);
       }
       return signInData.user.id;
     }
@@ -127,7 +128,7 @@ export async function ensureAuthenticatedUser(): Promise<string> {
 
     if (signUpData?.user?.id) {
       if (typeof window !== "undefined") {
-        localStorage.setItem("unicircle_user_id", signUpData.user.id);
+        safeSetItem("unicircle_user_id", signUpData.user.id);
       }
       return signUpData.user.id;
     }
@@ -221,7 +222,7 @@ export async function upsertLiveProfile(profile: any): Promise<boolean> {
       try {
         const cached = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_PROFILES) || "[]");
         const filtered = cached.filter((p: any) => p.id !== userId);
-        localStorage.setItem(CLOUD_SYNC_KEY_PROFILES, JSON.stringify([payload, ...filtered]));
+        safeSetItem(CLOUD_SYNC_KEY_PROFILES, JSON.stringify([payload, ...filtered]));
       } catch (e) {}
     }
 
@@ -365,7 +366,7 @@ export async function createLivePost(params: {
     if (typeof window !== "undefined") {
       try {
         const cached = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_POSTS) || "[]");
-        localStorage.setItem(CLOUD_SYNC_KEY_POSTS, JSON.stringify([postPayload, ...cached.filter((p: any) => p.id !== postId)]));
+        safeSetItem(CLOUD_SYNC_KEY_POSTS, JSON.stringify([postPayload, ...cached.filter((p: any) => p.id !== postId)]));
       } catch (e) {}
     }
 
@@ -584,7 +585,7 @@ export async function createLiveEvent(eventData: {
     if (typeof window !== "undefined") {
       try {
         const cached = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_EVENTS) || "[]");
-        localStorage.setItem(CLOUD_SYNC_KEY_EVENTS, JSON.stringify([payload, ...cached.filter((e: any) => e.id !== payload.id)]));
+        safeSetItem(CLOUD_SYNC_KEY_EVENTS, JSON.stringify([payload, ...cached.filter((e: any) => e.id !== payload.id)]));
       } catch (e) {}
     }
 

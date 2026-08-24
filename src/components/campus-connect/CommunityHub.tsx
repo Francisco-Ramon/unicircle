@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useEffect } from "react";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
@@ -271,7 +272,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setPosts(newPosts);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("unicircle_community_posts", JSON.stringify(newPosts));
+        safeSetItem("unicircle_community_posts", JSON.stringify(newPosts));
       } catch (e) {
         console.warn("Could not save posts to localStorage:", e);
       }
@@ -283,7 +284,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setCommunityEvents(newEvents);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("unicircle_community_events", JSON.stringify(newEvents));
+        safeSetItem("unicircle_community_events", JSON.stringify(newEvents));
       } catch (e) {
         console.warn("Could not save events to localStorage:", e);
       }
@@ -327,7 +328,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               const existingIds = new Set(formattedPosts.map((p) => p.id));
               const combined = [...formattedPosts, ...prev.filter((p) => !existingIds.has(p.id))];
               if (typeof window !== "undefined") {
-                localStorage.setItem("unicircle_community_posts", JSON.stringify(combined));
+                safeSetItem("unicircle_community_posts", JSON.stringify(combined));
               }
               return combined;
             });
@@ -357,7 +358,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               const existingEvtIds = new Set(formattedEvents.map((e) => e.id));
               const combined = [...formattedEvents, ...prev.filter((e) => !existingEvtIds.has(e.id))];
               if (typeof window !== "undefined") {
-                localStorage.setItem("unicircle_community_events", JSON.stringify(combined));
+                safeSetItem("unicircle_community_events", JSON.stringify(combined));
               }
               return combined;
             });
@@ -389,7 +390,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               const dedupe = prev.filter((p) => p.id !== incomingPost.id);
               const next = [incomingPost, ...dedupe];
               if (typeof window !== "undefined") {
-                localStorage.setItem("unicircle_community_posts", JSON.stringify(next));
+                safeSetItem("unicircle_community_posts", JSON.stringify(next));
               }
               return next;
             });
@@ -418,7 +419,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               const dedupe = prev.filter((e) => e.id !== incomingEvt.id);
               const next = [incomingEvt, ...dedupe];
               if (typeof window !== "undefined") {
-                localStorage.setItem("unicircle_community_events", JSON.stringify(next));
+                safeSetItem("unicircle_community_events", JSON.stringify(next));
               }
               return next;
             });
