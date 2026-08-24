@@ -35,19 +35,7 @@ interface Props {
   onNavigate?: (state: AppNavState) => void;
 }
 
-const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
-  "sp-1": [
-    { id: "m1", senderId: "sp-1", text: "Hey! Saw we matched on UniCircle! Loved your bio about CS and neural networks! 🚀", timestamp: "10:14 AM", isRead: true, type: "text" },
-    { id: "m2", senderId: "me", text: "Hey Amani! Thanks! Are you in the med school library today?", timestamp: "10:16 AM", isRead: true, type: "text" },
-    { id: "m3", senderId: "sp-1", text: "Yes! Preparing for anatomy midterms. Are you going to the campus hackathon this Saturday?", timestamp: "10:18 AM", isRead: true, type: "text" },
-  ],
-  "sp-2": [
-    { id: "m20", senderId: "sp-2", text: "Hi Alex! Ready for the finance study session?", timestamp: "Yesterday", isRead: true, type: "text" },
-  ],
-  "sp-3": [
-    { id: "m30", senderId: "sp-3", text: "Yo Alex! Let's team up for the East Africa AI challenge!", timestamp: "2 days ago", isRead: true, type: "text" },
-  ],
-};
+const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
 
 const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
   const chatFileInputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +104,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
               }));
             }
 
-            // Subscribe to live incoming WebSocket messages
+            // Subscribe to real live incoming WebSocket messages from the other user
             unsubscribe = subscribeToLiveMessages(convId, (newLiveMsg) => {
               const incoming: ChatMessage = {
                 id: newLiveMsg.id,
@@ -167,17 +155,26 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
         [currentMatch.id]: [...(prev[currentMatch.id] || []), imgMsg],
       }));
 
-      // Send to Supabase if live
-      if (activeConversationId) {
+      // Send to Supabase live database
+      try {
         const { data: authData } = await supabase.auth.getUser();
         if (authData?.user) {
-          await sendLiveChatMessage({
-            conversationId: activeConversationId,
-            senderId: authData.user.id,
-            content: "Shared a photo",
-            mediaUrl: publicUrl || undefined,
-          });
+          let convId = activeConversationId;
+          if (!convId && currentMatch.id.length > 10) {
+            convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
+            if (convId) setActiveConversationId(convId);
+          }
+          if (convId) {
+            await sendLiveChatMessage({
+              conversationId: convId,
+              senderId: authData.user.id,
+              content: "Shared a photo",
+              mediaUrl: publicUrl || undefined,
+            });
+          }
         }
+      } catch (e) {
+        console.warn("Could not push image message to Supabase:", e);
       }
     }
   };
@@ -217,47 +214,24 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
     setInputText("");
 
     // Send to Supabase live database
-    if (activeConversationId) {
+    try {
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user) {
-        await sendLiveChatMessage({
-          conversationId: activeConversationId,
-          senderId: authData.user.id,
-          content: textToSend,
-        });
+        let convId = activeConversationId;
+        if (!convId && currentMatch.id.length > 10) {
+          convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
+          if (convId) setActiveConversationId(convId);
+        }
+        if (convId) {
+          await sendLiveChatMessage({
+            conversationId: convId,
+            senderId: authData.user.id,
+            content: textToSend,
+          });
+        }
       }
-    } else {
-      // Simulate demo fallback response after 1.5s
-      setTimeout(async () => {
-        const autoReplies = [
-          "That sounds awesome! Let me check my lecture schedule! 😊",
-          "Haha totally agree! See you on campus!",
-          "Definitely! Let's grab coffee at the student union! ☕",
-        ];
-        const replyText = autoReplies[Math.floor(Math.random() * autoReplies.length)];
-        const replyMsg: ChatMessage = {
-          id: `msg-reply-${Date.now()}`,
-          senderId: currentMatch.id,
-          text: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          isRead: true,
-          type: "text",
-        };
-        updateMessagesMap((prev) => ({
-          ...prev,
-          [currentMatch.id]: [...(prev[currentMatch.id] || []), replyMsg],
-        }));
-
-        // Dispatch direct message notification if preference is ON
-        const prefs = await fetchNotificationPreferences();
-        dispatchAppNotification({
-          type: "direct_message",
-          fromName: currentMatch.name,
-          fromAvatar: currentMatch.photos[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-          fromUniversity: currentMatch.campus,
-          message: replyText,
-        }, prefs);
-      }, 1500);
+    } catch (e) {
+      console.warn("Could not push live message to Supabase:", e);
     }
   };
 
