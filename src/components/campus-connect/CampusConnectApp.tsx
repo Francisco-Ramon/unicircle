@@ -46,13 +46,25 @@ import {
 
 
 export const CampusConnectApp: React.FC = () => {
-  // User Session & Registration State
-  const [isRegistered, setIsRegistered] = useState(true);
-  const [isBiometricVerified, setIsBiometricVerified] = useState(true);
+  // User Session & Registration State: Only true if there is an active session or profile
+  const [isRegistered, setIsRegistered] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("unicircle_user_profile");
+    }
+    return false;
+  });
+
+  const [isBiometricVerified, setIsBiometricVerified] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("unicircle_user_profile");
+    }
+    return false;
+  });
+
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
 
-  // User Profile with localStorage persistence and Supabase sync
-  const [userProfile, setUserProfile] = useState<StudentProfileData>(() => {
+  // User Profile with localStorage persistence and Supabase sync (null if logged out)
+  const [userProfile, setUserProfile] = useState<StudentProfileData | null>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("unicircle_user_profile");
@@ -61,31 +73,25 @@ export const CampusConnectApp: React.FC = () => {
         console.warn("Failed to load user profile from localStorage:", err);
       }
     }
-    return {
-      email: "student@uonbi.ac.ke",
-      firstName: "Alex",
-      lastName: "Chen",
-      nickname: "Lex",
-      dob: "2003-05-14",
-      gender: "Male",
-      orientation: "Straight",
-      interestedIn: "Female",
-      relationshipGoal: "Dating",
-      country: "Kenya",
-      institutionType: "University",
-      campus: "University of Nairobi",
-      institutionId: "uon",
-      faculty: "School of Computing & Informatics",
-      course: "Computer Science & AI",
-      yearOfStudy: "3rd Year",
-      height: "178 cm",
-      lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Dog lover", religion: "Christian" },
-      interests: ["AI & Coding", "Gym & Fitness", "Coffee & Cafes", "Indie Rock"],
-      bio: "CS major passionate about neural networks, late night coffee runs, and weekend hiking trips. Looking for genuine campus connections!",
-      photos: ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80"],
-      verified: true,
-    };
+    return null;
   });
+
+  // Global Sign Out Handler: Clears all user session and state
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("unicircle_user_profile");
+      localStorage.removeItem("unicircle_registered");
+      localStorage.removeItem("unicircle_biometric_verified");
+      window.location.href = "/auth";
+    }
+    setUserProfile(null);
+    setIsRegistered(false);
+    setIsBiometricVerified(false);
+    setShowVerificationStudio(false);
+  };
 
   // Load and sync real logged-in user profile from Supabase
   useEffect(() => {
@@ -94,28 +100,37 @@ export const CampusConnectApp: React.FC = () => {
       try {
         const { data: authData } = await supabase.auth.getUser();
         if (authData?.user && isMounted) {
+          setIsRegistered(true);
           const liveProf = await getLiveProfile(authData.user.id);
           if (liveProf) {
             setUserProfile((prev) => {
               const updatedPhotos = (liveProf.photos && liveProf.photos.length > 0)
                 ? liveProf.photos
-                : prev.photos;
+                : (prev?.photos || ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"]);
 
               const merged: StudentProfileData = {
-                ...prev,
-                email: authData.user.email || liveProf.email || prev.email,
-                firstName: liveProf.first_name || prev.firstName,
-                lastName: liveProf.last_name || prev.lastName,
-                gender: (liveProf.gender as any) || prev.gender,
-                interestedIn: (liveProf.interested_in as any) || prev.interestedIn,
-                country: liveProf.country || prev.country,
-                campus: liveProf.campus || prev.campus,
-                course: liveProf.course || prev.course,
-                yearOfStudy: liveProf.year_of_study || prev.yearOfStudy,
-                bio: liveProf.bio || prev.bio,
-                interests: (liveProf.interests && liveProf.interests.length > 0) ? liveProf.interests : prev.interests,
+                email: authData.user.email || liveProf.email || prev?.email || "student@unicircle.app",
+                firstName: liveProf.first_name || prev?.firstName || "Student",
+                lastName: liveProf.last_name || prev?.lastName || "",
+                nickname: liveProf.first_name || prev?.nickname || "Student",
+                dob: prev?.dob || "2003-01-01",
+                gender: (liveProf.gender as any) || prev?.gender || "Female",
+                orientation: prev?.orientation || "Straight",
+                interestedIn: (liveProf.interested_in as any) || prev?.interestedIn || "Everyone",
+                relationshipGoal: prev?.relationshipGoal || "Friendship",
+                country: liveProf.country || prev?.country || "Kenya",
+                institutionType: "University",
+                campus: liveProf.campus || prev?.campus || "University of Nairobi",
+                institutionId: prev?.institutionId || "uon",
+                faculty: prev?.faculty || "General Studies",
+                course: liveProf.course || prev?.course || "Undergraduate",
+                yearOfStudy: liveProf.year_of_study || prev?.yearOfStudy || "3rd Year",
+                height: prev?.height || "170 cm",
+                lifestyle: prev?.lifestyle || { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
+                bio: liveProf.bio || prev?.bio || "Student on UniCircle looking to connect with peers!",
+                interests: (liveProf.interests && liveProf.interests.length > 0) ? liveProf.interests : (prev?.interests || ["Campus Events", "Networking"]),
                 photos: updatedPhotos,
-                verified: liveProf.verified ?? prev.verified,
+                verified: liveProf.verified ?? prev?.verified ?? true,
               };
               if (typeof window !== "undefined") {
                 localStorage.setItem("unicircle_user_profile", JSON.stringify(merged));
@@ -123,6 +138,9 @@ export const CampusConnectApp: React.FC = () => {
               return merged;
             });
           }
+        } else if (!localStorage.getItem("unicircle_user_profile") && isMounted) {
+          setIsRegistered(false);
+          setUserProfile(null);
         }
       } catch (err) {
         console.warn("Could not sync live student profile from Supabase:", err);
@@ -130,8 +148,13 @@ export const CampusConnectApp: React.FC = () => {
     }
     loadCurrentStudent();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      loadCurrentStudent();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setIsRegistered(false);
+        setUserProfile(null);
+      } else {
+        loadCurrentStudent();
+      }
     });
 
     return () => {
@@ -427,13 +450,7 @@ export const CampusConnectApp: React.FC = () => {
             unreadNotifCount={unreadNotifCount}
             activeMatchesCount={matches.length}
             themeMode={themeMode}
-            onSignOut={async () => {
-              await supabase.auth.signOut();
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("unicircle_user_profile");
-                window.location.href = "/auth";
-              }
-            }}
+            onSignOut={handleSignOut}
           />
         </div>
       )}
@@ -538,8 +555,8 @@ export const CampusConnectApp: React.FC = () => {
               {showUserDropdown && (
                 <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
                   <div className="px-3 py-2 border-b border-white/10">
-                    <p className="text-xs font-bold text-white truncate">{userProfile.firstName} {userProfile.lastName}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{userProfile.campus}</p>
+                    <p className="text-xs font-bold text-white truncate">{userProfile?.firstName || "Student"} {userProfile?.lastName || ""}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University"}</p>
                   </div>
 
                   <button
@@ -572,14 +589,11 @@ export const CampusConnectApp: React.FC = () => {
 
                   <div className="pt-1 border-t border-white/10">
                     <button
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        if (typeof window !== "undefined") {
-                          localStorage.removeItem("unicircle_user_profile");
-                          window.location.href = "/auth";
-                        }
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        handleSignOut();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" /> Sign Out
                     </button>

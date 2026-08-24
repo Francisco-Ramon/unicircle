@@ -1,9 +1,10 @@
-import React, { useState } from "react";
-import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, Upload, CheckCircle2 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { getCountryFlag } from "@/lib/globalUniversityService";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToStorage, upsertLiveProfile } from "@/lib/supabaseLiveService";
 import { toast } from "sonner";
 
 
@@ -48,14 +49,19 @@ const YEARS_OF_STUDY = [
 
 export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // The Required Multi-Country Onboarding Fields
   const [selectedCountry, setSelectedCountry] = useState("Kenya");
   const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [gender, setGender] = useState<"Male" | "Female" | "Non-binary" | "Other">("Female");
   const [interestedIn, setInterestedIn] = useState<"Female" | "Male" | "Everyone">("Male");
+  const [profilePhoto, setProfilePhoto] = useState<string>("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
   const [selectedInstitution, setSelectedInstitution] = useState<Institution>(
     INSTITUTIONS_DATA.find((i) => i.country === "Kenya") || INSTITUTIONS_DATA[0]
   );
@@ -83,6 +89,16 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
     if (firstUni) setSelectedInstitution(firstUni);
   };
 
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      setIsUploadingPhoto(true);
+      const url = await uploadToStorage(files[0], "avatars");
+      setProfilePhoto(url);
+      setIsUploadingPhoto(false);
+      toast.success("Profile photo uploaded!");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,12 +108,18 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
     if (!password || password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
 
     setBusy(true);
+    
+    // Default avatar if none uploaded
+    const photoList = profilePhoto
+      ? [profilePhoto]
+      : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"];
+
     // Build student profile object
     const fullProfile: StudentProfileData = {
-      email,
-      firstName,
-      lastName: "",
-      nickname: firstName,
+      email: email.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      nickname: firstName.trim(),
       dob: "2003-01-01",
       gender,
       orientation: "Straight",
@@ -108,24 +130,25 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       campus: selectedInstitution.name,
       institutionId: selectedInstitution.id,
       faculty: "General Studies",
-      course: "Student",
+      course: "Undergraduate",
       yearOfStudy,
       height: "170 cm",
       lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
-      interests: ["Campus Events", "Coffee & Cafes", "Networking"],
-      bio: `Hi! I'm ${firstName}, studying at ${selectedInstitution.shortName}. Looking forward to meeting verified students on UniCircle!`,
-      photos: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"],
+      interests: ["Campus Events", "Networking", "Tech"],
+      bio: `Hi! I'm ${firstName.trim()}, studying at ${selectedInstitution.shortName || selectedInstitution.name}. Excited to connect on UniCircle!`,
+      photos: photoList,
       verified: true,
     };
 
     try {
       // 1. Sign up with Supabase Auth
-      await supabase.auth.signUp({
-        email,
+      const { data: authData } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
           data: {
-            first_name: firstName,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
             gender,
             interested_in: interestedIn,
             university_name: selectedInstitution.name,
@@ -133,14 +156,27 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
           },
         },
       });
+
+      if (authData?.user) {
+        await upsertLiveProfile({
+          id: authData.user.id,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          campus: selectedInstitution.name,
+          country: selectedInstitution.country || "Kenya",
+          photos: photoList,
+          verified: true,
+        });
+      }
     } catch (err: any) {
       console.warn("Supabase auth signUp background notice:", err);
     }
 
     if (typeof window !== "undefined") {
       localStorage.setItem("unicircle_user_profile", JSON.stringify(fullProfile));
+      localStorage.setItem("unicircle_registered", "true");
     }
-    toast.success("Welcome to UniCircle! Your profile is ready.");
+    toast.success("Welcome to UniCircle! Your student profile is active.");
     onComplete(fullProfile);
     setBusy(false);
   };
@@ -157,19 +193,64 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-slate-900/80 backdrop-blur-xl border border-white/10 p-6 md:p-8 rounded-3xl shadow-2xl space-y-5">
-        {/* 1. First Name */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-            <User className="w-3.5 h-3.5 text-indigo-400" /> First Name
-          </label>
+        {/* Profile Photo Upload */}
+        <div className="flex flex-col items-center justify-center text-center pb-2">
           <input
-            type="text"
-            required
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="e.g. Alex"
-            className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handlePhotoSelect}
+            className="hidden"
           />
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="relative w-24 h-24 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-pink-500/20 border-2 border-dashed border-indigo-500/40 hover:border-indigo-400 cursor-pointer overflow-hidden flex flex-col items-center justify-center transition-all group shadow-lg"
+          >
+            {profilePhoto ? (
+              <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-2 text-indigo-300 group-hover:text-white">
+                <Camera className="w-6 h-6 mb-1" />
+                <span className="text-[10px] font-bold">Add Photo</span>
+              </div>
+            )}
+            {isUploadingPhoto && (
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-xs text-white">
+                Uploading...
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2">Tap to upload your profile photo (optional)</p>
+        </div>
+
+        {/* 1. First & Last Name */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-indigo-400" /> First Name
+            </label>
+            <input
+              type="text"
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="e.g. Alex"
+              className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Last Name
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="e.g. Chen"
+              className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
         </div>
 
         {/* 2. Email */}
