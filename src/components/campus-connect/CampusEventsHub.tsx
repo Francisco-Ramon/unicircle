@@ -133,7 +133,7 @@ export const SAMPLE_EVENTS: CampusEvent[] = [
 
 import { AppNavState } from "@/lib/navigationHistory";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchLiveEvents, createLiveEvent, uploadToStorage } from "@/lib/supabaseLiveService";
+import { fetchLiveEvents, createLiveEvent, uploadToStorage, getLocalUserId } from "@/lib/supabaseLiveService";
 
 interface Props {
   userProfile?: any;
@@ -391,20 +391,19 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
     // Push to Supabase
     try {
       const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) {
-        await createLiveEvent({
-          creatorId: authData.user.id,
-          campus: userProfile?.campus || "University of Nairobi",
-          title: newEventTitle,
-          category: newEventCategory,
-          date: newEventDate || "Upcoming",
-          time: newEventTime || "TBA",
-          location: newEventLocation,
-          image: chosenImage,
-          description: newEventDesc || "Join us for an exciting campus meetup!",
-          redirectUrl: formattedUrl || undefined,
-        });
-      }
+      const creatorId = authData?.user?.id || userProfile?.id || getLocalUserId();
+      await createLiveEvent({
+        creatorId,
+        campus: userProfile?.campus || "University of Nairobi",
+        title: newEventTitle,
+        category: newEventCategory,
+        date: newEventDate || "Upcoming",
+        time: newEventTime || "TBA",
+        location: newEventLocation,
+        image: chosenImage,
+        description: newEventDesc || "Join us for an exciting campus meetup!",
+        redirectUrl: formattedUrl || undefined,
+      });
     } catch (e) {
       console.warn("Could not save live event to Supabase:", e);
     }

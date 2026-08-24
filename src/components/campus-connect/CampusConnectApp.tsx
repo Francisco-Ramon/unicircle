@@ -43,6 +43,7 @@ import {
   fetchLiveDiscoverProfiles,
   fetchUserConversations,
   recordLiveSwipe,
+  getLocalUserId,
 } from "@/lib/supabaseLiveService";
 
 
@@ -262,7 +263,7 @@ export const CampusConnectApp: React.FC = () => {
     async function loadLiveStudentsAndChats() {
       try {
         const { data: authData } = await supabase.auth.getUser();
-        const currentUserId = authData?.user?.id;
+        const currentUserId = authData?.user?.id || getLocalUserId();
 
         // 1. Fetch real student accounts for discovery
         const liveProfs = await fetchLiveDiscoverProfiles(currentUserId);

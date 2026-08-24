@@ -19,6 +19,7 @@ import {
   createLiveEvent,
   uploadToStorage,
   subscribeToLiveCommunity,
+  getLocalUserId,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -562,8 +563,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
 
     const { data: authUser } = await supabase.auth.getUser();
+    const effectiveAuthor = authUser?.user?.id || userProfile?.id || getLocalUserId();
     const livePost = await createLivePost({
-      authorId: authUser?.user?.id,
+      authorId: effectiveAuthor,
       content: newPostContent.trim(),
       campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
       imageUrl: uploadedImageUrl || undefined,
