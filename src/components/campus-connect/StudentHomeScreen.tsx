@@ -372,6 +372,12 @@ export const StudentHomeScreen: React.FC<Props> = ({
           const currentUserId = userProfile?.id || getLocalUserId();
           const effectiveAuthorId = post.authorId || `author_${post.id}`;
           const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
+          
+          const isOwnPost = Boolean(
+            (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
+            (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase())) ||
+            ((post as any).authorEmail && userProfile?.email && (post as any).authorEmail.toLowerCase() === userProfile.email.toLowerCase())
+          );
 
           return (
             <div
@@ -392,7 +398,11 @@ export const StudentHomeScreen: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {effectiveAuthorId !== currentUserId && (
+                {isOwnPost ? (
+                  <span className="px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-300 text-[10px] font-bold border border-indigo-500/20">
+                    You
+                  </span>
+                ) : (
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
