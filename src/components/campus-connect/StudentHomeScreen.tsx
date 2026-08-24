@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-
+import { fetchLivePosts, fetchLiveEvents } from "@/lib/supabaseLiveService";
 import { AppNavState } from "@/lib/navigationHistory";
 
 interface Props {
@@ -35,32 +35,33 @@ export const StudentHomeScreen: React.FC<Props> = ({
   }, []);
 
   const activeFriends = TWENTY_STUDENT_PROFILES.slice(0, 5);
-  const communityPosts = [
-    {
-      id: "hp1",
-      authorName: "Amani Wanjiru",
-      authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-      campus: "University of Nairobi",
-      timeAgo: "2 hours ago",
-      title: "Inter-Hall Debate Competition Next Tuesday! 🏆",
-      content: "Main Campus Taifa Hall will be hosting the annual Inter-Hall Moots. Come support Hall 9 vs Hall 4!",
-      likes: 68,
-      comments: 24,
-    },
-    {
-      id: "hp2",
-      authorName: "Patricia Nsubuga",
-      authorAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
-      campus: "Makerere University",
-      timeAgo: "4 hours ago",
-      title: "Makerere Innovation Lab AI Hackathon 💡",
-      content: "Calling all Makerere techies! We are forming teams for the East Africa AI Climate Resilience Challenge at the CoCIT lab.",
-      likes: 42,
-      comments: 15,
-    },
-  ];
 
-  const upcomingEvents = [
+  const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_community_posts");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [
+      {
+        id: "hp1",
+        authorName: "Amani Wanjiru",
+        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+        campus: "University of Nairobi",
+        timeAgo: "2 hours ago",
+        title: "Inter-Hall Debate Competition Next Tuesday! 🏆",
+        content: "Main Campus Taifa Hall will be hosting the annual Inter-Hall Moots. Come support Hall 9 vs Hall 4!",
+        likes: 68,
+        comments: 24,
+      },
+    ];
+  });
+
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([
     {
       id: "he1",
       title: "Nairobi Student Tech Summit 2026",
@@ -79,7 +80,51 @@ export const StudentHomeScreen: React.FC<Props> = ({
       attendeesCount: 520,
       image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
     },
-  ];
+  ]);
+
+  // Load live posts and events on mount
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([fetchLivePosts(), fetchLiveEvents()]).then(([livePosts, liveEvents]) => {
+      if (!isMounted) return;
+      if (livePosts && livePosts.length > 0) {
+        const formatted = livePosts.map((lp) => ({
+          id: lp.id,
+          authorName: lp.profiles?.first_name
+            ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
+            : "Verified Student",
+          authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          authorCourse: `${lp.profiles?.course || "Student"} • ${lp.profiles?.year_of_study || "3rd Year"}`,
+          campus: lp.campus || "University of Nairobi",
+          timeAgo: new Date(lp.created_at).toLocaleDateString(),
+          title: lp.content.substring(0, 45),
+          content: lp.content,
+          image: lp.image_url,
+          likes: lp.likes_count || 0,
+          comments: lp.comments_count || 0,
+        }));
+        setCommunityPosts(formatted);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("unicircle_community_posts", JSON.stringify(formatted));
+        }
+      }
+
+      if (liveEvents && liveEvents.length > 0) {
+        const formattedEvts = liveEvents.map((le) => ({
+          id: le.id,
+          title: le.title,
+          date: le.date,
+          venue: le.location,
+          organizer: "Campus Student",
+          attendeesCount: le.rsvp_count || 12,
+          image: le.image,
+        }));
+        setUpcomingEvents(formattedEvts);
+      }
+    }).catch((err) => console.warn("HomeScreen live load:", err));
+
+    return () => { isMounted = false; };
+  }, []);
 
   // ─── Search Logic ───
   const q = searchQuery.trim().toLowerCase();
@@ -322,7 +367,11 @@ export const StudentHomeScreen: React.FC<Props> = ({
         </div>
 
         {communityPosts.map((post) => (
-          <div key={post.id} className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 shadow-lg space-y-3">
+          <div
+            key={post.id}
+            onClick={onNavigateToCommunity}
+            className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 shadow-lg space-y-3 cursor-pointer hover:border-indigo-500/30 transition"
+          >
             <div className="flex items-center gap-3">
               <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
               <div>
@@ -334,13 +383,18 @@ export const StudentHomeScreen: React.FC<Props> = ({
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-white leading-snug">{post.title}</h3>
-              <p className="text-xs text-slate-300 mt-1">{post.content}</p>
+              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
             </div>
 
+            {post.image && (
+              <div className="rounded-2xl overflow-hidden max-h-64">
+                <img src={post.image} alt="Post attachment" className="w-full object-cover" />
+              </div>
+            )}
+
             <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-white/10">
-              <span>❤️ {post.likes} Likes</span>
-              <span>💬 {post.comments} Comments</span>
+              <span>❤️ {post.likes || 0} Likes</span>
+              <span>💬 {post.comments || post.commentsCount || 0} Comments</span>
             </div>
           </div>
         ))}
