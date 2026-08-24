@@ -200,10 +200,23 @@ export const CampusConnectApp: React.FC = () => {
     }
   };
 
-  // Centralized Navigation History State
+  // Centralized Navigation History State with Refresh Persistence
   const [navState, setNavState] = useState<AppNavState>(() => {
     if (typeof window === "undefined") return { tab: "home" };
-    return decodeNavState(window.location.hash);
+    if (window.location.hash && window.location.hash.length > 1) {
+      return decodeNavState(window.location.hash);
+    }
+    try {
+      const lastHash = localStorage.getItem("unicircle_last_nav_hash");
+      if (lastHash && lastHash.length > 1) {
+        return decodeNavState(lastHash);
+      }
+      const lastTab = localStorage.getItem("unicircle_last_active_tab");
+      if (lastTab) {
+        return { tab: lastTab as TabType };
+      }
+    } catch (e) {}
+    return { tab: "home" };
   });
 
   const activeTab = navState.tab;
@@ -361,7 +374,7 @@ export const CampusConnectApp: React.FC = () => {
     return () => window.removeEventListener("unicircle-notifications-updated", handleNotifUpdate);
   }, []);
 
-  // Synchronize URL hash and browser history (popstate / back button)
+  // Synchronize URL hash and browser history (popstate / hashchange / refresh)
   React.useEffect(() => {
     const initialDecoded = decodeNavState(window.location.hash);
     replaceNavState(initialDecoded);
@@ -379,9 +392,35 @@ export const CampusConnectApp: React.FC = () => {
       setCelebratedMatch(null);
     };
 
+    const handleHashChange = () => {
+      const decoded = decodeNavState(window.location.hash);
+      setNavState((prev) => {
+        if (encodeNavState(prev) === encodeNavState(decoded)) return prev;
+        return decoded;
+      });
+    };
+
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
+    };
   }, []);
+
+  // Persist current route on every nav change
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hash = encodeNavState(navState);
+      try {
+        localStorage.setItem("unicircle_last_active_tab", navState.tab);
+        localStorage.setItem("unicircle_last_nav_hash", hash);
+      } catch (e) {}
+      if (window.location.hash !== hash) {
+        replaceNavState(navState);
+      }
+    }
+  }, [navState]);
 
   const handleNavigate = (newState: AppNavState) => {
     setNavState(newState);

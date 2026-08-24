@@ -5,29 +5,43 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  // Phase state: 'init' | 'visible' | 'fading' | 'hidden'
-  const [phase, setPhase] = useState<"init" | "visible" | "fading" | "hidden">("init");
+  // Only show splash screen on the very first visit in this session; do not re-trigger on page refresh
+  const [phase, setPhase] = useState<"init" | "visible" | "fading" | "hidden">(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("unicircle_splash_shown")) {
+      return "hidden";
+    }
+    return "init";
+  });
 
   useEffect(() => {
-    // Check if reduced motion is preferred
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (typeof window !== "undefined") {
+      if (sessionStorage.getItem("unicircle_splash_shown")) {
+        setPhase("hidden");
+        if (onFinish) onFinish();
+        return;
+      }
+      sessionStorage.setItem("unicircle_splash_shown", "true");
+    }
 
-    // Timeline steps (in ms) - Updated to 2.5-3s total presentation
-    // 0ms: init -> visible (trigger scale 0.8 -> 1.0 & opacity 0 -> 1)
+    // Check if reduced motion is preferred
+    const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Fast-track if reduced motion
+    const fadeDelay = prefersReducedMotion ? 600 : 2000;
+    const hideDelay = prefersReducedMotion ? 900 : 2400;
+
     const t1 = setTimeout(() => {
       setPhase("visible");
-    }, 50);
+    }, 30);
 
-    // 2300ms: visible -> fading (start fade out splash overlay 1 -> 0)
     const t2 = setTimeout(() => {
       setPhase("fading");
-    }, 2300);
+    }, fadeDelay);
 
-    // 2800ms: fading -> hidden (unmount from DOM after smooth 500ms fade)
     const t3 = setTimeout(() => {
       setPhase("hidden");
       if (onFinish) onFinish();
-    }, 2800);
+    }, hideDelay);
 
     return () => {
       clearTimeout(t1);
