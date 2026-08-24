@@ -2,7 +2,7 @@ import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap, UserCheck } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-import { fetchLivePosts, fetchLiveEvents, getLocalUserId } from "@/lib/supabaseLiveService";
+import { fetchLivePosts, fetchLiveEvents, getLocalUserId, subscribeToLiveCommunity } from "@/lib/supabaseLiveService";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { SocialController } from "@/lib/social/socialController";
 import { AppNavState } from "@/lib/navigationHistory";
@@ -85,9 +85,11 @@ export const StudentHomeScreen: React.FC<Props> = ({
     },
   ]);
 
-  // Load live posts and events on mount
+  // Load live posts and events on mount + Realtime Subscription
   useEffect(() => {
     let isMounted = true;
+    let unsubscribe: (() => void) | undefined;
+
     Promise.all([fetchLivePosts(), fetchLiveEvents()]).then(([livePosts, liveEvents]) => {
       if (!isMounted) return;
       if (livePosts && livePosts.length > 0) {
@@ -128,7 +130,43 @@ export const StudentHomeScreen: React.FC<Props> = ({
       }
     }).catch((err) => console.warn("HomeScreen live load:", err));
 
-    return () => { isMounted = false; };
+    // Realtime Community Posts listener on Home Screen
+    unsubscribe = subscribeToLiveCommunity({
+      onNewPost: (newLivePost) => {
+        if (!isMounted) return;
+        const incomingPost = {
+          id: newLivePost.id,
+          authorName: newLivePost.profiles?.first_name
+            ? `${newLivePost.profiles.first_name} ${newLivePost.profiles.last_name || ""}`.trim()
+            : "Verified Student",
+          authorAvatar: newLivePost.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          authorCourse: "Campus Student",
+          campus: newLivePost.campus || "University of Nairobi",
+          timeAgo: "Just now",
+          title: newLivePost.content.substring(0, 45),
+          content: newLivePost.content,
+          image: newLivePost.image_url,
+          likes: 0,
+          comments: 0,
+          commentsCount: 0,
+          authorId: newLivePost.author_id,
+        };
+
+        setCommunityPosts((prev) => {
+          const dedupe = prev.filter((p) => p.id !== incomingPost.id);
+          const next = [incomingPost, ...dedupe];
+          if (typeof window !== "undefined") {
+            safeSetItem("unicircle_community_posts", JSON.stringify(next));
+          }
+          return next;
+        });
+      },
+    });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // ─── Search Logic ───

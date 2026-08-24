@@ -242,28 +242,24 @@ export async function upsertLiveProfile(profile: any): Promise<boolean> {
 // --------------------------------------------------------------------------
 export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
   try {
-    let rawPosts: any[] = [];
-    const { data: postsData, error } = await (supabase
+    let query = supabase
       .from("posts" as any)
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50) as any);
+      .limit(50);
 
-    if (!error && postsData && postsData.length > 0) {
-      rawPosts = postsData;
+    if (campus && campus !== "All Campuses") {
+      query = query.eq("campus", campus);
     }
 
-    if (typeof window !== "undefined") {
-      try {
-        const cached = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_POSTS) || "[]");
-        if (cached.length > 0) {
-          const remoteIds = new Set(rawPosts.map((p) => p.id));
-          const localOnly = cached.filter((p: any) => !remoteIds.has(p.id));
-          rawPosts = [...localOnly, ...rawPosts];
-        }
-      } catch (e) {}
+    const { data: postsData, error } = await (query as any);
+
+    if (error) {
+      console.error("fetchLivePosts error from Supabase:", error);
+      return [];
     }
 
+    const rawPosts: any[] = postsData || [];
     if (rawPosts.length === 0) return [];
 
     const authorIds = Array.from(new Set(rawPosts.map((p) => p.author_id).filter(Boolean)));
@@ -278,15 +274,6 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
           authorMap[pr.id] = pr;
         });
       }
-    }
-
-    if (typeof window !== "undefined") {
-      try {
-        const cachedProfs = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_PROFILES) || "[]");
-        cachedProfs.forEach((cp: LiveProfile) => {
-          if (!authorMap[cp.id]) authorMap[cp.id] = cp;
-        });
-      } catch (e) {}
     }
 
     return rawPosts.map((p) => {
@@ -323,66 +310,106 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
 
 export async function createLivePost(params: {
   authorId?: string;
+  authorProfile?: any;
   content: string;
   campus: string;
   imageUrl?: string;
 }): Promise<LivePost | null> {
   try {
-    const authorId = await ensureAuthenticatedUser();
+    let authorId = params.authorId;
+    const isValidUUID = Boolean(authorId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authorId));
+
+    if (!isValidUUID) {
+      authorId = await ensureAuthenticatedUser();
+    }
+
+    if (!authorId) {
+      console.error("createLivePost: Could not resolve valid Supabase Auth UUID for author.");
+      return null;
+    }
 
     // 1. Ensure author exists in profiles table so foreign key constraint is 100% satisfied
+    const prof = params.authorProfile || {};
     try {
-      const storedProf = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
-      const parsedProf = storedProf ? JSON.parse(storedProf) : {};
-      await supabase.from("profiles" as any).upsert({
+      const storedProfStr = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
+      const storedProf = storedProfStr ? JSON.parse(storedProfStr) : {};
+      const fName = prof.firstName || storedProf.firstName || storedProf.first_name || "Student";
+      const lName = prof.lastName || storedProf.lastName || storedProf.last_name || "";
+      const campusName = params.campus || prof.campus || storedProf.campus || "University of Nairobi";
+      const courseName = prof.course || storedProf.course || "Student";
+      const yearName = prof.yearOfStudy || storedProf.yearOfStudy || storedProf.year_of_study || "3rd Year";
+      const photoList = prof.photos || storedProf.photos || ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"];
+
+      await (supabase.from("profiles" as any).upsert({
         id: authorId,
-        first_name: parsedProf.firstName || parsedProf.first_name || "Student",
-        last_name: parsedProf.lastName || parsedProf.last_name || "",
-        campus: params.campus,
-        course: parsedProf.course || "Student",
-        year_of_study: parsedProf.yearOfStudy || parsedProf.year_of_study || "3rd Year",
-        photos: parsedProf.photos || ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"],
+        first_name: fName,
+        last_name: lName,
+        campus: campusName,
+        course: courseName,
+        year_of_study: yearName,
+        photos: photoList,
         verified: true,
         is_online: true,
         last_seen: new Date().toISOString(),
-      }, { onConflict: "id" });
-    } catch (e) {}
+      }, { onConflict: "id" }) as any);
+    } catch (e) {
+      console.warn("createLivePost profile upsert notice:", e);
+    }
 
-    const postId = typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : undefined;
-
-    const postPayload: any = {
+    // 2. Insert directly into Supabase posts table
+    const postPayload = {
       author_id: authorId,
-      campus: params.campus,
+      campus: params.campus || "University of Nairobi",
       content: params.content,
       image_url: params.imageUrl || null,
       likes_count: 0,
       comments_count: 0,
-      created_at: new Date().toISOString(),
     };
-    if (postId) postPayload.id = postId;
-
-    if (typeof window !== "undefined") {
-      try {
-        const cached = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_POSTS) || "[]");
-        safeSetItem(CLOUD_SYNC_KEY_POSTS, JSON.stringify([postPayload, ...cached.filter((p: any) => p.id !== postId)]));
-      } catch (e) {}
-    }
 
     const { data: postData, error } = await (supabase
       .from("posts" as any)
       .insert(postPayload)
       .select()
-      .maybeSingle() as any);
+      .single() as any);
 
-    if (!error && postData) {
-      return postData as LivePost;
+    if (error) {
+      console.error("createLivePost: Supabase insert failed:", error);
+      return null;
     }
 
-    return postPayload as LivePost;
+    if (!postData) {
+      console.error("createLivePost: No post row returned from Supabase insert.");
+      return null;
+    }
+
+    // Return the confirmed database record
+    const resultPost: LivePost = {
+      id: postData.id,
+      author_id: postData.author_id,
+      campus: postData.campus,
+      content: postData.content,
+      image_url: postData.image_url,
+      likes_count: postData.likes_count || 0,
+      comments_count: postData.comments_count || 0,
+      created_at: postData.created_at || new Date().toISOString(),
+      profiles: {
+        id: authorId,
+        first_name: prof.firstName || "Student",
+        last_name: prof.lastName || "",
+        campus: params.campus,
+        course: prof.course || "Student",
+        year_of_study: prof.yearOfStudy || "3rd Year",
+        photos: prof.photos || [],
+        interests: prof.interests || [],
+        gender: prof.gender || "Female",
+        bio: prof.bio || "",
+        verified: true,
+      }
+    };
+
+    return resultPost;
   } catch (err) {
-    console.warn("createLivePost notice:", err);
+    console.error("createLivePost fatal error:", err);
     return null;
   }
 }
@@ -391,13 +418,29 @@ export function subscribeToLiveCommunity(callbacks: {
   onNewPost?: (post: LivePost) => void;
   onNewEvent?: (event: LiveEvent) => void;
 }) {
+  const channelName = `unicircle-live-feed-${Date.now()}`;
   const channel = supabase
-    .channel("unicircle-live-feed-channel")
+    .channel(channelName)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "posts" },
-      (payload) => {
+      async (payload) => {
         const p: any = payload.new;
+        if (!p || !p.id) return;
+
+        // Fetch author profile for the incoming realtime post
+        let authorProf: LiveProfile | undefined;
+        if (p.author_id) {
+          try {
+            const { data: profData } = await (supabase
+              .from("profiles" as any)
+              .select("*")
+              .eq("id", p.author_id)
+              .maybeSingle() as any);
+            if (profData) authorProf = profData;
+          } catch (e) {}
+        }
+
         if (callbacks.onNewPost) {
           callbacks.onNewPost({
             id: p.id,
@@ -407,7 +450,8 @@ export function subscribeToLiveCommunity(callbacks: {
             image_url: p.image_url || null,
             likes_count: p.likes_count || 0,
             comments_count: p.comments_count || 0,
-            created_at: p.created_at,
+            created_at: p.created_at || new Date().toISOString(),
+            profiles: authorProf,
           });
         }
       }

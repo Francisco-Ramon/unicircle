@@ -597,29 +597,39 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         isOnline: true,
       };
 
-      // 1. Authoritative Social Engine Post Creation (Validates, Events, Hybrid Fan-out)
-      const socialPost = await SocialController.createPost({
-        author: authorProfile,
-        content: newPostContent.trim(),
-        campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
-        imageUrl: uploadedImageUrl || null,
-        visibility: postVisibility,
-      });
-
-      // 2. Also write to Supabase
-      createLivePost({
+      // 1. Authoritative Database Persistence to Supabase
+      const livePost = await createLivePost({
         authorId: authorProfile.id,
+        authorProfile: authorProfile,
         content: newPostContent.trim(),
         campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
         imageUrl: uploadedImageUrl || undefined,
-      }).catch(() => {});
+      });
+
+      if (!livePost) {
+        toast.error("Failed to publish post to campus feed. Please try again.");
+        setIsSubmittingPost(false);
+        return;
+      }
+
+      // 2. Synchronize Social Graph Distribution Engine
+      try {
+        await SocialController.createPost({
+          id: livePost.id,
+          author: authorProfile,
+          content: newPostContent.trim(),
+          campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
+          imageUrl: uploadedImageUrl || null,
+          visibility: postVisibility,
+        });
+      } catch (e) {}
 
       const studentName = `${authorProfile.firstName} ${authorProfile.lastName}`.trim();
       const studentAvatar = authorProfile.photos[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
 
       const formatted: CommunityPost = {
-        id: socialPost.id,
-        authorId: authorProfile.id,
+        id: livePost.id,
+        authorId: livePost.author_id,
         authorName: studentName,
         authorAvatar: studentAvatar,
         authorCourse: `${authorProfile.course} • ${authorProfile.yearOfStudy}`,
@@ -637,6 +647,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       setNewPostContent("");
       setNewPostImage("");
       setShowNewPost(false);
+      toast.success("Post published to campus!");
 
       // Dispatch community_post notification if preference is ON
       const prefs = await fetchNotificationPreferences();
