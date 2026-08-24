@@ -36,7 +36,13 @@ import {
   encodeNavState,
 } from "@/lib/navigationHistory";
 import { supabase } from "@/integrations/supabase/client";
-import { getLiveProfile, upsertLiveProfile } from "@/lib/supabaseLiveService";
+import {
+  getLiveProfile,
+  upsertLiveProfile,
+  fetchLiveDiscoverProfiles,
+  fetchUserConversations,
+  recordLiveSwipe,
+} from "@/lib/supabaseLiveService";
 
 
 export const CampusConnectApp: React.FC = () => {
@@ -224,6 +230,97 @@ export const CampusConnectApp: React.FC = () => {
   const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
   const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(TWENTY_STUDENT_PROFILES[0]);
   const [celebratedMatch, setCelebratedMatch] = useState<StudentProfile | null>(null);
+  const [liveProfiles, setLiveProfiles] = useState<StudentProfile[]>([]);
+
+  // Fetch real students from Supabase and hydrate conversations
+  useEffect(() => {
+    async function loadLiveStudentsAndChats() {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData?.user?.id;
+
+        // 1. Fetch real student accounts for discovery
+        const liveProfs = await fetchLiveDiscoverProfiles(currentUserId);
+        if (liveProfs && liveProfs.length > 0) {
+          const formatted: StudentProfile[] = liveProfs.map((lp) => ({
+            id: lp.id,
+            name: `${lp.first_name || "Student"} ${lp.last_name || ""}`.trim(),
+            age: 21,
+            gender: (lp.gender as any) || "Female",
+            campus: lp.campus || "University of Nairobi",
+            country: lp.country || "Kenya",
+            course: lp.course || "Computer Science",
+            yearOfStudy: lp.year_of_study || "3rd Year",
+            distanceKm: 1.2,
+            compatibilityScore: 92,
+            verified: lp.verified ?? true,
+            online: true,
+            intentMode: "Dating",
+            photos: (lp.photos && lp.photos.length > 0) ? lp.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"],
+            bio: lp.bio || "Student on UniCircle looking to connect with peers!",
+            interests: (lp.interests && lp.interests.length > 0) ? lp.interests : ["Coding", "Campus Life", "Coffee"],
+            prompts: [
+              { question: "Best spot to study on campus", answer: "The university library top floor" }
+            ],
+            height: "172 cm",
+            lifestyle: { smoking: "Non-smoker", drinking: "Socially" },
+          }));
+          setLiveProfiles(formatted);
+          setMatches((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            return [...formatted.filter((f) => !existingIds.has(f.id)), ...prev];
+          });
+        }
+
+        // 2. Fetch real conversations for the user
+        if (currentUserId) {
+          const convs = await fetchUserConversations(currentUserId);
+          if (convs && convs.length > 0) {
+            const convMatches: StudentProfile[] = convs
+              .filter((c) => c.otherUser)
+              .map((c) => {
+                const u = c.otherUser!;
+                return {
+                  id: u.id,
+                  name: `${u.first_name || "Student"} ${u.last_name || ""}`.trim(),
+                  age: 21,
+                  gender: (u.gender as any) || "Female",
+                  campus: u.campus || "University of Nairobi",
+                  country: u.country || "Kenya",
+                  course: u.course || "Computer Science",
+                  yearOfStudy: u.year_of_study || "3rd Year",
+                  distanceKm: 1.0,
+                  compatibilityScore: 95,
+                  verified: u.verified ?? true,
+                  online: true,
+                  intentMode: "Dating",
+                  photos: (u.photos && u.photos.length > 0) ? u.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"],
+                  bio: u.bio || "Matched on UniCircle!",
+                  interests: u.interests || ["Campus Life"],
+                  prompts: [],
+                  height: "170 cm",
+                  lifestyle: { smoking: "No", drinking: "Socially" },
+                };
+              });
+
+            if (convMatches.length > 0) {
+              setMatches((prev) => {
+                const existingIds = new Set(prev.map((m) => m.id));
+                return [...convMatches.filter((cm) => !existingIds.has(cm.id)), ...prev];
+              });
+              if (!activeChatMatch) {
+                setActiveChatMatch(convMatches[0]);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load live discover profiles or conversations:", err);
+      }
+    }
+
+    loadLiveStudentsAndChats();
+  }, []);
 
   // Fetch notification preferences and listen for updates
   React.useEffect(() => {
@@ -272,18 +369,44 @@ export const CampusConnectApp: React.FC = () => {
     handleNavigate(newState);
   };
 
-  const handleSwipeLike = (profile: StudentProfile) => {
+  const handleSwipeLike = async (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
       setCelebratedMatch(profile);
     }
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user && profile.id.length > 10) {
+      await recordLiveSwipe({
+        swiperId: authData.user.id,
+        targetId: profile.id,
+        action: "like",
+      });
+    }
   };
 
-  const handleSwipePass = (profile: StudentProfile) => {};
-  const handleSwipeSuperLike = (profile: StudentProfile) => {
+  const handleSwipePass = async (profile: StudentProfile) => {
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user && profile.id.length > 10) {
+      await recordLiveSwipe({
+        swiperId: authData.user.id,
+        targetId: profile.id,
+        action: "pass",
+      });
+    }
+  };
+
+  const handleSwipeSuperLike = async (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
       setCelebratedMatch(profile);
+    }
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user && profile.id.length > 10) {
+      await recordLiveSwipe({
+        swiperId: authData.user.id,
+        targetId: profile.id,
+        action: "superlike",
+      });
     }
   };
 
@@ -506,7 +629,7 @@ export const CampusConnectApp: React.FC = () => {
               {activeTab === "discover" && (
                 <DiscoverDeck
                   currentProfile={userProfile}
-                  profiles={TWENTY_STUDENT_PROFILES}
+                  profiles={[...liveProfiles, ...TWENTY_STUDENT_PROFILES.filter((s) => !liveProfiles.some((lp) => lp.id === s.id))]}
                   onSwipeLike={handleSwipeLike}
                   onSwipePass={handleSwipePass}
                   onSwipeSuperLike={handleSwipeSuperLike}

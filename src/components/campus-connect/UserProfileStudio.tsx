@@ -1,9 +1,10 @@
 import React, { useState, useRef } from "react";
-import { User, Camera, ShieldCheck, Sparkles, Plus, Trash2, CheckCircle2, AlertCircle, Edit3, Save, Upload, Settings, Globe } from "lucide-react";
+import { User, Camera, ShieldCheck, Sparkles, Plus, Trash2, CheckCircle2, AlertCircle, Edit3, Save, Upload, Settings, Globe, Share2 } from "lucide-react";
 import { StudentProfileData } from "./RegistrationWizard";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { uploadToStorage, upsertLiveProfile } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Props {
   profile: StudentProfileData;
@@ -96,6 +97,27 @@ export const UserProfileStudio: React.FC<Props> = ({
 
   const [activeViewerIndex, setActiveViewerIndex] = useState<number | null>(null);
 
+  const handleShareProfile = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://unicircle.app";
+    const shareUrl = `${origin}/auth`;
+    const shareData = {
+      title: `Connect with ${profile.firstName} on UniCircle`,
+      text: `Hey! I'm on UniCircle, the verified campus social network for East Africa. Connect and chat with me:`,
+      url: shareUrl,
+    };
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (e) {
+        // user cancelled share
+      }
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      toast.success("UniCircle invite link copied! Share it on WhatsApp, X, or Instagram! 🚀");
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6 py-2">
       <input
@@ -151,14 +173,24 @@ export const UserProfileStudio: React.FC<Props> = ({
                 <p className="text-xs text-slate-400 mt-0.5">{profile.course} • {profile.yearOfStudy}</p>
               </div>
 
-              {onNavigateToSettings && (
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={onNavigateToSettings}
-                  className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-slate-300 transition flex items-center gap-1.5 shrink-0"
+                  onClick={handleShareProfile}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-xs font-bold text-indigo-300 transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                  title="Share profile or invite friends to chat"
                 >
-                  <Settings className="w-4 h-4 text-indigo-400" /> Settings
+                  <Share2 className="w-4 h-4 text-indigo-400" /> Share & Invite
                 </button>
-              )}
+
+                {onNavigateToSettings && (
+                  <button
+                    onClick={onNavigateToSettings}
+                    className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-slate-300 transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 text-indigo-400" /> Settings
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2 mt-3">
