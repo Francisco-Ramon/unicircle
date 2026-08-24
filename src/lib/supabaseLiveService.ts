@@ -143,26 +143,72 @@ export async function upsertLiveProfile(profile: Partial<LiveProfile> & { id: st
 // --------------------------------------------------------------------------
 // 3. CAMPUS POSTS: Fetch, Create, Like, Comment
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 3. CAMPUS POSTS: Fetch, Create, Like, Comment
+// --------------------------------------------------------------------------
 export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
   try {
-    let query = (supabase
-      .from("posts" as any)
-      .select(`
-        *,
-        profiles:author_id (id, first_name, last_name, campus, course, year_of_study, photos, verified)
-      `)
-      .order("created_at", { ascending: false })) as any;
+    // 1. Try fetching from community_posts
+    let rawPosts: any[] = [];
+    const { data: commPosts, error: commErr } = await (supabase
+      .from("community_posts" as any)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50) as any);
 
-    if (campus) {
-      query = query.ilike("campus", `%${campus}%`);
+    if (!commErr && commPosts && commPosts.length > 0) {
+      rawPosts = commPosts;
+    } else {
+      // Fallback to posts table
+      const { data: simplePosts } = await (supabase
+        .from("posts" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50) as any);
+      if (simplePosts) rawPosts = simplePosts;
     }
 
-    const { data, error } = await query;
-    if (error) {
-      console.warn("Could not fetch live posts:", error.message);
-      return [];
+    if (rawPosts.length === 0) return [];
+
+    // 2. Fetch author profiles in bulk
+    const authorIds = Array.from(new Set(rawPosts.map((p) => p.author_id).filter(Boolean)));
+    let authorMap: Record<string, LiveProfile> = {};
+    if (authorIds.length > 0) {
+      const { data: profs } = await (supabase
+        .from("profiles" as any)
+        .select("*")
+        .in("id", authorIds) as any);
+      if (profs) {
+        profs.forEach((pr: LiveProfile) => {
+          authorMap[pr.id] = pr;
+        });
+      }
     }
-    return (data || []) as LivePost[];
+
+    // 3. Map to unified LivePost
+    return rawPosts.map((p) => {
+      const author = authorMap[p.author_id];
+      return {
+        id: p.id,
+        author_id: p.author_id,
+        campus: p.university_name || p.campus || "University",
+        content: p.content || p.title || "",
+        image_url: p.image_url || p.cover_photo || null,
+        likes_count: p.likes_count || 0,
+        comments_count: p.comments_count || 0,
+        created_at: p.created_at,
+        profiles: author ? {
+          id: author.id,
+          first_name: author.first_name,
+          last_name: author.last_name,
+          campus: author.campus || author.university_name || "",
+          course: author.course || "Student",
+          year_of_study: author.year_of_study || "3rd Year",
+          photos: author.photos || [],
+          verified: author.verified ?? true,
+        } : undefined,
+      };
+    });
   } catch (err) {
     console.error("Error in fetchLivePosts:", err);
     return [];
@@ -176,7 +222,37 @@ export async function createLivePost(params: {
   imageUrl?: string;
 }): Promise<LivePost | null> {
   try {
-    const { data, error } = await (supabase
+    const titleSnippet = params.content.substring(0, 50);
+
+    // 1. Try inserting to community_posts
+    const { data: commData, error: commErr } = await (supabase
+      .from("community_posts" as any)
+      .insert({
+        author_id: params.authorId,
+        university_name: params.campus,
+        title: titleSnippet,
+        content: params.content,
+        category: "General",
+        image_url: params.imageUrl || null,
+      })
+      .select()
+      .single() as any);
+
+    if (!commErr && commData) {
+      return {
+        id: commData.id,
+        author_id: commData.author_id,
+        campus: commData.university_name,
+        content: commData.content,
+        image_url: commData.image_url,
+        likes_count: commData.likes_count || 0,
+        comments_count: 0,
+        created_at: commData.created_at,
+      };
+    }
+
+    // 2. Fallback to posts table
+    const { data: postData, error: postErr } = await (supabase
       .from("posts" as any)
       .insert({
         author_id: params.authorId,
@@ -184,17 +260,15 @@ export async function createLivePost(params: {
         content: params.content,
         image_url: params.imageUrl || null,
       })
-      .select(`
-        *,
-        profiles:author_id (id, first_name, last_name, campus, course, year_of_study, photos, verified)
-      `)
+      .select()
       .single() as any);
 
-    if (error) {
-      console.error("Create post error:", error);
+    if (postErr) {
+      console.warn("Could not insert post:", postErr.message);
       return null;
     }
-    return data as LivePost;
+
+    return postData as LivePost;
   } catch (err) {
     console.error("Failed to create post:", err);
     return null;
@@ -228,10 +302,7 @@ export async function addLivePostComment(params: {
         author_id: params.authorId,
         content: params.content,
       })
-      .select(`
-        *,
-        profiles:author_id (id, first_name, last_name, course, year_of_study, photos, verified)
-      `)
+      .select()
       .single() as any);
 
     if (error) {
@@ -250,16 +321,32 @@ export async function addLivePostComment(params: {
 // --------------------------------------------------------------------------
 export async function fetchLiveEvents(campus?: string): Promise<LiveEvent[]> {
   try {
-    let query = (supabase.from("events" as any).select("*").order("created_at", { ascending: false })) as any;
-    if (campus) {
-      query = query.ilike("campus", `%${campus}%`);
-    }
-    const { data, error } = await query;
+    const { data, error } = await (supabase
+      .from("events" as any)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50) as any);
+
     if (error) {
       console.warn("Could not fetch live events:", error.message);
       return [];
     }
-    return (data || []) as LiveEvent[];
+
+    return ((data || []) as any[]).map((ev) => ({
+      id: ev.id,
+      creator_id: ev.creator_id || ev.organizer_id || "",
+      campus: ev.campus || ev.university_name || "Campus",
+      title: ev.title,
+      category: ev.category || "Party",
+      date: ev.date || ev.event_date || "Upcoming",
+      time: ev.time || ev.event_time || "TBA",
+      location: ev.location || ev.venue || "Campus Venue",
+      image: ev.image || ev.cover_photo || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
+      description: ev.description || "",
+      redirect_url: ev.redirect_url || ev.registration_link || null,
+      rsvp_count: ev.rsvp_count || 1,
+      created_at: ev.created_at,
+    }));
   } catch (err) {
     console.error("Error in fetchLiveEvents:", err);
     return [];
@@ -279,18 +366,28 @@ export async function createLiveEvent(eventData: {
   redirectUrl?: string;
 }): Promise<LiveEvent | null> {
   try {
+    const defaultCover = eventData.image || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
+
+    // Try creating event with schema-compatible payload
     const { data, error } = await (supabase
       .from("events" as any)
       .insert({
+        organizer_id: eventData.creatorId,
         creator_id: eventData.creatorId,
+        university_name: eventData.campus,
         campus: eventData.campus,
         title: eventData.title,
-        category: eventData.category,
-        date: eventData.date,
-        time: eventData.time,
-        location: eventData.location,
-        image: eventData.image || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
         description: eventData.description,
+        category: eventData.category,
+        cover_photo: defaultCover,
+        image: defaultCover,
+        event_date: eventData.date || new Date().toISOString().split("T")[0],
+        date: eventData.date || "Upcoming",
+        event_time: eventData.time || "TBA",
+        time: eventData.time || "TBA",
+        venue: eventData.location,
+        location: eventData.location,
+        registration_link: eventData.redirectUrl || null,
         redirect_url: eventData.redirectUrl || null,
         rsvp_count: 1,
       })
@@ -298,10 +395,57 @@ export async function createLiveEvent(eventData: {
       .single() as any);
 
     if (error) {
-      console.error("Create event error:", error);
+      // Retry with minimal columns if specific constraints failed
+      const { data: retryData, error: retryErr } = await (supabase
+        .from("events" as any)
+        .insert({
+          title: eventData.title,
+          description: eventData.description,
+          category: eventData.category,
+          university_name: eventData.campus,
+          organizer_id: eventData.creatorId,
+          cover_photo: defaultCover,
+          event_date: new Date().toISOString().split("T")[0],
+          event_time: eventData.time || "TBA",
+          venue: eventData.location,
+        })
+        .select()
+        .single() as any);
+
+      if (!retryErr && retryData) {
+        return {
+          id: retryData.id,
+          creator_id: eventData.creatorId,
+          campus: eventData.campus,
+          title: retryData.title,
+          category: retryData.category,
+          date: eventData.date,
+          time: eventData.time,
+          location: eventData.location,
+          image: defaultCover,
+          description: retryData.description,
+          rsvp_count: 1,
+          created_at: retryData.created_at,
+        };
+      }
+      console.warn("Create event retry error:", retryErr?.message || error.message);
       return null;
     }
-    return data as LiveEvent;
+
+    return {
+      id: data.id,
+      creator_id: eventData.creatorId,
+      campus: eventData.campus,
+      title: data.title,
+      category: data.category,
+      date: eventData.date,
+      time: eventData.time,
+      location: eventData.location,
+      image: defaultCover,
+      description: data.description,
+      rsvp_count: 1,
+      created_at: data.created_at,
+    };
   } catch (err) {
     console.error("Failed to create event:", err);
     return null;

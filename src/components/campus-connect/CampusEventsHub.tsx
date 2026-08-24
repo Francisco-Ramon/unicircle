@@ -132,6 +132,8 @@ export const SAMPLE_EVENTS: CampusEvent[] = [
 ];
 
 import { AppNavState } from "@/lib/navigationHistory";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchLiveEvents, createLiveEvent, uploadToStorage } from "@/lib/supabaseLiveService";
 
 interface Props {
   userProfile?: any;
@@ -162,6 +164,51 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
       }
     }
   };
+
+  // Hydrate live events from Supabase
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadLiveCampusEvents() {
+      try {
+        const liveEvents = await fetchLiveEvents(userProfile?.campus);
+        if (liveEvents && liveEvents.length > 0 && isMounted) {
+          const formatted: CampusEvent[] = liveEvents.map((le) => ({
+            id: le.id,
+            title: le.title,
+            category: (le.category as any) || "Party",
+            date: le.date || "Upcoming",
+            time: le.time || "TBA",
+            location: le.location || "Campus Venue",
+            campus: le.campus || userProfile?.campus || "University",
+            organizer: "Campus Student",
+            rsvpCount: le.rsvp_count || 1,
+            maxCapacity: 150,
+            userRsvpd: false,
+            image: le.image || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
+            description: le.description || "",
+            redirectUrl: le.redirect_url || undefined,
+            attendees: [
+              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+            ],
+            comments: [],
+          }));
+
+          setEvents((prev) => {
+            const existingIds = new Set(formatted.map((f) => f.id));
+            const merged = [...formatted, ...prev.filter((p) => !existingIds.has(p.id))];
+            if (typeof window !== "undefined") {
+              localStorage.setItem("unicircle_campus_events", JSON.stringify(merged));
+            }
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn("Could not load live campus events:", err);
+      }
+    }
+    loadLiveCampusEvents();
+    return () => { isMounted = false; };
+  }, [userProfile?.campus]);
 
   const [localCategory, setLocalCategory] = useState<string>("All");
   const [search, setSearch] = useState("");
@@ -308,7 +355,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
     setEventCommentInput("");
   };
 
-  const handleCreateEvent = () => {
+  const handleCreateEvent = async () => {
     if (!newEventTitle.trim() || !newEventLocation.trim()) return;
 
     let formattedUrl = newEventRedirectUrl.trim();
@@ -317,6 +364,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
     }
 
     const defaultImage = "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80";
+    const chosenImage = eventPoster || defaultImage;
 
     const newEvt: CampusEvent = {
       id: `evt-${Date.now()}`,
@@ -326,19 +374,41 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
       time: newEventTime || "TBA",
       location: newEventLocation,
       campus: userProfile?.campus || "University of Nairobi",
-      organizer: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
+      organizer: `${userProfile?.firstName || "Student"} ${userProfile?.lastName || ""}`.trim(),
       rsvpCount: 1,
       maxCapacity: 100,
       userRsvpd: true,
-      image: eventPoster || defaultImage,
+      image: chosenImage,
       description: newEventDesc || "Join us for an exciting campus meetup!",
       redirectUrl: formattedUrl || undefined,
-      attendees: [userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"],
+      attendees: [userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"],
       comments: [],
     };
 
     updateEvents([newEvt, ...events]);
     setShowHostModal(false);
+
+    // Push to Supabase
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        await createLiveEvent({
+          creatorId: authData.user.id,
+          campus: userProfile?.campus || "University of Nairobi",
+          title: newEventTitle,
+          category: newEventCategory,
+          date: newEventDate || "Upcoming",
+          time: newEventTime || "TBA",
+          location: newEventLocation,
+          image: chosenImage,
+          description: newEventDesc || "Join us for an exciting campus meetup!",
+          redirectUrl: formattedUrl || undefined,
+        });
+      }
+    } catch (e) {
+      console.warn("Could not save live event to Supabase:", e);
+    }
+
     setNewEventTitle("");
     setNewEventLocation("");
     setNewEventDesc("");
