@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, Upload, CheckCircle2, AlertCircle, LogIn, UserPlus } from "lucide-react";
+import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, AlertCircle, LogIn, UserPlus } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { supabase } from "@/integrations/supabase/client";

@@ -23,12 +23,12 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Something went wrong</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight text-white">Something went wrong</h1>
+        <p className="mt-2 text-sm text-slate-400">
           An unexpected error occurred. Please try again.
         </p>
-        {import.meta.env.DEV && error.message && (
-          <pre className="mt-4 max-h-40 overflow-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-destructive">
+        {error?.message && (
+          <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-slate-900 border border-white/10 p-3 text-left font-mono text-xs text-red-400">
             {error.message}
           </pre>
         )}
@@ -38,19 +38,21 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 cursor-pointer shadow-lg shadow-indigo-600/30"
           >
-            Try again
+            Try Again
           </button>
           <button
             onClick={() => {
               if (typeof window !== "undefined") {
+                localStorage.removeItem("unicircle_community_posts");
+                localStorage.removeItem("unicircle_community_events");
                 window.location.href = "/app#home";
               }
             }}
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-white/5 cursor-pointer"
           >
-            Go home
+            Reset Feed & Reload
           </button>
         </div>
       </div>
