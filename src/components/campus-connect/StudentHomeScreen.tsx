@@ -170,10 +170,10 @@ export const StudentHomeScreen: React.FC<Props> = ({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            Welcome back, {userProfile?.firstName || "Alex"} 👋
+            Welcome back{userProfile?.firstName ? `, ${userProfile.firstName}` : ""} 👋
           </h1>
           <p className="text-xs md:text-sm text-slate-400 mt-1">
-            {userProfile?.campus || "University of Nairobi"} • {userProfile?.yearOfStudy || "3rd Year"}
+            {userProfile?.campus || "Verified Campus Network"} • {userProfile?.yearOfStudy || "3rd Year"}
           </p>
         </div>
 

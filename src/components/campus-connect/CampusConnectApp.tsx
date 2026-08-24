@@ -508,7 +508,7 @@ export const CampusConnectApp: React.FC = () => {
       <SplashScreen />
 
       {/* 1. DESKTOP LEFT SIDEBAR NAVIGATION (Visible on lg >= 1024px) */}
-      {isRegistered && (
+      {isRegistered && userProfile && (
         <div className="hidden lg:flex h-screen sticky top-0 shrink-0 z-30">
           <CampusDesktopSidebar
             activeTab={activeTab}
@@ -680,19 +680,9 @@ export const CampusConnectApp: React.FC = () => {
               onComplete={(profile) => {
                 setUserProfile(profile);
                 setIsRegistered(true);
-                setShowVerificationStudio(true);
-              }}
-            />
-          ) : showVerificationStudio ? (
-            <LiveFaceVerification
-              onVerified={() => {
-                setIsBiometricVerified(true);
                 setShowVerificationStudio(false);
-                setActiveTab("home");
-              }}
-              onSkipDemo={() => {
                 setIsBiometricVerified(true);
-                setShowVerificationStudio(false);
+                handleTabChange("home");
               }}
             />
           ) : (
