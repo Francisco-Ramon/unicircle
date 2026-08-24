@@ -22,3 +22,21 @@ export function useAuth() {
 
   return { session, user, loading };
 }
+
+export async function signOutUser() {
+  try {
+    await supabase.auth.signOut({ scope: "global" });
+  } catch (e) {}
+
+  if (typeof window !== "undefined") {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("sb-") || k.startsWith("unicircle_"))) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    sessionStorage.clear();
+  }
+}

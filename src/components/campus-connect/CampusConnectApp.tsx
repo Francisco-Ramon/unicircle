@@ -36,6 +36,7 @@ import {
   encodeNavState,
 } from "@/lib/navigationHistory";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutUser } from "@/lib/auth";
 import {
   getLiveProfile,
   upsertLiveProfile,
@@ -78,19 +79,14 @@ export const CampusConnectApp: React.FC = () => {
 
   // Global Sign Out Handler: Clears all user session and state
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {}
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("unicircle_user_profile");
-      localStorage.removeItem("unicircle_registered");
-      localStorage.removeItem("unicircle_biometric_verified");
-      window.location.href = "/auth";
-    }
+    await signOutUser();
     setUserProfile(null);
     setIsRegistered(false);
     setIsBiometricVerified(false);
     setShowVerificationStudio(false);
+    if (typeof window !== "undefined") {
+      window.location.href = "/auth?logged_out=1";
+    }
   };
 
   // Load and sync real logged-in user profile from Supabase
