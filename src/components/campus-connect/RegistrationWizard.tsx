@@ -162,10 +162,16 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
           id: authData.user.id,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
+          university_name: selectedInstitution.name,
           campus: selectedInstitution.name,
           country: selectedInstitution.country || "Kenya",
+          gender,
+          course: "Undergraduate",
+          year_of_study: yearOfStudy,
           photos: photoList,
           verified: true,
+          bio: `Hi! I'm ${firstName.trim()}, studying at ${selectedInstitution.shortName || selectedInstitution.name}. Excited to connect on UniCircle!`,
+          interests: ["Campus Events", "Networking", "Tech"],
         });
       }
     } catch (err: any) {

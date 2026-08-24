@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   Heart, X, ShieldCheck, MapPin, GraduationCap,
   SlidersHorizontal, UserPlus, BookOpen, Briefcase,
-  Bookmark, Flag, Ban, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle
+  Bookmark, Flag, Ban, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Search
 } from "lucide-react";
 import {
   dispatchAppNotification,
@@ -65,6 +65,7 @@ export const DiscoverDeck: React.FC<Props> = ({
   const showReportModal = (navState?.tab === "discover" && navState.modal === "report");
   const showBlockConfirm = (navState?.tab === "discover" && navState.modal === "block");
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [savedProfiles, setSavedProfiles] = useState<Set<string>>(new Set());
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [reportedProfiles, setReportedProfiles] = useState<Set<string>>(new Set());
@@ -72,6 +73,17 @@ export const DiscoverDeck: React.FC<Props> = ({
   const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [reportReason, setReportReason] = useState("");
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  const filteredProfiles = profiles.filter((student) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const matchesName = student.name.toLowerCase().includes(q);
+    const matchesCampus = student.campus.toLowerCase().includes(q);
+    const matchesCourse = student.course.toLowerCase().includes(q);
+    const matchesBio = student.bio.toLowerCase().includes(q);
+    const matchesInterests = student.interests?.some((i) => i.toLowerCase().includes(q));
+    return matchesName || matchesCampus || matchesCourse || matchesBio || matchesInterests;
+  });
 
   const toggleSave = (id: string) => {
     setSavedProfiles((prev) => {
@@ -127,24 +139,62 @@ export const DiscoverDeck: React.FC<Props> = ({
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 py-2">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Discover</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Meet verified students near you</p>
+          <p className="text-xs text-slate-400 mt-0.5">Meet verified students across your campus and network</p>
         </div>
 
-        <button
-          onClick={onOpenFilters}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/90 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition"
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
-          Filters
-        </button>
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, course, campus..."
+              className="w-full bg-slate-900/90 border border-white/10 rounded-2xl pl-10 pr-8 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={onOpenFilters}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition shrink-0"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Filters</span>
+          </button>
+        </div>
       </div>
+
+      {/* Empty State when no search matches */}
+      {filteredProfiles.length === 0 && (
+        <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-white/5 p-6">
+          <Search className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-white mb-1">No students found</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
+            We couldn't find any verified students matching "{searchQuery}". Try a different name or clear the search.
+          </p>
+          <button
+            onClick={() => setSearchQuery("")}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition shadow-lg shadow-indigo-600/30"
+          >
+            Clear Search
+          </button>
+        </div>
+      )}
 
       {/* Student Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-        {profiles.map((student) => (
+        {filteredProfiles.map((student) => (
           <div
             key={student.id}
             onClick={() => openProfile(student)}
