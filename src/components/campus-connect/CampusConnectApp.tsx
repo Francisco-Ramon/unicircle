@@ -359,7 +359,7 @@ export const CampusConnectApp: React.FC = () => {
     }
 
     loadLiveStudentsAndChats();
-  }, []);
+  }, [activeTab]);
 
   // Fetch notification preferences and listen for updates
   React.useEffect(() => {
