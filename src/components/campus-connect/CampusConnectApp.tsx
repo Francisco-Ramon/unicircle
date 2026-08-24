@@ -141,9 +141,34 @@ export const CampusConnectApp: React.FC = () => {
               return merged;
             });
           }
-        } else if (!localStorage.getItem("unicircle_user_profile") && isMounted) {
-          setIsRegistered(false);
-          setUserProfile(null);
+        } else if (isMounted) {
+          const localProfStr = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
+          if (localProfStr) {
+            try {
+              const localProf = JSON.parse(localProfStr);
+              if (localProf && (localProf.firstName || localProf.first_name)) {
+                setIsRegistered(true);
+                const syncId = authData?.user?.id || localProf.id || getLocalUserId();
+                await upsertLiveProfile({
+                  id: syncId,
+                  first_name: localProf.firstName || localProf.first_name,
+                  last_name: localProf.lastName || localProf.last_name || "",
+                  email: localProf.email || `${syncId.substring(0, 8)}@unicircle.app`,
+                  campus: localProf.campus || "University of Nairobi",
+                  course: localProf.course || "Undergraduate",
+                  year_of_study: localProf.yearOfStudy || localProf.year_of_study || "3rd Year",
+                  photos: localProf.photos || [],
+                  bio: localProf.bio || "",
+                  interests: localProf.interests || ["Campus Events", "Networking"],
+                  gender: localProf.gender || "Female",
+                  verified: true,
+                });
+              }
+            } catch (e) {}
+          } else {
+            setIsRegistered(false);
+            setUserProfile(null);
+          }
         }
       } catch (err) {
         console.warn("Could not sync live student profile from Supabase:", err);

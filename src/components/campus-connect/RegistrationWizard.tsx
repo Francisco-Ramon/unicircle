@@ -158,7 +158,8 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
 
     try {
       // 1. Sign up with Supabase Auth
-      const { data: authData } = await supabase.auth.signUp({
+      let authUserId = "";
+      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
@@ -173,7 +174,20 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
         },
       });
 
-      const effectiveId = authData?.user?.id || persistentId;
+      if (authData?.user?.id) {
+        authUserId = authData.user.id;
+      } else {
+        // Fallback: If user already registered or needs sign in
+        const { data: signInData } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInData?.user?.id) {
+          authUserId = signInData.user.id;
+        }
+      }
+
+      const effectiveId = authUserId || persistentId;
       fullProfile.id = effectiveId;
       if (typeof window !== "undefined") {
         localStorage.setItem("unicircle_user_id", effectiveId);
