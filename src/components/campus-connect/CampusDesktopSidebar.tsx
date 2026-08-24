@@ -154,17 +154,6 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
             >
               <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
             </button>
-
-            {onSignOut && (
-              <div className="pt-1 border-t border-white/10">
-                <button
-                  onClick={() => { onSignOut(); setShowProfileMenu(false); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition"
-                >
-                  <LogOut className="w-4 h-4" /> Sign Out
-                </button>
-              </div>
-            )}
           </div>
         )}
 
