@@ -1,8 +1,10 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { getSafeErrorMessage } from "./lib/errorHandler";
 
-function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function DefaultErrorComponent({ error, reset }: { error: any; reset: () => void }) {
   const router = useRouter();
+  const safeMessage = getSafeErrorMessage(error);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -27,9 +29,9 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
         <p className="mt-2 text-sm text-slate-400">
           An unexpected error occurred. Please try again.
         </p>
-        {error?.message && (
+        {safeMessage && (
           <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-slate-900 border border-white/10 p-3 text-left font-mono text-xs text-red-400">
-            {error.message}
+            {safeMessage}
           </pre>
         )}
         <div className="mt-6 flex items-center justify-center gap-3">

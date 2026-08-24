@@ -5,6 +5,7 @@ import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./Universit
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage, upsertLiveProfile, getLiveProfile } from "@/lib/supabaseLiveService";
+import { getSafeErrorMessage } from "@/lib/errorHandler";
 import { toast } from "sonner";
 
 export interface StudentProfileData {
@@ -129,7 +130,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
 
       if (signInErr || !signInData?.user) {
         setAuthStatus("ERROR");
-        const msg = signInErr?.message || "Invalid email or password. Please try again.";
+        const msg = getSafeErrorMessage(signInErr) || "Invalid email or password. Please try again.";
         setErrorMessage(msg);
         toast.error(msg);
         return;
@@ -175,7 +176,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       onComplete(resolvedProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = err?.message || "An unexpected error occurred during sign-in. Please try again.";
+      const msg = getSafeErrorMessage(err) || "An unexpected error occurred during sign-in. Please try again.";
       setErrorMessage(msg);
       toast.error(msg);
     }
@@ -233,8 +234,9 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       if (authData?.user?.id) {
         authUserId = authData.user.id;
       } else if (signUpErr) {
+        const errString = getSafeErrorMessage(signUpErr).toLowerCase();
         // If email is already registered, attempt sign-in automatically
-        if (signUpErr.message.toLowerCase().includes("already registered") || signUpErr.message.toLowerCase().includes("exists")) {
+        if (errString.includes("already registered") || errString.includes("exists")) {
           const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
             email: email.trim(),
             password,
@@ -251,7 +253,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
           }
         } else {
           setAuthStatus("ERROR");
-          const msg = signUpErr.message || "Failed to create account. Please check your details.";
+          const msg = getSafeErrorMessage(signUpErr) || "Failed to create account. Please check your details.";
           setErrorMessage(msg);
           toast.error(msg);
           return;
@@ -332,7 +334,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
       onComplete(fullProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = err?.message || "Registration failed due to a connection issue. Please try again.";
+      const msg = getSafeErrorMessage(err) || "Registration failed due to a connection issue. Please try again.";
       setErrorMessage(msg);
       toast.error(msg);
     }
