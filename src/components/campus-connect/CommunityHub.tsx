@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
   Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
@@ -10,6 +10,16 @@ import {
   fetchNotificationPreferences,
 } from "@/lib/notificationService";
 import { CampusEvent, EventComment } from "./CampusEventsHub";
+import {
+  fetchLivePosts,
+  createLivePost,
+  toggleLiveLike,
+  addLivePostComment,
+  fetchLiveEvents,
+  createLiveEvent,
+  uploadToStorage,
+} from "@/lib/supabaseLiveService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PostComment {
   id: string;
@@ -224,6 +234,64 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
 
+  // Load live posts & events from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveData() {
+      try {
+        const [livePostsData, liveEventsData] = await Promise.all([
+          fetchLivePosts(activeInst.name),
+          fetchLiveEvents(activeInst.name),
+        ]);
+
+        if (isMounted) {
+          if (livePostsData && livePostsData.length > 0) {
+            const formattedPosts: CommunityPost[] = livePostsData.map((lp) => ({
+              id: lp.id,
+              authorName: `${lp.profiles?.first_name || "Alex"} ${lp.profiles?.last_name || "Chen"}`,
+              authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+              authorCourse: `${lp.profiles?.course || "Computer Science"} • ${lp.profiles?.year_of_study || "3rd Year"}`,
+              timeAgo: new Date(lp.created_at).toLocaleDateString(),
+              content: lp.content,
+              image: lp.image_url,
+              likes: lp.likes_count || 0,
+              commentsCount: lp.comments_count || 0,
+              userLiked: false,
+              comments: [],
+            }));
+            setPosts([...formattedPosts, ...INITIAL_POSTS]);
+          }
+
+          if (liveEventsData && liveEventsData.length > 0) {
+            const formattedEvents: CampusEvent[] = liveEventsData.map((le) => ({
+              id: le.id,
+              title: le.title,
+              category: le.category as any,
+              date: le.date,
+              time: le.time,
+              location: le.location,
+              campus: le.campus,
+              organizer: "Campus Student",
+              rsvpCount: le.rsvp_count || 1,
+              maxCapacity: 200,
+              userRsvpd: false,
+              image: le.image,
+              description: le.description,
+              redirectUrl: le.redirect_url,
+              attendees: [],
+              comments: [],
+            }));
+            setCommunityEvents([...formattedEvents, ...INITIAL_COMMUNITY_EVENTS]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load Supabase live feed, using cached initial posts:", err);
+      }
+    }
+    loadLiveData();
+    return () => { isMounted = false; };
+  }, [activeInst.name]);
+
   const openCommunityEventDetail = (evt: CampusEvent) => {
     if (onNavigate) {
       onNavigate({ tab: "communities", communityId: activeInst.id, eventId: evt.id, eventView: "details" });
@@ -354,20 +422,54 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
     const postTitle = newPostContent.substring(0, 45);
-    const newPost: CommunityPost = {
-      id: `post-${Date.now()}`,
-      authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
-      authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-      authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
-      timeAgo: "Just now",
-      content: newPostContent,
-      image: newPostImage || undefined,
-      likes: 0,
-      commentsCount: 0,
-      userLiked: false,
-      comments: [],
-    };
-    setPosts([newPost, ...posts]);
+
+    let uploadedImageUrl = newPostImage;
+    if (postFileInputRef.current?.files?.[0]) {
+      const liveUploaded = await uploadToStorage(postFileInputRef.current.files[0], "post_images");
+      if (liveUploaded) uploadedImageUrl = liveUploaded;
+    }
+
+    const { data: authUser } = await supabase.auth.getUser();
+    if (authUser?.user) {
+      const livePost = await createLivePost({
+        authorId: authUser.user.id,
+        content: newPostContent,
+        campus: activeInst?.name || "University of Nairobi",
+        imageUrl: uploadedImageUrl || undefined,
+      });
+      if (livePost) {
+        const formatted: CommunityPost = {
+          id: livePost.id,
+          authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
+          authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+          authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+          timeAgo: "Just now",
+          content: livePost.content,
+          image: livePost.image_url || undefined,
+          likes: 0,
+          commentsCount: 0,
+          userLiked: false,
+          comments: [],
+        };
+        setPosts([formatted, ...posts]);
+      }
+    } else {
+      const newPost: CommunityPost = {
+        id: `post-${Date.now()}`,
+        authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
+        authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+        authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+        timeAgo: "Just now",
+        content: newPostContent,
+        image: uploadedImageUrl || undefined,
+        likes: 0,
+        commentsCount: 0,
+        userLiked: false,
+        comments: [],
+      };
+      setPosts([newPost, ...posts]);
+    }
+
     setNewPostContent("");
     setNewPostImage("");
     setShowNewPost(false);
@@ -402,7 +504,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
   };
 
-  const handleCreateCommunityEvent = () => {
+  const handleCreateCommunityEvent = async () => {
     if (!eventTitle.trim() || !eventLocation.trim()) return;
 
     let formattedUrl = eventRedirectUrl.trim();
@@ -411,6 +513,22 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
 
     const defaultImg = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
+
+    const { data: authUser } = await supabase.auth.getUser();
+    if (authUser?.user) {
+      await createLiveEvent({
+        creatorId: authUser.user.id,
+        campus: activeInst?.name || "University of Nairobi",
+        title: eventTitle,
+        category: eventCategory,
+        date: eventDate || "TBA",
+        time: eventTime || "TBA",
+        location: eventLocation,
+        image: eventPoster || defaultImg,
+        description: eventDesc || "Community event hosted on UniCircle.",
+        redirectUrl: formattedUrl || undefined,
+      });
+    }
 
     const newEvt: CampusEvent = {
       id: `cevt-${Date.now()}`,

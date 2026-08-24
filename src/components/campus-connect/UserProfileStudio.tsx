@@ -2,6 +2,8 @@ import React, { useState, useRef } from "react";
 import { User, Camera, ShieldCheck, Sparkles, Plus, Trash2, CheckCircle2, AlertCircle, Edit3, Save, Upload, Settings, Globe } from "lucide-react";
 import { StudentProfileData } from "./RegistrationWizard";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
+import { uploadToStorage, upsertLiveProfile } from "@/lib/supabaseLiveService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   profile: StudentProfileData;
@@ -17,6 +19,7 @@ export const UserProfileStudio: React.FC<Props> = ({
   onNavigateToSettings,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photos, setPhotos] = useState<string[]>(
     profile.photos && profile.photos.length > 0
       ? profile.photos
@@ -30,14 +33,31 @@ export const UserProfileStudio: React.FC<Props> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [showUniSearch, setShowUniSearch] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const localUrl = URL.createObjectURL(file);
-      const updated = [...photos, localUrl];
+      setIsUploadingPhoto(true);
+      
+      // Upload to Supabase Storage Bucket 'avatars'
+      const publicUrl = await uploadToStorage(file, "avatars");
+      const finalUrl = publicUrl || URL.createObjectURL(file);
+      
+      const updated = [...photos, finalUrl];
       setPhotos(updated);
-      onUpdateProfile({ ...profile, photos: updated });
+      setIsUploadingPhoto(false);
+      
+      const updatedProfile = { ...profile, photos: updated };
+      onUpdateProfile(updatedProfile);
+
+      // Save to Supabase profiles table if logged in
+      const { data: authUser } = await supabase.auth.getUser();
+      if (authUser?.user) {
+        await upsertLiveProfile({
+          id: authUser.user.id,
+          photos: updated,
+        });
+      }
     }
   };
 
