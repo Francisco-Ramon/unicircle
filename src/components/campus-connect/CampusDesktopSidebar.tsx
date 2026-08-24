@@ -165,6 +165,9 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
               <img
                 src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
                 alt="User"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80";
+                }}
                 className="w-full h-full object-cover"
               />
               <span className="absolute bottom-0 right-0 p-0.5 bg-emerald-500 rounded-full text-slate-950">

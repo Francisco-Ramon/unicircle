@@ -140,7 +140,29 @@ interface Props {
 }
 
 export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavigate }) => {
-  const [events, setEvents] = useState<CampusEvent[]>(SAMPLE_EVENTS);
+  const [events, setEvents] = useState<CampusEvent[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_campus_events");
+        if (saved) return JSON.parse(saved);
+      } catch (err) {
+        console.warn("Failed to load campus events from localStorage:", err);
+      }
+    }
+    return SAMPLE_EVENTS;
+  });
+
+  const updateEvents = (newEvents: CampusEvent[]) => {
+    setEvents(newEvents);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("unicircle_campus_events", JSON.stringify(newEvents));
+      } catch (e) {
+        console.warn("Could not save campus events to localStorage:", e);
+      }
+    }
+  };
+
   const [localCategory, setLocalCategory] = useState<string>("All");
   const [search, setSearch] = useState("");
 
@@ -228,19 +250,18 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
     const target = events.find((e) => e.id === id);
     const isNowAttending = target ? !target.userRsvpd : false;
 
-    setEvents(
-      events.map((e) => {
-        if (e.id === id) {
-          const nextState = !e.userRsvpd;
-          return {
-            ...e,
-            userRsvpd: nextState,
-            rsvpCount: nextState ? e.rsvpCount + 1 : e.rsvpCount - 1,
-          };
-        }
-        return e;
-      })
-    );
+    const nextEvents = events.map((e) => {
+      if (e.id === id) {
+        const nextState = !e.userRsvpd;
+        return {
+          ...e,
+          userRsvpd: nextState,
+          rsvpCount: nextState ? e.rsvpCount + 1 : e.rsvpCount - 1,
+        };
+      }
+      return e;
+    });
+    updateEvents(nextEvents);
 
     if (selectedEvent && selectedEvent.id === id) {
       setSelectedEvent((prev) => prev ? {
@@ -282,7 +303,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
       return e;
     });
 
-    setEvents(updatedEvents);
+    updateEvents(updatedEvents);
     setSelectedEvent({ ...selectedEvent, comments: [...selectedEvent.comments, newComment] });
     setEventCommentInput("");
   };
@@ -316,7 +337,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
       comments: [],
     };
 
-    setEvents([newEvt, ...events]);
+    updateEvents([newEvt, ...events]);
     setShowHostModal(false);
     setNewEventTitle("");
     setNewEventLocation("");

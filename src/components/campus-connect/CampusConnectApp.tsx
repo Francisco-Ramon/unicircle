@@ -403,6 +403,9 @@ export const CampusConnectApp: React.FC = () => {
                 <img
                   src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
                   alt="User"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80";
+                  }}
                   className="w-7 h-7 rounded-lg object-cover"
                 />
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 pr-1" />

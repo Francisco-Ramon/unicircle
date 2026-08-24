@@ -33,15 +33,24 @@ export const UserProfileStudio: React.FC<Props> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [showUniSearch, setShowUniSearch] = useState(false);
 
+  // Sync state whenever parent profile updates (e.g. from Supabase)
+  React.useEffect(() => {
+    if (profile.photos && profile.photos.length > 0) {
+      setPhotos(profile.photos);
+    }
+    if (profile.bio) {
+      setBio(profile.bio);
+    }
+  }, [profile.photos, profile.bio]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
       setIsUploadingPhoto(true);
       
-      // Upload to Supabase Storage Bucket 'avatars'
-      const publicUrl = await uploadToStorage(file, "avatars");
-      const finalUrl = publicUrl || URL.createObjectURL(file);
+      // Upload to Supabase Storage Bucket 'avatars' with Base64 fallback
+      const finalUrl = await uploadToStorage(file, "avatars");
       
       const updated = [...photos, finalUrl];
       setPhotos(updated);
@@ -105,7 +114,14 @@ export const UserProfileStudio: React.FC<Props> = ({
             onClick={() => setActiveViewerIndex(0)}
             className="relative w-24 h-24 rounded-2xl p-1 bg-gradient-to-tr from-indigo-500 to-pink-500 shadow-xl shrink-0 cursor-pointer group"
           >
-            <img src={photos[0]} alt={profile.firstName} className="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition" />
+            <img
+              src={photos[0]}
+              alt={profile.firstName}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80";
+              }}
+              className="w-full h-full object-cover rounded-xl group-hover:opacity-90 transition"
+            />
             <div className="absolute -bottom-1.5 -right-1.5 p-1.5 bg-emerald-500 rounded-xl text-slate-950 shadow-lg" title="Verified Student Account">
               <ShieldCheck className="w-4 h-4" />
             </div>
@@ -209,7 +225,14 @@ export const UserProfileStudio: React.FC<Props> = ({
               onClick={() => setActiveViewerIndex(idx)}
               className="relative aspect-[3/4] rounded-2xl overflow-hidden group border border-white/10 cursor-pointer shadow-md"
             >
-              <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <img
+                src={url}
+                alt={`Photo ${idx + 1}`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80";
+                }}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
               {/* Remove Photo Trash Button */}
@@ -241,7 +264,14 @@ export const UserProfileStudio: React.FC<Props> = ({
             className="relative max-w-lg w-full bg-slate-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
+            <img
+              src={photos[activeViewerIndex]}
+              alt="Viewing photo"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80";
+              }}
+              className="w-full max-h-[70vh] object-cover"
+            />    {/* Close Button */}
             <button
               onClick={() => setActiveViewerIndex(null)}
               className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/60 hover:bg-white/20 text-white transition"

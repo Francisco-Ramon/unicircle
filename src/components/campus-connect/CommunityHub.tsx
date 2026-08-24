@@ -224,17 +224,62 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
 
   const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
 
-  // Posts state
-  const [posts, setPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
+  // Posts state with localStorage initialization
+  const [posts, setPosts] = useState<CommunityPost[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_community_posts");
+        if (saved) return JSON.parse(saved);
+      } catch (err) {
+        console.warn("Failed to load posts from localStorage:", err);
+      }
+    }
+    return INITIAL_POSTS;
+  });
 
-  // Community Events state
-  const [communityEvents, setCommunityEvents] = useState<CampusEvent[]>(INITIAL_COMMUNITY_EVENTS);
+  // Community Events state with localStorage initialization
+  const [communityEvents, setCommunityEvents] = useState<CampusEvent[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_community_events");
+        if (saved) return JSON.parse(saved);
+      } catch (err) {
+        console.warn("Failed to load events from localStorage:", err);
+      }
+    }
+    return INITIAL_COMMUNITY_EVENTS;
+  });
+
   const selectedEventId = (navState?.tab === "communities") ? navState.eventId : undefined;
   const selectedEvent = communityEvents.find((e) => e.id === selectedEventId) || null;
   const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
 
-  // Load live posts & events from Supabase
+  // Sync posts to localStorage
+  const updatePosts = (newPosts: CommunityPost[]) => {
+    setPosts(newPosts);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("unicircle_community_posts", JSON.stringify(newPosts));
+      } catch (e) {
+        console.warn("Could not save posts to localStorage:", e);
+      }
+    }
+  };
+
+  // Sync events to localStorage
+  const updateEvents = (newEvents: CampusEvent[]) => {
+    setCommunityEvents(newEvents);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("unicircle_community_events", JSON.stringify(newEvents));
+      } catch (e) {
+        console.warn("Could not save events to localStorage:", e);
+      }
+    }
+  };
+
+  // Load live posts & events from Supabase and merge
   useEffect(() => {
     let isMounted = true;
     async function loadLiveData() {
@@ -259,7 +304,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               userLiked: false,
               comments: [],
             }));
-            setPosts([...formattedPosts, ...INITIAL_POSTS]);
+            
+            // Deduplicate posts by ID
+            setPosts((prev) => {
+              const existingIds = new Set(formattedPosts.map((p) => p.id));
+              const combined = [...formattedPosts, ...prev.filter((p) => !existingIds.has(p.id))];
+              if (typeof window !== "undefined") {
+                localStorage.setItem("unicircle_community_posts", JSON.stringify(combined));
+              }
+              return combined;
+            });
           }
 
           if (liveEventsData && liveEventsData.length > 0) {
@@ -281,7 +335,15 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               attendees: [],
               comments: [],
             }));
-            setCommunityEvents([...formattedEvents, ...INITIAL_COMMUNITY_EVENTS]);
+            
+            setCommunityEvents((prev) => {
+              const existingEvtIds = new Set(formattedEvents.map((e) => e.id));
+              const combined = [...formattedEvents, ...prev.filter((e) => !existingEvtIds.has(e.id))];
+              if (typeof window !== "undefined") {
+                localStorage.setItem("unicircle_community_events", JSON.stringify(combined));
+              }
+              return combined;
+            });
           }
         }
       } catch (err) {
@@ -371,15 +433,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   const handleToggleLike = (postId: string) => {
-    setPosts(posts.map((p) =>
+    const nextPosts = posts.map((p) =>
       p.id === postId
         ? { ...p, userLiked: !p.userLiked, likes: p.userLiked ? p.likes - 1 : p.likes + 1 }
         : p
-    ));
+    );
+    updatePosts(nextPosts);
   };
 
   const handleToggleCommentLike = (postId: string, commentId: string) => {
-    setPosts(posts.map((p) => {
+    const nextPosts = posts.map((p) => {
       if (p.id !== postId) return p;
       return {
         ...p,
@@ -389,7 +452,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             : c
         )
       };
-    }));
+    });
+    updatePosts(nextPosts);
   };
 
   const handleAddComment = (postId: string) => {
@@ -407,15 +471,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       userLiked: false,
     };
 
-    setPosts(posts.map((p) => {
+    const nextPosts = posts.map((p) => {
       if (p.id !== postId) return p;
       return {
         ...p,
         commentsCount: p.commentsCount + 1,
         comments: [...p.comments, newComment],
       };
-    }));
+    });
 
+    updatePosts(nextPosts);
     setCommentInputs({ ...commentInputs, [postId]: "" });
   };
 
@@ -451,7 +516,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           userLiked: false,
           comments: [],
         };
-        setPosts([formatted, ...posts]);
+        updatePosts([formatted, ...posts]);
       }
     } else {
       const newPost: CommunityPost = {
@@ -467,7 +532,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         userLiked: false,
         comments: [],
       };
-      setPosts([newPost, ...posts]);
+      updatePosts([newPost, ...posts]);
     }
 
     setNewPostContent("");
@@ -486,7 +551,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   const toggleEventRsvp = (eventId: string) => {
-    setCommunityEvents(communityEvents.map((e) => {
+    const nextEvents = communityEvents.map((e) => {
       if (e.id !== eventId) return e;
       const nextState = !e.userRsvpd;
       return {
@@ -494,7 +559,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         userRsvpd: nextState,
         rsvpCount: nextState ? e.rsvpCount + 1 : e.rsvpCount - 1,
       };
-    }));
+    });
+    updateEvents(nextEvents);
+
     if (selectedEvent && selectedEvent.id === eventId) {
       setSelectedEvent((prev) => prev ? {
         ...prev,
@@ -549,7 +616,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       comments: [],
     };
 
-    setCommunityEvents([newEvt, ...communityEvents]);
+    updateEvents([newEvt, ...communityEvents]);
     setShowCreateEventModal(false);
     setEventTitle("");
     setEventLocation("");

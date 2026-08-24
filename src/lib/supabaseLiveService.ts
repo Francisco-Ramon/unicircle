@@ -64,27 +64,40 @@ export interface LiveEvent {
 export async function uploadToStorage(
   file: File,
   bucket: "avatars" | "post_images" | "event_posters" | "chat_media" = "avatars"
-): Promise<string | null> {
+): Promise<string> {
+  // Convert to Base64 helper for guaranteed persistence fallback
+  const fileToBase64 = (f: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(f);
+    });
+
   try {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const cleanExt = fileExt.replace(/[^a-zA-Z0-9]/g, "");
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${cleanExt}`;
     const filePath = `${fileName}`;
 
     const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, {
       cacheControl: "3600",
-      upsert: false,
+      upsert: true,
+      contentType: file.type || "image/jpeg",
     });
 
     if (error) {
-      console.error("Storage upload error:", error);
-      return null;
+      console.warn("Storage bucket upload notice (using permanent Base64):", error.message);
+      return await fileToBase64(file);
     }
 
     const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
-    return publicUrlData.publicUrl;
+    if (publicUrlData?.publicUrl) {
+      return publicUrlData.publicUrl;
+    }
+    return await fileToBase64(file);
   } catch (err) {
-    console.error("Failed to upload image to Supabase storage:", err);
-    return null;
+    console.warn("Using permanent Base64 fallback for uploaded photo:", err);
+    return await fileToBase64(file);
   }
 }
 

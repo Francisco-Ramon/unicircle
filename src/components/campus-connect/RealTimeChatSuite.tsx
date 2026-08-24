@@ -51,7 +51,32 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
 
 const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
   const chatFileInputRef = useRef<HTMLInputElement>(null);
-  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
+  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_chat_messages");
+        if (saved) return JSON.parse(saved);
+      } catch (err) {
+        console.warn("Failed to load chat messages from localStorage:", err);
+      }
+    }
+    return INITIAL_MESSAGES;
+  });
+
+  const updateMessagesMap = (updater: (prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>) => {
+    setMessagesMap((prev) => {
+      const next = updater(prev);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("unicircle_chat_messages", JSON.stringify(next));
+        } catch (e) {
+          console.warn("Failed to save chat messages to localStorage:", e);
+        }
+      }
+      return next;
+    });
+  };
+
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -85,7 +110,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
                 type: m.media_url ? "image" : "text",
                 mediaUrl: m.media_url,
               }));
-              setMessagesMap((prev) => ({
+              updateMessagesMap((prev) => ({
                 ...prev,
                 [currentMatch.id]: formatted,
               }));
@@ -102,7 +127,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
                 type: newLiveMsg.media_url ? "image" : "text",
                 mediaUrl: newLiveMsg.media_url,
               };
-              setMessagesMap((prev) => ({
+              updateMessagesMap((prev) => ({
                 ...prev,
                 [currentMatch.id]: [...(prev[currentMatch.id] || []).filter((x) => x.id !== incoming.id), incoming],
               }));
@@ -137,7 +162,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
         mediaUrl: fileUrl,
       };
 
-      setMessagesMap((prev) => ({
+      updateMessagesMap((prev) => ({
         ...prev,
         [currentMatch.id]: [...(prev[currentMatch.id] || []), imgMsg],
       }));
@@ -185,8 +210,10 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
       type: "text",
     };
 
-    const updated = { ...messagesMap, [currentMatch.id]: [...activeMessages, newMsg] };
-    setMessagesMap(updated);
+    updateMessagesMap((prev) => ({
+      ...prev,
+      [currentMatch.id]: [...(prev[currentMatch.id] || []), newMsg],
+    }));
     setInputText("");
 
     // Send to Supabase live database
@@ -216,7 +243,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
           isRead: true,
           type: "text",
         };
-        setMessagesMap((prev) => ({
+        updateMessagesMap((prev) => ({
           ...prev,
           [currentMatch.id]: [...(prev[currentMatch.id] || []), replyMsg],
         }));
