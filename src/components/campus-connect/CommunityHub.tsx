@@ -4,7 +4,6 @@ import {
   Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
-import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
 import {
   dispatchAppNotification,
@@ -214,8 +213,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     : userInst);
 
   const [activeTab, setActiveTab] = useState<"feed" | "events" | "members" | "about">("feed");
-  const [showSwitcher, setShowSwitcher] = useState(false);
-  const [switcherSearch, setSwitcherSearch] = useState("");
 
   // Posts state
   const [posts, setPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
@@ -226,15 +223,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const selectedEvent = communityEvents.find((e) => e.id === selectedEventId) || null;
   const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
-
-  const handleSelectInstitution = (inst: any) => {
-    setSelectedInst(inst);
-    setShowSwitcher(false);
-
-    if (onNavigate) {
-      onNavigate({ tab: "communities", communityId: inst.id });
-    }
-  };
 
   const openCommunityEventDetail = (evt: CampusEvent) => {
     if (onNavigate) {
@@ -477,13 +465,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setEventCommentInput("");
   };
 
-  // Filtered universities for switcher
-  const filteredInstitutions = INSTITUTIONS_DATA.filter((i) =>
-    i.name.toLowerCase().includes(switcherSearch.toLowerCase()) ||
-    i.shortName.toLowerCase().includes(switcherSearch.toLowerCase()) ||
-    i.city.toLowerCase().includes(switcherSearch.toLowerCase())
-  );
-
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6 py-2">
       {/* Community Header */}
@@ -504,13 +485,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             </p>
           </div>
         </div>
-
-        <button
-          onClick={() => setShowSwitcher(true)}
-          className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition shrink-0"
-        >
-          Change University
-        </button>
       </div>
 
       {/* Community Sub-tabs */}
@@ -1293,16 +1267,6 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             </div>
           </div>
         </div>
-      )}
-
-      {/* Worldwide University Switcher Modal */}
-      {showSwitcher && (
-        <GlobalUniversitySearch
-          title="Change University Worldwide"
-          currentUniversityName={activeInst.name}
-          onSelectInstitution={handleSelectInstitution}
-          onClose={() => setShowSwitcher(false)}
-        />
       )}
     </div>
   );
