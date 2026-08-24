@@ -57,6 +57,7 @@ interface CommunityPost {
 const INITIAL_POSTS: CommunityPost[] = [
   {
     id: "p1",
+    authorId: "author_brian_omondi",
     authorName: "Brian Omondi",
     authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
     authorCourse: "Medicine & Surgery • 4th Year",
@@ -90,6 +91,7 @@ const INITIAL_POSTS: CommunityPost[] = [
   },
   {
     id: "p2",
+    authorId: "author_amani_wanjiru",
     authorName: "Amani Wanjiru",
     authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
     authorCourse: "Law • 2nd Year",
@@ -114,6 +116,7 @@ const INITIAL_POSTS: CommunityPost[] = [
   },
   {
     id: "p3",
+    authorId: "author_kevin_wafula",
     authorName: "Kevin Wafula",
     authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
     authorCourse: "Computer Science • 3rd Year",
@@ -303,6 +306,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           if (livePostsData && livePostsData.length > 0) {
             const formattedPosts: CommunityPost[] = livePostsData.map((lp) => ({
               id: lp.id,
+              authorId: lp.author_id || (lp.profiles?.id) || `author_${lp.id}`,
               authorName: lp.profiles?.first_name
                 ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
                 : "Verified Student",
@@ -311,6 +315,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               timeAgo: new Date(lp.created_at).toLocaleDateString(),
               content: lp.content,
               image: lp.image_url,
+              visibility: lp.visibility || "PUBLIC",
               likes: lp.likes_count || 0,
               commentsCount: lp.comments_count || 0,
               userLiked: false,
@@ -364,6 +369,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           onNewPost: (newLivePost) => {
             const incomingPost: CommunityPost = {
               id: newLivePost.id,
+              authorId: newLivePost.author_id,
               authorName: newLivePost.profiles?.first_name
                 ? `${newLivePost.profiles.first_name} ${newLivePost.profiles.last_name || ""}`.trim()
                 : "Verified Student",
@@ -372,6 +378,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               timeAgo: "Just now",
               content: newLivePost.content,
               image: newLivePost.image_url,
+              visibility: (newLivePost as any).visibility || "PUBLIC",
               likes: 0,
               commentsCount: 0,
               userLiked: false,
@@ -975,7 +982,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             .map((post) => {
             const isCommentsOpen = activeCommentPostId === post.id;
             const currentUserId = userProfile?.id || getLocalUserId();
-            const isFollowingAuthor = post.authorId ? SocialGraphService.isFollowing(currentUserId, post.authorId) : false;
+            const effectiveAuthorId = post.authorId || `author_${post.id}`;
+            const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
 
             return (
               <div key={post.id} className="bg-slate-900/60 border border-white/[0.06] rounded-2xl overflow-hidden shadow-lg transition">
@@ -995,11 +1003,11 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                     </div>
                   </div>
 
-                  {post.authorId && post.authorId !== currentUserId && (
+                  {effectiveAuthorId !== currentUserId && (
                     <button
                       onClick={async () => {
                         if (isFollowingAuthor) {
-                          SocialGraphService.unfollowUser(currentUserId, post.authorId!);
+                          SocialGraphService.unfollowUser(currentUserId, effectiveAuthorId);
                         } else {
                           await SocialController.followUser({
                             id: currentUserId,
@@ -1015,17 +1023,27 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                             gender: userProfile?.gender || "Female",
                             verified: true,
                             isOnline: true,
-                          }, post.authorId!);
+                          }, effectiveAuthorId);
                         }
                         setPosts((prev) => [...prev]);
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 ${
                         isFollowingAuthor
-                          ? "bg-white/10 text-slate-300 hover:bg-white/15"
-                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+                          ? "bg-white/10 text-slate-300 hover:bg-white/15 border border-white/10"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
                       }`}
                     >
-                      {isFollowingAuthor ? "Following" : "+ Follow"}
+                      {isFollowingAuthor ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Following</span>
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="w-3.5 h-3.5" />
+                          <span>+ Follow</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

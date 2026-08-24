@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap } from "lucide-react";
+import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap, UserCheck } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-import { fetchLivePosts, fetchLiveEvents } from "@/lib/supabaseLiveService";
+import { fetchLivePosts, fetchLiveEvents, getLocalUserId } from "@/lib/supabaseLiveService";
+import { SocialGraphService } from "@/lib/social/socialGraphService";
+import { SocialController } from "@/lib/social/socialController";
 import { AppNavState } from "@/lib/navigationHistory";
 
 interface Props {
@@ -366,38 +368,93 @@ export const StudentHomeScreen: React.FC<Props> = ({
           </button>
         </div>
 
-        {communityPosts.map((post) => (
-          <div
-            key={post.id}
-            onClick={onNavigateToCommunity}
-            className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 shadow-lg space-y-3 cursor-pointer hover:border-indigo-500/30 transition"
-          >
-            <div className="flex items-center gap-3">
-              <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
-              <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-1">
-                  {post.authorName} <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                </h4>
-                <p className="text-[11px] text-slate-400">{post.campus} • {post.timeAgo}</p>
+        {communityPosts.map((post) => {
+          const currentUserId = userProfile?.id || getLocalUserId();
+          const effectiveAuthorId = post.authorId || `author_${post.id}`;
+          const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
+
+          return (
+            <div
+              key={post.id}
+              className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 shadow-lg space-y-3 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div
+                  onClick={onNavigateToCommunity}
+                  className="flex items-center gap-3 cursor-pointer min-w-0"
+                >
+                  <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1 truncate">
+                      {post.authorName} <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    </h4>
+                    <p className="text-[11px] text-slate-400 truncate">{post.campus} • {post.timeAgo}</p>
+                  </div>
+                </div>
+
+                {effectiveAuthorId !== currentUserId && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (isFollowingAuthor) {
+                        SocialGraphService.unfollowUser(currentUserId, effectiveAuthorId);
+                      } else {
+                        await SocialController.followUser({
+                          id: currentUserId,
+                          email: userProfile?.email || "student@unicircle.app",
+                          firstName: userProfile?.firstName || "Student",
+                          lastName: userProfile?.lastName || "",
+                          campus: userProfile?.campus || "University of Nairobi",
+                          course: userProfile?.course || "Student",
+                          yearOfStudy: userProfile?.yearOfStudy || "3rd Year",
+                          bio: userProfile?.bio || "",
+                          photos: userProfile?.photos || [],
+                          interests: userProfile?.interests || [],
+                          gender: userProfile?.gender || "Female",
+                          verified: true,
+                          isOnline: true,
+                        }, effectiveAuthorId);
+                      }
+                      setCommunityPosts((prev) => [...prev]);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 ${
+                      isFollowingAuthor
+                        ? "bg-white/10 text-slate-300 hover:bg-white/15 border border-white/10"
+                        : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
+                    }`}
+                  >
+                    {isFollowingAuthor ? (
+                      <>
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Following</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>+ Follow</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div onClick={onNavigateToCommunity} className="cursor-pointer">
+                <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+              </div>
+
+              {post.image && (
+                <div onClick={onNavigateToCommunity} className="rounded-2xl overflow-hidden max-h-64 cursor-pointer">
+                  <img src={post.image} alt="Post attachment" className="w-full object-cover" />
+                </div>
+              )}
+
+              <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-white/10">
+                <span>❤️ {post.likes || 0} Likes</span>
+                <span>💬 {post.comments || post.commentsCount || 0} Comments</span>
               </div>
             </div>
-
-            <div>
-              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
-            </div>
-
-            {post.image && (
-              <div className="rounded-2xl overflow-hidden max-h-64">
-                <img src={post.image} alt="Post attachment" className="w-full object-cover" />
-              </div>
-            )}
-
-            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-white/10">
-              <span>❤️ {post.likes || 0} Likes</span>
-              <span>💬 {post.comments || post.commentsCount || 0} Comments</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 5. Upcoming Campus Events */}
