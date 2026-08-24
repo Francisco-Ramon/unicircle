@@ -966,20 +966,52 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           )}
 
           {/* Posts List */}
-          {posts
-            .filter((post) => {
-              const currentUserId = userProfile?.id || getLocalUserId();
+          {(() => {
+            const currentUserId = userProfile?.id || getLocalUserId();
+            const visiblePosts = posts.filter((post) => {
+              const effectiveAuthorId = post.authorId || `author_${post.id}`;
+              const isOwnPost = Boolean(
+                (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
+                (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase())) ||
+                ((post as any).authorEmail && userProfile?.email && (post as any).authorEmail.toLowerCase() === userProfile.email.toLowerCase())
+              );
+
+              // 1. If on "Following" feed: STRICTLY only show posts by authors you are actively following!
               if (activeTab === "following") {
-                if (post.authorId && post.authorId !== currentUserId) {
-                  return SocialGraphService.isFollowing(currentUserId, post.authorId);
-                }
+                if (isOwnPost) return false;
+                return SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
               }
-              if (post.visibility === "FOLLOWERS_ONLY" && post.authorId && post.authorId !== currentUserId) {
-                return SocialGraphService.isFollowing(currentUserId, post.authorId);
+
+              // 2. If post is marked FOLLOWERS_ONLY: only show if author or followed
+              if (post.visibility === "FOLLOWERS_ONLY") {
+                if (isOwnPost) return true;
+                return SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
               }
+
               return true;
-            })
-            .map((post) => {
+            });
+
+            if (activeTab === "following" && visiblePosts.length === 0) {
+              return (
+                <div className="text-center py-12 px-6 bg-slate-900/60 rounded-3xl border border-white/10 space-y-3 my-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">No Posts in Following Feed Yet</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                    You haven't followed any campus creators yet. Tap <span className="text-indigo-400 font-bold">+ Follow</span> on other students' posts in the Campus Feed to see their posts appear here!
+                  </p>
+                  <button
+                    onClick={() => setActiveTab("campus")}
+                    className="mt-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer"
+                  >
+                    Explore Campus Feed
+                  </button>
+                </div>
+              );
+            }
+
+            return visiblePosts.map((post) => {
             const isCommentsOpen = activeCommentPostId === post.id;
             const currentUserId = userProfile?.id || getLocalUserId();
             const effectiveAuthorId = post.authorId || `author_${post.id}`;
@@ -1173,9 +1205,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 )}
               </div>
             );
-          })}
-        </div>
-      )}
+          });
+        })()}
+      </div>
+    )}
 
       {/* EVENTS TAB (Community Events with Poster Upload & Redirect Links) */}
       {activeTab === "events" && (
