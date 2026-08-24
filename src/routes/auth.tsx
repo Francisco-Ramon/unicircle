@@ -23,11 +23,8 @@ function AuthPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
-    const isLoggedOutParam = typeof window !== "undefined" && window.location.search.includes("logged_out");
-    if (session && !isLoggedOutParam) {
-      navigate({ to: "/app" });
-    }
-  }, [session, navigate]);
+    navigate({ to: "/app" });
+  }, [navigate]);
 
   async function handleGoogleAuth() {
     setGoogleBusy(true);

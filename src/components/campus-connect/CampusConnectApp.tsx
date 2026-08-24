@@ -48,53 +48,70 @@ import {
 } from "@/lib/supabaseLiveService";
 
 
+const DEFAULT_FREE_PROFILE: StudentProfileData = {
+  id: "ac5c42f3-1682-4f58-9522-ef7f7cbd88fd",
+  email: "student@unicircle.app",
+  firstName: "Alex",
+  lastName: "Cisco",
+  nickname: "Alex",
+  dob: "2003-01-01",
+  gender: "Male",
+  orientation: "Straight",
+  interestedIn: "Everyone",
+  relationshipGoal: "Friendship",
+  country: "Kenya",
+  institutionType: "University",
+  campus: "University of Nairobi",
+  institutionId: "uon",
+  faculty: "Engineering & Technology",
+  course: "Computer Science",
+  yearOfStudy: "3rd Year",
+  height: "178 cm",
+  lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
+  interests: ["Campus Events", "Networking", "Tech", "Music", "Photography"],
+  bio: "Computer Science student at UoN. Excited to connect on UniCircle!",
+  photos: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"],
+  verified: true,
+};
+
 export const CampusConnectApp: React.FC = () => {
-  // User Session & Registration State: Only true if there is an active session or profile
-  const [isRegistered, setIsRegistered] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return !!localStorage.getItem("unicircle_user_profile");
-    }
-    return false;
-  });
-
-  const [isBiometricVerified, setIsBiometricVerified] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return !!localStorage.getItem("unicircle_user_profile");
-    }
-    return false;
-  });
-
+  // 100% Free Direct Access: No login/account creation required
+  const [isRegistered, setIsRegistered] = useState<boolean>(true);
+  const [isBiometricVerified, setIsBiometricVerified] = useState<boolean>(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
 
-  // User Profile with localStorage persistence and Supabase sync (null if logged out)
-  const [userProfile, setUserProfile] = useState<StudentProfileData | null>(() => {
+  // User Profile: Default to active verified student profile
+  const [userProfile, setUserProfile] = useState<StudentProfileData>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("unicircle_user_profile");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.firstName || parsed.first_name)) return parsed;
+        }
       } catch (err) {
         console.warn("Failed to load user profile from localStorage:", err);
       }
     }
-    return null;
+    return DEFAULT_FREE_PROFILE;
   });
 
-  // Global Sign Out Handler: Clears all user session and state
+  // Global Reset Handler: Keeps app active in free mode
   const handleSignOut = async () => {
     try {
       await signOutUser();
     } catch (e) {}
     if (typeof window !== "undefined") {
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.hash = "";
+      localStorage.removeItem("unicircle_user_profile");
+      safeSetItem("unicircle_user_profile", JSON.stringify(DEFAULT_FREE_PROFILE));
     }
-    setUserProfile(null);
-    setIsRegistered(false);
-    setIsBiometricVerified(false);
+    setUserProfile(DEFAULT_FREE_PROFILE);
+    setIsRegistered(true);
+    setIsBiometricVerified(true);
     setShowVerificationStudio(false);
     setActiveTab("home");
     setShowUserDropdown(false);
+    toast.success("Feed refreshed in free access mode!");
   };
 
   // Load and sync real logged-in user profile from Supabase
@@ -676,19 +693,8 @@ export const CampusConnectApp: React.FC = () => {
       {/* 3. CENTER COLUMN MAIN CONTENT WRAPPER */}
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
         <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0">
-          {!isRegistered ? (
-            <RegistrationWizard
-              onComplete={(profile) => {
-                setUserProfile(profile);
-                setIsRegistered(true);
-                setShowVerificationStudio(false);
-                setIsBiometricVerified(true);
-                handleTabChange("home");
-              }}
-            />
-          ) : (
-            <>
-              {activeTab === "home" && (
+          <>
+            {activeTab === "home" && (
                 <StudentHomeScreen
                   userProfile={userProfile}
                   onNavigateToDiscover={() => handleTabChange("discover")}
@@ -776,7 +782,6 @@ export const CampusConnectApp: React.FC = () => {
                 />
               )}
             </>
-          )}
         </main>
 
         {/* 4. MOBILE BOTTOM NAVIGATION BAR (< 768px) */}
