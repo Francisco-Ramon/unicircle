@@ -552,58 +552,64 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setCommentInputs({ ...commentInputs, [postId]: "" });
   };
 
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+
   const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() || isSubmittingPost) return;
+    setIsSubmittingPost(true);
     const postTitle = newPostContent.substring(0, 45);
 
-    let uploadedImageUrl = newPostImage;
-    if (postFileInputRef.current?.files?.[0]) {
-      const liveUploaded = await uploadToStorage(postFileInputRef.current.files[0], "post_images");
-      if (liveUploaded) uploadedImageUrl = liveUploaded;
+    try {
+      let uploadedImageUrl = newPostImage;
+      if (postFileInputRef.current?.files?.[0]) {
+        const liveUploaded = await uploadToStorage(postFileInputRef.current.files[0], "post_images");
+        if (liveUploaded) uploadedImageUrl = liveUploaded;
+      }
+
+      const livePost = await createLivePost({
+        content: newPostContent.trim(),
+        campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
+        imageUrl: uploadedImageUrl || undefined,
+      });
+
+      const studentName = userProfile?.firstName
+        ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
+        : "Verified Student";
+      const studentAvatar = userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+
+      const formatted: CommunityPost = {
+        id: livePost?.id || `post-${Date.now()}`,
+        authorName: studentName,
+        authorAvatar: studentAvatar,
+        authorCourse: `${userProfile?.course || "Student"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+        timeAgo: "Just now",
+        content: newPostContent.trim(),
+        image: uploadedImageUrl || undefined,
+        likes: 0,
+        commentsCount: 0,
+        userLiked: false,
+        comments: [],
+      };
+
+      updatePosts([formatted, ...posts.filter((p) => p.id !== formatted.id)]);
+      setNewPostContent("");
+      setNewPostImage("");
+      setShowNewPost(false);
+
+      // Dispatch community_post notification if preference is ON
+      const prefs = await fetchNotificationPreferences();
+      dispatchAppNotification({
+        type: "community_post",
+        fromName: activeInst?.name || "Campus Community",
+        fromAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
+        fromUniversity: activeInst?.name || "University of Nairobi",
+        message: `posted: '${postTitle}${newPostContent.length > 45 ? "..." : ""}'`,
+      }, prefs);
+    } catch (err) {
+      console.warn("Post creation error:", err);
+    } finally {
+      setIsSubmittingPost(false);
     }
-
-    const { data: authUser } = await supabase.auth.getUser();
-    const effectiveAuthor = authUser?.user?.id || userProfile?.id || getLocalUserId();
-    const livePost = await createLivePost({
-      authorId: effectiveAuthor,
-      content: newPostContent.trim(),
-      campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
-      imageUrl: uploadedImageUrl || undefined,
-    });
-
-    const studentName = userProfile?.firstName
-      ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
-      : "Verified Student";
-    const studentAvatar = userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
-
-    const formatted: CommunityPost = {
-      id: livePost?.id || `post-${Date.now()}`,
-      authorName: studentName,
-      authorAvatar: studentAvatar,
-      authorCourse: `${userProfile?.course || "Student"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
-      timeAgo: "Just now",
-      content: newPostContent.trim(),
-      image: uploadedImageUrl || undefined,
-      likes: 0,
-      commentsCount: 0,
-      userLiked: false,
-      comments: [],
-    };
-
-    updatePosts([formatted, ...posts.filter((p) => p.id !== formatted.id)]);
-    setNewPostContent("");
-    setNewPostImage("");
-    setShowNewPost(false);
-
-    // Dispatch community_post notification if preference is ON
-    const prefs = await fetchNotificationPreferences();
-    dispatchAppNotification({
-      type: "community_post",
-      fromName: activeInst?.name || "Campus Community",
-      fromAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
-      fromUniversity: activeInst?.name || "University of Nairobi",
-      message: `posted: '${postTitle}${newPostContent.length > 45 ? "..." : ""}'`,
-    }, prefs);
   };
 
   const toggleEventRsvp = (eventId: string) => {
