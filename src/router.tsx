@@ -34,23 +34,32 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
         )}
         <div className="mt-6 flex items-center justify-center gap-3">
           <button
+            type="button"
             onClick={() => {
-              router.invalidate();
-              reset();
+              if (typeof window !== "undefined") {
+                window.location.reload();
+              } else {
+                router.invalidate();
+                reset();
+              }
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 cursor-pointer shadow-lg shadow-indigo-600/30"
+            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 cursor-pointer shadow-lg shadow-indigo-600/30 active:scale-95"
           >
             Try Again
           </button>
           <button
+            type="button"
             onClick={() => {
               if (typeof window !== "undefined") {
                 localStorage.removeItem("unicircle_community_posts");
                 localStorage.removeItem("unicircle_community_events");
-                window.location.href = "/app#home";
+                window.location.href = "/app";
+                setTimeout(() => {
+                  window.location.reload();
+                }, 100);
               }
             }}
-            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-white/5 cursor-pointer"
+            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-white/5 cursor-pointer active:scale-95"
           >
             Reset Feed & Reload
           </button>
