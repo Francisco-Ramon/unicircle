@@ -456,8 +456,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
               </div>
 
               {post.image && (
-                <div onClick={onNavigateToCommunity} className="rounded-2xl overflow-hidden max-h-64 cursor-pointer">
-                  <img src={post.image} alt="Post attachment" className="w-full object-cover" />
+                <div onClick={onNavigateToCommunity} className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center max-h-[500px] cursor-pointer">
+                  <img src={post.image} alt="Post attachment" className="w-full max-h-[500px] object-contain rounded-2xl" />
                 </div>
               )}
 

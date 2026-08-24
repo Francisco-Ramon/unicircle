@@ -896,8 +896,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               </div>
 
               {newPostImage && (
-                <div className="relative group rounded-xl overflow-hidden border border-white/10">
-                  <img src={newPostImage} alt="Attached preview" className="w-full max-h-56 object-cover rounded-xl" />
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center max-h-80">
+                  <img src={newPostImage} alt="Attached preview" className="w-full max-h-80 object-contain rounded-2xl" />
                   <div className="absolute top-2 right-2 flex items-center gap-1.5">
                     <button
                       type="button"
@@ -1099,7 +1099,13 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 {/* Post image */}
                 {post.image && (
                   <div className="px-4 pb-3">
-                    <img src={post.image} alt="Post attachment" className="w-full rounded-xl object-cover max-h-72" />
+                    <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center max-h-[550px]">
+                      <img
+                        src={post.image}
+                        alt="Post attachment"
+                        className="w-full max-h-[550px] object-contain rounded-2xl"
+                      />
+                    </div>
                   </div>
                 )}
 
