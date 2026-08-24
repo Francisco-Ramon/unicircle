@@ -1,10 +1,18 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft } from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
 import {
   dispatchAppNotification,
   fetchNotificationPreferences,
 } from "@/lib/notificationService";
+import {
+  sendLiveChatMessage,
+  fetchConversationMessages,
+  subscribeToLiveMessages,
+  uploadToStorage,
+  getOrCreateConversation,
+} from "@/lib/supabaseLiveService";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ChatMessage {
   id: string;
@@ -49,11 +57,76 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const currentMatch = (navState?.tab === "chat" && navState.matchId)
+    ? (matches.find((m) => m.id === navState.matchId) || activeMatch || matches[0] || null)
+    : (activeMatch || matches[0] || null);
+
+  // Connect to Supabase Realtime Conversation for the active match
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    async function initLiveChat() {
+      if (!currentMatch) return;
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user && currentMatch.id.length > 10) {
+          const convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
+          if (convId) {
+            setActiveConversationId(convId);
+            const liveMsgs = await fetchConversationMessages(convId);
+            if (liveMsgs && liveMsgs.length > 0) {
+              const formatted: ChatMessage[] = liveMsgs.map((m) => ({
+                id: m.id,
+                senderId: m.sender_id === authData.user.id ? "me" : currentMatch.id,
+                text: m.content,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                isRead: m.is_read,
+                type: m.media_url ? "image" : "text",
+                mediaUrl: m.media_url,
+              }));
+              setMessagesMap((prev) => ({
+                ...prev,
+                [currentMatch.id]: formatted,
+              }));
+            }
+
+            // Subscribe to live incoming WebSocket messages
+            unsubscribe = subscribeToLiveMessages(convId, (newLiveMsg) => {
+              const incoming: ChatMessage = {
+                id: newLiveMsg.id,
+                senderId: newLiveMsg.sender_id === authData.user.id ? "me" : currentMatch.id,
+                text: newLiveMsg.content,
+                timestamp: new Date(newLiveMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                isRead: newLiveMsg.is_read,
+                type: newLiveMsg.media_url ? "image" : "text",
+                mediaUrl: newLiveMsg.media_url,
+              };
+              setMessagesMap((prev) => ({
+                ...prev,
+                [currentMatch.id]: [...(prev[currentMatch.id] || []).filter((x) => x.id !== incoming.id), incoming],
+              }));
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not connect to live chat room:", err);
+      }
+    }
+
+    initLiveChat();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [currentMatch?.id]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0 && currentMatch) {
-      const fileUrl = URL.createObjectURL(files[0]);
+      const file = files[0];
+      const publicUrl = await uploadToStorage(file, "chat_media");
+      const fileUrl = publicUrl || URL.createObjectURL(file);
+
       const imgMsg: ChatMessage = {
         id: `img-${Date.now()}`,
         senderId: "me",
@@ -63,16 +136,26 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
         type: "image",
         mediaUrl: fileUrl,
       };
+
       setMessagesMap((prev) => ({
         ...prev,
         [currentMatch.id]: [...(prev[currentMatch.id] || []), imgMsg],
       }));
+
+      // Send to Supabase if live
+      if (activeConversationId) {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          await sendLiveChatMessage({
+            conversationId: activeConversationId,
+            senderId: authData.user.id,
+            content: "Shared a photo",
+            mediaUrl: publicUrl || undefined,
+          });
+        }
+      }
     }
   };
-
-  const currentMatch = (navState?.tab === "chat" && navState.matchId)
-    ? (matches.find((m) => m.id === navState.matchId) || activeMatch || matches[0] || null)
-    : (activeMatch || matches[0] || null);
 
   const activeMessages = currentMatch ? (messagesMap[currentMatch.id] || []) : [];
   const mobileView = (navState?.tab === "chat" && (navState.chatView === "chat" || navState.matchId)) ? "chat" : "list";
@@ -90,12 +173,13 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim() || !currentMatch) return;
+    const textToSend = inputText.trim();
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       senderId: "me",
-      text: inputText.trim(),
+      text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isRead: true,
       type: "text",
@@ -105,37 +189,49 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
     setMessagesMap(updated);
     setInputText("");
 
-    // Simulate response after 1.5s
-    setTimeout(async () => {
-      const autoReplies = [
-        "That sounds awesome! Let me check my lecture schedule! 😊",
-        "Haha totally agree! See you on campus!",
-        "Definitely! Let's grab coffee at the student union! ☕",
-      ];
-      const replyText = autoReplies[Math.floor(Math.random() * autoReplies.length)];
-      const replyMsg: ChatMessage = {
-        id: `msg-reply-${Date.now()}`,
-        senderId: currentMatch.id,
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        isRead: true,
-        type: "text",
-      };
-      setMessagesMap((prev) => ({
-        ...prev,
-        [currentMatch.id]: [...(prev[currentMatch.id] || []), replyMsg],
-      }));
+    // Send to Supabase live database
+    if (activeConversationId) {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        await sendLiveChatMessage({
+          conversationId: activeConversationId,
+          senderId: authData.user.id,
+          content: textToSend,
+        });
+      }
+    } else {
+      // Simulate demo fallback response after 1.5s
+      setTimeout(async () => {
+        const autoReplies = [
+          "That sounds awesome! Let me check my lecture schedule! 😊",
+          "Haha totally agree! See you on campus!",
+          "Definitely! Let's grab coffee at the student union! ☕",
+        ];
+        const replyText = autoReplies[Math.floor(Math.random() * autoReplies.length)];
+        const replyMsg: ChatMessage = {
+          id: `msg-reply-${Date.now()}`,
+          senderId: currentMatch.id,
+          text: replyText,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isRead: true,
+          type: "text",
+        };
+        setMessagesMap((prev) => ({
+          ...prev,
+          [currentMatch.id]: [...(prev[currentMatch.id] || []), replyMsg],
+        }));
 
-      // Dispatch direct message notification if preference is ON
-      const prefs = await fetchNotificationPreferences();
-      dispatchAppNotification({
-        type: "direct_message",
-        fromName: currentMatch.name,
-        fromAvatar: currentMatch.photos[0],
-        fromUniversity: currentMatch.campus,
-        message: `sent you a message: "${replyText.substring(0, 35)}..."`,
-      }, prefs);
-    }, 1500);
+        // Dispatch direct message notification if preference is ON
+        const prefs = await fetchNotificationPreferences();
+        dispatchAppNotification({
+          type: "direct_message",
+          fromName: currentMatch.name,
+          fromAvatar: currentMatch.photos[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          fromUniversity: currentMatch.campus,
+          message: replyText,
+        }, prefs);
+      }, 1500);
+    }
   };
 
   const handleSendVoiceNote = () => {

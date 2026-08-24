@@ -357,3 +357,179 @@ export async function recordLiveSwipe(params: {
     return { isMatch: false };
   }
 }
+
+// --------------------------------------------------------------------------
+// 6. LIVE REAL-TIME CHAT & CONVERSATIONS
+// --------------------------------------------------------------------------
+export interface LiveConversation {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  last_message: string;
+  last_message_time: string;
+  otherUser?: LiveProfile;
+}
+
+export interface LiveMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  media_url?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function fetchUserConversations(userId: string): Promise<LiveConversation[]> {
+  try {
+    const { data, error } = await (supabase
+      .from("conversations" as any)
+      .select("*")
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .order("last_message_time", { ascending: false })) as any;
+
+    if (error) {
+      console.warn("Error fetching conversations:", error.message);
+      return [];
+    }
+
+    const conversations = (data || []) as LiveConversation[];
+    
+    // Enrich with other user's profile
+    const enriched = await Promise.all(
+      conversations.map(async (c) => {
+        const otherId = c.user1_id === userId ? c.user2_id : c.user1_id;
+        const otherProf = await getLiveProfile(otherId);
+        return {
+          ...c,
+          otherUser: otherProf || undefined,
+        };
+      })
+    );
+
+    return enriched;
+  } catch (err) {
+    console.error("Error in fetchUserConversations:", err);
+    return [];
+  }
+}
+
+export async function getOrCreateConversation(user1Id: string, user2Id: string): Promise<string | null> {
+  try {
+    // Check existing
+    const { data: existing } = await (supabase
+      .from("conversations" as any)
+      .select("id")
+      .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id}),and(user1_id.eq.${user2Id},user2_id.eq.${user1Id})`)
+      .maybeSingle() as any);
+
+    if (existing) return existing.id;
+
+    // Create new
+    const { data: created, error } = await (supabase
+      .from("conversations" as any)
+      .insert({
+        user1_id: user1Id,
+        user2_id: user2Id,
+        last_message: "Started a new conversation 👋",
+        last_message_time: new Date().toISOString(),
+      })
+      .select("id")
+      .single() as any);
+
+    if (error) {
+      console.error("Failed to create conversation:", error);
+      return null;
+    }
+    return created.id;
+  } catch (err) {
+    console.error("Error in getOrCreateConversation:", err);
+    return null;
+  }
+}
+
+export async function fetchConversationMessages(conversationId: string): Promise<LiveMessage[]> {
+  try {
+    const { data, error } = await (supabase
+      .from("messages" as any)
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })) as any;
+
+    if (error) {
+      console.warn("Error fetching messages:", error.message);
+      return [];
+    }
+    return (data || []) as LiveMessage[];
+  } catch (err) {
+    console.error("Error in fetchConversationMessages:", err);
+    return [];
+  }
+}
+
+export async function sendLiveChatMessage(params: {
+  conversationId: string;
+  senderId: string;
+  content: string;
+  mediaUrl?: string;
+}): Promise<LiveMessage | null> {
+  try {
+    const { data, error } = await (supabase
+      .from("messages" as any)
+      .insert({
+        conversation_id: params.conversationId,
+        sender_id: params.senderId,
+        content: params.content,
+        media_url: params.mediaUrl || null,
+        is_read: false,
+      })
+      .select()
+      .single() as any);
+
+    if (error) {
+      console.error("Failed to send message:", error);
+      return null;
+    }
+
+    // Update conversation last_message
+    await (supabase
+      .from("conversations" as any)
+      .update({
+        last_message: params.content,
+        last_message_time: new Date().toISOString(),
+      })
+      .eq("id", params.conversationId) as any);
+
+    return data as LiveMessage;
+  } catch (err) {
+    console.error("Error in sendLiveChatMessage:", err);
+    return null;
+  }
+}
+
+export function subscribeToLiveMessages(
+  conversationId: string,
+  onNewMessage: (msg: LiveMessage) => void
+) {
+  const channel = supabase
+    .channel(`chat_${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        if (payload.new) {
+          onNewMessage(payload.new as LiveMessage);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
