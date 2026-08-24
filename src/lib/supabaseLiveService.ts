@@ -216,63 +216,143 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
 }
 
 export async function createLivePost(params: {
-  authorId: string;
+  authorId?: string;
   content: string;
   campus: string;
   imageUrl?: string;
 }): Promise<LivePost | null> {
   try {
+    const { data: authData } = await supabase.auth.getUser();
+    const effectiveAuthorId = authData?.user?.id || params.authorId;
     const titleSnippet = params.content.substring(0, 50);
 
     // 1. Try inserting to community_posts
-    const { data: commData, error: commErr } = await (supabase
-      .from("community_posts" as any)
-      .insert({
-        author_id: params.authorId,
-        university_name: params.campus,
-        title: titleSnippet,
-        content: params.content,
-        category: "General",
-        image_url: params.imageUrl || null,
-      })
-      .select()
-      .single() as any);
+    if (effectiveAuthorId) {
+      const { data: commData, error: commErr } = await (supabase
+        .from("community_posts" as any)
+        .insert({
+          author_id: effectiveAuthorId,
+          university_name: params.campus,
+          title: titleSnippet,
+          content: params.content,
+          category: "General",
+          image_url: params.imageUrl || null,
+        })
+        .select()
+        .single() as any);
 
-    if (!commErr && commData) {
-      return {
-        id: commData.id,
-        author_id: commData.author_id,
-        campus: commData.university_name,
-        content: commData.content,
-        image_url: commData.image_url,
-        likes_count: commData.likes_count || 0,
-        comments_count: 0,
-        created_at: commData.created_at,
-      };
+      if (!commErr && commData) {
+        return {
+          id: commData.id,
+          author_id: commData.author_id,
+          campus: commData.university_name,
+          content: commData.content,
+          image_url: commData.image_url,
+          likes_count: commData.likes_count || 0,
+          comments_count: 0,
+          created_at: commData.created_at,
+        };
+      }
     }
 
     // 2. Fallback to posts table
-    const { data: postData, error: postErr } = await (supabase
-      .from("posts" as any)
-      .insert({
-        author_id: params.authorId,
-        campus: params.campus,
-        content: params.content,
-        image_url: params.imageUrl || null,
-      })
-      .select()
-      .single() as any);
+    if (effectiveAuthorId) {
+      const { data: postData, error: postErr } = await (supabase
+        .from("posts" as any)
+        .insert({
+          author_id: effectiveAuthorId,
+          campus: params.campus,
+          content: params.content,
+          image_url: params.imageUrl || null,
+        })
+        .select()
+        .single() as any);
 
-    if (postErr) {
-      console.warn("Could not insert post:", postErr.message);
-      return null;
+      if (!postErr && postData) {
+        return postData as LivePost;
+      }
     }
 
-    return postData as LivePost;
+    return null;
   } catch (err) {
-    console.error("Failed to create post:", err);
+    console.error("Failed to create post in Supabase:", err);
     return null;
   }
+}
+
+export function subscribeToLiveCommunity(callbacks: {
+  onNewPost?: (post: LivePost) => void;
+  onNewEvent?: (event: LiveEvent) => void;
+}) {
+  const channel = supabase
+    .channel("unicircle-live-feed-channel")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "community_posts" },
+      (payload) => {
+        const p: any = payload.new;
+        if (callbacks.onNewPost) {
+          callbacks.onNewPost({
+            id: p.id,
+            author_id: p.author_id,
+            campus: p.university_name || "University",
+            content: p.content || p.title || "",
+            image_url: p.image_url || null,
+            likes_count: p.likes_count || 0,
+            comments_count: p.comments_count || 0,
+            created_at: p.created_at,
+          });
+        }
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "posts" },
+      (payload) => {
+        const p: any = payload.new;
+        if (callbacks.onNewPost) {
+          callbacks.onNewPost({
+            id: p.id,
+            author_id: p.author_id,
+            campus: p.campus || "University",
+            content: p.content || "",
+            image_url: p.image_url || null,
+            likes_count: p.likes_count || 0,
+            comments_count: 0,
+            created_at: p.created_at,
+          });
+        }
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "events" },
+      (payload) => {
+        const ev: any = payload.new;
+        if (callbacks.onNewEvent) {
+          callbacks.onNewEvent({
+            id: ev.id,
+            creator_id: ev.creator_id || ev.organizer_id || "",
+            campus: ev.campus || ev.university_name || "Campus",
+            title: ev.title,
+            category: ev.category || "Party",
+            date: ev.date || ev.event_date || "Upcoming",
+            time: ev.time || ev.event_time || "TBA",
+            location: ev.location || ev.venue || "Campus",
+            image: ev.image || ev.cover_photo || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
+            description: ev.description || "",
+            redirect_url: ev.redirect_url || ev.registration_link || null,
+            rsvp_count: ev.rsvp_count || 1,
+            created_at: ev.created_at,
+          });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
 
 export async function toggleLiveLike(postId: string, userId: string, isCurrentlyLiked: boolean): Promise<boolean> {

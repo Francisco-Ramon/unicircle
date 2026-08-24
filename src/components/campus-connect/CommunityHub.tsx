@@ -18,6 +18,7 @@ import {
   fetchLiveEvents,
   createLiveEvent,
   uploadToStorage,
+  subscribeToLiveCommunity,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -282,6 +283,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   // Load live posts & events from Supabase and merge
   useEffect(() => {
     let isMounted = true;
+    let unsubscribe: (() => void) | undefined;
+
     async function loadLiveData() {
       try {
         const [livePostsData, liveEventsData] = await Promise.all([
@@ -293,9 +296,11 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           if (livePostsData && livePostsData.length > 0) {
             const formattedPosts: CommunityPost[] = livePostsData.map((lp) => ({
               id: lp.id,
-              authorName: `${lp.profiles?.first_name || "Alex"} ${lp.profiles?.last_name || "Chen"}`,
-              authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-              authorCourse: `${lp.profiles?.course || "Computer Science"} • ${lp.profiles?.year_of_study || "3rd Year"}`,
+              authorName: lp.profiles?.first_name
+                ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
+                : "Verified Student",
+              authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+              authorCourse: `${lp.profiles?.course || "Student"} • ${lp.profiles?.year_of_study || "3rd Year"}`,
               timeAgo: new Date(lp.created_at).toLocaleDateString(),
               content: lp.content,
               image: lp.image_url,
@@ -346,12 +351,74 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             });
           }
         }
+
+        // Realtime Subscription across all students
+        unsubscribe = subscribeToLiveCommunity({
+          onNewPost: (newLivePost) => {
+            const incomingPost: CommunityPost = {
+              id: newLivePost.id,
+              authorName: newLivePost.profiles?.first_name
+                ? `${newLivePost.profiles.first_name} ${newLivePost.profiles.last_name || ""}`.trim()
+                : "Verified Student",
+              authorAvatar: newLivePost.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+              authorCourse: "Campus Student",
+              timeAgo: "Just now",
+              content: newLivePost.content,
+              image: newLivePost.image_url,
+              likes: 0,
+              commentsCount: 0,
+              userLiked: false,
+              comments: [],
+            };
+
+            setPosts((prev) => {
+              const dedupe = prev.filter((p) => p.id !== incomingPost.id);
+              const next = [incomingPost, ...dedupe];
+              if (typeof window !== "undefined") {
+                localStorage.setItem("unicircle_community_posts", JSON.stringify(next));
+              }
+              return next;
+            });
+          },
+          onNewEvent: (newLiveEvent) => {
+            const incomingEvt: CampusEvent = {
+              id: newLiveEvent.id,
+              title: newLiveEvent.title,
+              category: newLiveEvent.category as any,
+              date: newLiveEvent.date,
+              time: newLiveEvent.time,
+              location: newLiveEvent.location,
+              campus: newLiveEvent.campus,
+              organizer: "Campus Student",
+              rsvpCount: 1,
+              maxCapacity: 200,
+              userRsvpd: false,
+              image: newLiveEvent.image,
+              description: newLiveEvent.description,
+              redirectUrl: newLiveEvent.redirect_url,
+              attendees: [],
+              comments: [],
+            };
+
+            setCommunityEvents((prev) => {
+              const dedupe = prev.filter((e) => e.id !== incomingEvt.id);
+              const next = [incomingEvt, ...dedupe];
+              if (typeof window !== "undefined") {
+                localStorage.setItem("unicircle_community_events", JSON.stringify(next));
+              }
+              return next;
+            });
+          },
+        });
       } catch (err) {
         console.warn("Could not load Supabase live feed, using cached initial posts:", err);
       }
     }
     loadLiveData();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [activeInst.name]);
 
   const openCommunityEventDetail = (evt: CampusEvent) => {
@@ -495,46 +562,33 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
 
     const { data: authUser } = await supabase.auth.getUser();
-    if (authUser?.user) {
-      const livePost = await createLivePost({
-        authorId: authUser.user.id,
-        content: newPostContent,
-        campus: activeInst?.name || "University of Nairobi",
-        imageUrl: uploadedImageUrl || undefined,
-      });
-      if (livePost) {
-        const formatted: CommunityPost = {
-          id: livePost.id,
-          authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
-          authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-          authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
-          timeAgo: "Just now",
-          content: livePost.content,
-          image: livePost.image_url || undefined,
-          likes: 0,
-          commentsCount: 0,
-          userLiked: false,
-          comments: [],
-        };
-        updatePosts([formatted, ...posts]);
-      }
-    } else {
-      const newPost: CommunityPost = {
-        id: `post-${Date.now()}`,
-        authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
-        authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-        authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
-        timeAgo: "Just now",
-        content: newPostContent,
-        image: uploadedImageUrl || undefined,
-        likes: 0,
-        commentsCount: 0,
-        userLiked: false,
-        comments: [],
-      };
-      updatePosts([newPost, ...posts]);
-    }
+    const livePost = await createLivePost({
+      authorId: authUser?.user?.id,
+      content: newPostContent.trim(),
+      campus: activeInst?.name || userProfile?.campus || "University of Nairobi",
+      imageUrl: uploadedImageUrl || undefined,
+    });
 
+    const studentName = userProfile?.firstName
+      ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
+      : "Verified Student";
+    const studentAvatar = userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+
+    const formatted: CommunityPost = {
+      id: livePost?.id || `post-${Date.now()}`,
+      authorName: studentName,
+      authorAvatar: studentAvatar,
+      authorCourse: `${userProfile?.course || "Student"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+      timeAgo: "Just now",
+      content: newPostContent.trim(),
+      image: uploadedImageUrl || undefined,
+      likes: 0,
+      commentsCount: 0,
+      userLiked: false,
+      comments: [],
+    };
+
+    updatePosts([formatted, ...posts.filter((p) => p.id !== formatted.id)]);
     setNewPostContent("");
     setNewPostImage("");
     setShowNewPost(false);
