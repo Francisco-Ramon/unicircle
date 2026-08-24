@@ -646,20 +646,26 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       updatePosts([formatted, ...posts.filter((p) => p.id !== formatted.id)]);
       setNewPostContent("");
       setNewPostImage("");
+      if (postFileInputRef.current) {
+        postFileInputRef.current.value = "";
+      }
       setShowNewPost(false);
       toast.success("Post published to campus!");
 
       // Dispatch community_post notification if preference is ON
-      const prefs = await fetchNotificationPreferences();
-      dispatchAppNotification({
-        type: "community_post",
-        fromName: activeInst?.name || "Campus Community",
-        fromAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
-        fromUniversity: activeInst?.name || "University of Nairobi",
-        message: `posted: '${postTitle}${newPostContent.length > 45 ? "..." : ""}'`,
-      }, prefs);
-    } catch (err) {
+      try {
+        const prefs = await fetchNotificationPreferences();
+        dispatchAppNotification({
+          type: "community_post",
+          fromName: activeInst?.name || "Campus Community",
+          fromAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80",
+          fromUniversity: activeInst?.name || "University of Nairobi",
+          message: `posted: '${postTitle}${newPostContent.length > 45 ? "..." : ""}'`,
+        }, prefs);
+      } catch (e) {}
+    } catch (err: any) {
       console.warn("Post creation error:", err);
+      toast.error(err?.message || "Failed to publish post. Please check your connection and try again.");
     } finally {
       setIsSubmittingPost(false);
     }

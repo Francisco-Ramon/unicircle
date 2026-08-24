@@ -139,42 +139,110 @@ export async function ensureAuthenticatedUser(): Promise<string> {
 }
 
 // --------------------------------------------------------------------------
-// 1. STORAGE: Upload Media (Avatars, Post Images, Event Flyers)
+// 1. STORAGE: Upload Media with Client-Side Compression (Avatars, Posts, Events)
 // --------------------------------------------------------------------------
+async function compressImageFile(file: File, maxDim = 1400, quality = 0.82): Promise<{ file: File; base64: string }> {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith("image/")) {
+      resolve({ file, base64: "" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      if (!src || typeof window === "undefined" || !window.Image) {
+        resolve({ file, base64: src || "" });
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve({ file, base64: src });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+              });
+              resolve({ file: compressedFile, base64: compressedBase64 });
+            } else {
+              resolve({ file, base64: compressedBase64 });
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => resolve({ file, base64: src });
+      img.src = src;
+    };
+    reader.onerror = () => resolve({ file, base64: "" });
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function uploadToStorage(
   file: File,
-  bucket: "avatars" | "post_images" | "event_posters" | "chat_media" = "avatars"
+  bucket: "avatars" | "post_images" | "event_posters" | "chat_media" = "post_images"
 ): Promise<string> {
-  const fileToBase64 = (f: File): Promise<string> =>
-    new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(f);
-    });
-
   try {
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const cleanExt = fileExt.replace(/[^a-zA-Z0-9]/g, "");
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${cleanExt}`;
+    // 1. Ensure authenticated user session
+    await ensureAuthenticatedUser();
+
+    // 2. Compress image on client to speed up upload & prevent payload limits
+    const { file: optimizedFile, base64: fallbackBase64 } = await compressImageFile(file);
+
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.jpg`;
     const filePath = `${fileName}`;
 
-    const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, {
+    // 3. Upload to Supabase Storage with 6s timeout race
+    const uploadPromise = supabase.storage.from(bucket).upload(filePath, optimizedFile, {
       cacheControl: "3600",
       upsert: true,
-      contentType: file.type || "image/jpeg",
+      contentType: "image/jpeg",
     });
 
-    if (error) {
-      return await fileToBase64(file);
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error("Storage upload timeout")), 6000)
+    );
+
+    const { data, error } = (await Promise.race([uploadPromise, timeoutPromise])) as any;
+
+    if (!error && data?.path) {
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
     }
 
-    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
-    if (publicUrlData?.publicUrl) {
-      return publicUrlData.publicUrl;
-    }
-    return await fileToBase64(file);
+    return fallbackBase64;
   } catch (err) {
-    return await fileToBase64(file);
+    console.warn("Storage upload notice:", err);
+    try {
+      const { base64 } = await compressImageFile(file, 800, 0.7);
+      return base64;
+    } catch {
+      return "";
+    }
   }
 }
 
