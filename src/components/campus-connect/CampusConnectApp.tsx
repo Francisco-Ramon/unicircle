@@ -79,14 +79,20 @@ export const CampusConnectApp: React.FC = () => {
 
   // Global Sign Out Handler: Clears all user session and state
   const handleSignOut = async () => {
-    await signOutUser();
+    try {
+      await signOutUser();
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.hash = "";
+    }
     setUserProfile(null);
     setIsRegistered(false);
     setIsBiometricVerified(false);
     setShowVerificationStudio(false);
-    if (typeof window !== "undefined") {
-      window.location.href = "/auth?logged_out=1";
-    }
+    setActiveTab("home");
+    setShowUserDropdown(false);
   };
 
   // Load and sync real logged-in user profile from Supabase
