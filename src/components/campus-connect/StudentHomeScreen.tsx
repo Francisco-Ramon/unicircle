@@ -145,17 +145,17 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
     const posts = communityPosts.filter(
       (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.content.toLowerCase().includes(q) ||
-        p.authorName.toLowerCase().includes(q) ||
-        p.campus.toLowerCase().includes(q)
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.content && p.content.toLowerCase().includes(q)) ||
+        (p.authorName && p.authorName.toLowerCase().includes(q)) ||
+        (p.campus && p.campus.toLowerCase().includes(q))
     );
 
     const events = upcomingEvents.filter(
       (e) =>
-        e.title.toLowerCase().includes(q) ||
-        e.venue.toLowerCase().includes(q) ||
-        e.organizer.toLowerCase().includes(q)
+        (e.title && e.title.toLowerCase().includes(q)) ||
+        ((e.venue || (e as any).location) && (e.venue || (e as any).location).toLowerCase().includes(q)) ||
+        (e.organizer && e.organizer.toLowerCase().includes(q))
     );
 
     return { students, posts, events };
@@ -283,9 +283,9 @@ export const StudentHomeScreen: React.FC<Props> = ({
                       >
                         <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-bold text-white truncate">{post.title}</h4>
+                          <h4 className="text-xs font-bold text-white truncate">{post.title || post.content}</h4>
                           <p className="text-[11px] text-slate-400 truncate">{post.authorName} • {post.campus}</p>
-                          <p className="text-[10px] text-slate-500">❤️ {post.likes} • 💬 {post.comments}</p>
+                          <p className="text-[10px] text-slate-500">❤️ {post.likes || 0} • 💬 {Array.isArray(post.comments) ? post.comments.length : (post.commentsCount || (typeof post.comments === 'number' ? post.comments : 0))}</p>
                         </div>
                         <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                       </button>
@@ -460,7 +460,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
               <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-white/10">
                 <span>❤️ {post.likes || 0} Likes</span>
-                <span>💬 {post.comments || post.commentsCount || 0} Comments</span>
+                <span>💬 {Array.isArray(post.comments) ? post.comments.length : (post.commentsCount || (typeof post.comments === 'number' ? post.comments : 0))} Comments</span>
               </div>
             </div>
           );
