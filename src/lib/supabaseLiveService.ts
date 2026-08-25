@@ -141,7 +141,7 @@ export async function ensureAuthenticatedUser(): Promise<string> {
 // --------------------------------------------------------------------------
 // 1. STORAGE: Upload Media with Client-Side Compression (Avatars, Posts, Events)
 // --------------------------------------------------------------------------
-async function compressImageFile(file: File, maxDim = 1400, quality = 0.82): Promise<{ file: File; base64: string }> {
+export async function compressImageFile(file: File, maxDim = 1400, quality = 0.82): Promise<{ file: File; base64: string }> {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith("image/")) {
       resolve({ file, base64: "" });
@@ -205,10 +205,24 @@ export async function uploadToStorage(
   bucket: "avatars" | "post_images" | "event_posters" | "chat_media" = "post_images"
 ): Promise<string> {
   try {
-    // 1. Ensure authenticated user session
+    // 1. Try Firebase Cloud Storage first if configured
+    try {
+      const { uploadToFirebaseStorage, isFirebaseConfigured } = await import("./firebaseStorage");
+      if (isFirebaseConfigured) {
+        const folder = bucket === "avatars" ? "avatars" : bucket === "event_posters" ? "events" : "posts";
+        const fbUrl = await uploadToFirebaseStorage(file, folder);
+        if (fbUrl) {
+          return fbUrl;
+        }
+      }
+    } catch (fbErr) {
+      console.warn("Firebase Storage fallback to Supabase:", fbErr);
+    }
+
+    // 2. Ensure authenticated user session for Supabase
     await ensureAuthenticatedUser();
 
-    // 2. Compress image on client to speed up upload & prevent payload limits
+    // 3. Compress image on client to speed up upload & prevent payload limits
     const { file: optimizedFile, base64: fallbackBase64 } = await compressImageFile(file);
 
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.jpg`;
