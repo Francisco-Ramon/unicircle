@@ -692,7 +692,7 @@ export const CampusConnectApp: React.FC = () => {
 
       {/* 3. CENTER COLUMN MAIN CONTENT WRAPPER */}
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
-        <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0">
+        <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0 pb-24 lg:pb-6">
           <>
             {activeTab === "home" && (
                 <StudentHomeScreen
@@ -784,35 +784,51 @@ export const CampusConnectApp: React.FC = () => {
             </>
         </main>
 
-        {/* 4. MOBILE BOTTOM NAVIGATION BAR (< 768px) */}
-        {isRegistered && (
-          <div className={`md:hidden sticky bottom-0 z-40 backdrop-blur-xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 ${
-            themeMode === "light" ? "bg-white/95 border-slate-200 shadow-lg" : "bg-[#0B0F17]/95 border-white/10"
-          }`}>
-            {[
-              { id: "home", label: "Home", icon: Home },
-              { id: "discover", label: "Discover", icon: Search },
-              { id: "communities", label: "Communities", icon: Users },
-              { id: "events", label: "Events", icon: Calendar },
-              { id: "chat", label: "Chats", icon: MessageSquare },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id as any)}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition ${
-                    isActive ? "text-indigo-400 font-extrabold" : "text-slate-500 hover:text-slate-300"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${isActive ? "text-indigo-400" : ""}`} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* 4. MOBILE & TABLET BOTTOM NAVIGATION BAR (< 1024px) */}
+        <div className={`lg:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-2xl px-2 py-2 flex items-center justify-around border-t transition-colors duration-300 shadow-2xl ${
+          themeMode === "light"
+            ? "bg-white/95 border-slate-200 text-slate-700 shadow-slate-900/10"
+            : "bg-[#0B0F17]/95 border-white/10 text-slate-400 shadow-black"
+        }`}>
+          {[
+            { id: "home", label: "Home", icon: Home },
+            { id: "discover", label: "Discover", icon: Search },
+            { id: "communities", label: "Community", icon: Users },
+            { id: "events", label: "Events", icon: Calendar },
+            { id: "chat", label: "Chats", icon: MessageSquare, badge: matches.length > 0 ? matches.length : undefined },
+            { id: "notifications", label: "Alerts", icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id || (tab.id === "notifications" && activeTab === "alerts");
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id as any)}
+                className={`relative flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? "text-indigo-400 font-black scale-105"
+                    : themeMode === "light"
+                    ? "text-slate-500 hover:text-slate-900"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <div className="relative">
+                  <Icon className={`w-5 h-5 transition-transform ${isActive ? "text-indigo-400 stroke-[2.5]" : ""}`} />
+                  {tab.badge !== undefined && (
+                    <span className="absolute -top-1.5 -right-2 px-1.5 py-0.2 rounded-full bg-pink-500 text-white text-[8px] font-black min-w-[15px] h-[15px] flex items-center justify-center border border-slate-950">
+                      {tab.badge > 9 ? "9+" : tab.badge}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] tracking-tight">{tab.label}</span>
+                {isActive && (
+                  <span className="absolute -bottom-0.5 w-4 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 5. DESKTOP RIGHT CONTEXTUAL PANEL (Visible on xl >= 1280px) */}
