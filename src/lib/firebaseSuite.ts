@@ -4,14 +4,14 @@ import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, onSna
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { compressImageFile } from "./supabaseLiveService";
 
-// Firebase Configuration from environment variables
+// Firebase Configuration from environment variables with fallback
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBBBSSZhhRIeZiX-_9yn6iPOYfBGR2SLIk",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "unicircle-5d9cc.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "unicircle-5d9cc",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "unicircle-5d9cc.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "39665974829",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:39665974829:web:83ab5116356635fc54c2a4",
 };
 
 export const isFirebaseConfigured = Boolean(
