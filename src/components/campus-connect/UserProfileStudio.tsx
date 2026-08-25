@@ -33,6 +33,15 @@ export const UserProfileStudio: React.FC<Props> = ({
   const [bio, setBio] = useState(profile.bio || "CS major passionate about neural networks, late night coffee runs, and weekend hiking trips.");
   const [isEditing, setIsEditing] = useState(false);
   const [showUniSearch, setShowUniSearch] = useState(false);
+  const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+
+  const [firstName, setFirstName] = useState(profile.firstName || "Student");
+  const [lastName, setLastName] = useState(profile.lastName || "");
+  const [course, setCourse] = useState(profile.course || "Computer Science");
+  const [yearOfStudy, setYearOfStudy] = useState(profile.yearOfStudy || "3rd Year");
+  const [gender, setGender] = useState(profile.gender || "Male");
+  const [relationshipGoal, setRelationshipGoal] = useState(profile.relationshipGoal || "Friendship");
+  const [interestsInput, setInterestsInput] = useState(profile.interests ? profile.interests.join(", ") : "Campus Events, Tech");
 
   // Sync state whenever parent profile updates (e.g. from Supabase)
   React.useEffect(() => {
@@ -42,7 +51,39 @@ export const UserProfileStudio: React.FC<Props> = ({
     if (profile.bio) {
       setBio(profile.bio);
     }
-  }, [profile.photos, profile.bio]);
+    if (profile.firstName) setFirstName(profile.firstName);
+    if (profile.lastName) setLastName(profile.lastName);
+    if (profile.course) setCourse(profile.course);
+    if (profile.yearOfStudy) setYearOfStudy(profile.yearOfStudy);
+    if (profile.gender) setGender(profile.gender);
+    if (profile.relationshipGoal) setRelationshipGoal(profile.relationshipGoal);
+    if (profile.interests) setInterestsInput(profile.interests.join(", "));
+  }, [profile]);
+
+  const handleSaveFullDetails = () => {
+    const updatedInterests = interestsInput
+      .split(",")
+      .map((i) => i.trim())
+      .filter(Boolean);
+
+    const updatedProfile: StudentProfileData = {
+      ...profile,
+      firstName: firstName.trim() || "Student",
+      lastName: lastName.trim(),
+      nickname: firstName.trim() || "Student",
+      course: course.trim() || "Student",
+      yearOfStudy,
+      gender: gender as any,
+      relationshipGoal,
+      interests: updatedInterests.length > 0 ? updatedInterests : ["Campus Events", "Networking"],
+      bio,
+      photos,
+    };
+
+    onUpdateProfile(updatedProfile);
+    setShowEditDetailsModal(false);
+    toast.success("Profile details updated and broadcasted to campus network!");
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -173,7 +214,15 @@ export const UserProfileStudio: React.FC<Props> = ({
                 <p className="text-xs text-slate-400 mt-0.5">{profile.course} • {profile.yearOfStudy}</p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                <button
+                  onClick={() => setShowEditDetailsModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer"
+                  title="Edit your name, course, goals, and details"
+                >
+                  <Edit3 className="w-4 h-4" /> Edit Profile
+                </button>
+
                 <button
                   onClick={handleShareProfile}
                   className="px-3.5 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-xs font-bold text-indigo-300 transition flex items-center gap-1.5 shadow-md cursor-pointer"
@@ -391,6 +440,148 @@ export const UserProfileStudio: React.FC<Props> = ({
           }}
           onClose={() => setShowUniSearch(false)}
         />
+      )}
+      {showEditDetailsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-indigo-400" /> Edit Student Profile
+              </h3>
+              <button
+                onClick={() => setShowEditDetailsModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* First Name & Last Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">First Name</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="e.g. Jomba"
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Last Name</label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="e.g. Otieno"
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Course / Degree */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Major / Course</label>
+                <input
+                  type="text"
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  placeholder="e.g. Computer Science, Law, Medicine"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Year of Study & Gender */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Year of Study</label>
+                  <select
+                    value={yearOfStudy}
+                    onChange={(e) => setYearOfStudy(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="Postgraduate">Postgraduate</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Gender</label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-Binary">Non-Binary</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Relationship Goal */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Campus Goal</label>
+                <select
+                  value={relationshipGoal}
+                  onChange={(e) => setRelationshipGoal(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="Friendship">Friendship & Study Buddies</option>
+                  <option value="Dating">Campus Dating & Romance</option>
+                  <option value="Networking">Career & Startup Networking</option>
+                  <option value="Anything">Open to Anything</option>
+                </select>
+              </div>
+
+              {/* Interests */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Interests & Hobbies (comma separated)</label>
+                <input
+                  type="text"
+                  value={interestsInput}
+                  onChange={(e) => setInterestsInput(e.target.value)}
+                  placeholder="e.g. Tech, Football, Debate, Music"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Bio Description */}
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Bio / Introduction</label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={3}
+                  placeholder="Tell campus about yourself..."
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowEditDetailsModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveFullDetails}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-xs font-bold text-white transition shadow-lg shadow-indigo-600/30 cursor-pointer"
+              >
+                Save & Update Profile
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
