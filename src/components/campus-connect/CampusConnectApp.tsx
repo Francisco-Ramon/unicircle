@@ -220,8 +220,10 @@ export const CampusConnectApp: React.FC = () => {
     }
 
     try {
-      const syncUser = await ensureAuthenticatedUser();
-      const syncId = syncUser?.id || (updated as any).id || userProfile?.id || getLocalUserId();
+      const syncUserId = await ensureAuthenticatedUser();
+      const syncId = (typeof syncUserId === "string" && syncUserId.includes("-"))
+        ? syncUserId
+        : ((syncUserId as any)?.id || (updated as any).id || userProfile?.id || getLocalUserId());
       await upsertLiveProfile({
         id: syncId,
         first_name: updated.firstName,
