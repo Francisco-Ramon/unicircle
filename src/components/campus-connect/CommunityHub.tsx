@@ -1020,7 +1020,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                     You haven't followed any campus creators yet. Tap <span className="text-indigo-400 font-bold">+ Follow</span> on other students' posts in the Campus Feed to see their posts appear here!
                   </p>
                   <button
-                    onClick={() => setActiveTab("campus")}
+                    onClick={() => setActiveTab("feed")}
                     className="mt-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer"
                   >
                     Explore Campus Feed
