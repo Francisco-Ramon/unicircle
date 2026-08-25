@@ -2,13 +2,15 @@ import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap, UserCheck } from "lucide-react";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-import { fetchLivePosts, fetchLiveEvents, getLocalUserId, subscribeToLiveCommunity } from "@/lib/supabaseLiveService";
+import { fetchLivePosts, fetchLiveEvents, fetchLiveDiscoverProfiles, getLocalUserId, subscribeToLiveCommunity } from "@/lib/supabaseLiveService";
+import { supabase } from "@/integrations/supabase/client";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { SocialController } from "@/lib/social/socialController";
 import { AppNavState } from "@/lib/navigationHistory";
 
 interface Props {
   userProfile: any;
+  liveProfiles?: any[];
   onNavigateToDiscover: () => void;
   onNavigateToEvents: () => void;
   onNavigateToCommunity: () => void;
@@ -17,6 +19,7 @@ interface Props {
 
 export const StudentHomeScreen: React.FC<Props> = ({
   userProfile,
+  liveProfiles = [],
   onNavigateToDiscover,
   onNavigateToEvents,
   onNavigateToCommunity,
@@ -38,6 +41,24 @@ export const StudentHomeScreen: React.FC<Props> = ({
   }, []);
 
   const activeFriends = TWENTY_STUDENT_PROFILES.slice(0, 5);
+
+  const [liveStudents, setLiveStudents] = useState<any[]>(() => {
+    if (liveProfiles && liveProfiles.length > 0) {
+      return liveProfiles.map((p) => ({
+        id: p.id,
+        name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
+        campus: p.campus || "University of Nairobi",
+        course: p.course || "Student",
+        year: p.year_of_study || "3rd Year",
+        photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
+        interests: p.interests || ["Campus Life", "Tech"],
+        bio: p.bio || "",
+        verified: true,
+        online: p.is_online || false,
+      }));
+    }
+    return [];
+  });
 
   const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
@@ -85,11 +106,32 @@ export const StudentHomeScreen: React.FC<Props> = ({
     },
   ]);
 
-  // Load live posts and events on mount + Realtime Subscription
+  // Load live students, posts, and events on mount + Realtime Subscriptions
   useEffect(() => {
     let isMounted = true;
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribePosts: (() => void) | undefined;
 
+    // 1. Fetch live database students from Supabase profiles
+    fetchLiveDiscoverProfiles().then((profs) => {
+      if (!isMounted) return;
+      if (profs && profs.length > 0) {
+        const formattedStudents = profs.map((p) => ({
+          id: p.id,
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
+          campus: p.campus || "University of Nairobi",
+          course: p.course || "Student",
+          year: p.year_of_study || "3rd Year",
+          photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
+          interests: p.interests || ["Campus Life", "Tech"],
+          bio: p.bio || "",
+          verified: true,
+          online: p.is_online || false,
+        }));
+        setLiveStudents(formattedStudents);
+      }
+    }).catch(() => {});
+
+    // 2. Fetch live posts and events
     Promise.all([fetchLivePosts(), fetchLiveEvents()]).then(([livePosts, liveEvents]) => {
       if (!isMounted) return;
       if (livePosts && livePosts.length > 0) {
@@ -130,8 +172,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
       }
     }).catch((err) => console.warn("HomeScreen live load:", err));
 
-    // Realtime Community Posts listener on Home Screen
-    unsubscribe = subscribeToLiveCommunity({
+    // 3. Realtime Community Posts listener
+    unsubscribePosts = subscribeToLiveCommunity({
       onNewPost: (newLivePost) => {
         if (!isMounted) return;
         const incomingPost = {
@@ -163,26 +205,61 @@ export const StudentHomeScreen: React.FC<Props> = ({
       },
     });
 
+    // 4. Realtime profiles listener: newly registered students appear in search instantly
+    const profileChannel = supabase
+      .channel("unicircle-profiles-realtime-search")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        (payload) => {
+          const p: any = payload.new;
+          if (p && p.id && isMounted) {
+            const formattedItem = {
+              id: p.id,
+              name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
+              campus: p.campus || "University of Nairobi",
+              course: p.course || "Student",
+              year: p.year_of_study || "3rd Year",
+              photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
+              interests: p.interests || ["Campus Life", "Tech"],
+              bio: p.bio || "",
+              verified: true,
+              online: p.is_online || false,
+            };
+            setLiveStudents((prev) => [formattedItem, ...prev.filter((item) => item.id !== formattedItem.id)]);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
-      if (unsubscribe) unsubscribe();
+      if (unsubscribePosts) unsubscribePosts();
+      supabase.removeChannel(profileChannel);
     };
   }, []);
 
-  // ─── Search Logic ───
+  // ─── Search Logic Across Live Supabase Database & Profiles ───
   const q = searchQuery.trim().toLowerCase();
   const hasQuery = q.length > 0;
 
   const searchResults = useMemo(() => {
     if (!hasQuery) return { students: [], posts: [], events: [] };
 
-    const students = TWENTY_STUDENT_PROFILES.filter(
+    // Combine live database profiles and student dataset, deduplicating
+    const allStudentsPool = [
+      ...liveStudents,
+      ...TWENTY_STUDENT_PROFILES.filter((s) => !liveStudents.some((ls) => ls.id === s.id || ls.name.toLowerCase() === s.name.toLowerCase())),
+    ];
+
+    const students = allStudentsPool.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
-        s.campus.toLowerCase().includes(q) ||
-        s.course.toLowerCase().includes(q) ||
-        s.interests.some((i) => i.toLowerCase().includes(q))
-    ).slice(0, 6);
+        (s.campus && s.campus.toLowerCase().includes(q)) ||
+        (s.course && s.course.toLowerCase().includes(q)) ||
+        (s.bio && s.bio.toLowerCase().includes(q)) ||
+        (s.interests && s.interests.some((i: string) => i.toLowerCase().includes(q)))
+    ).slice(0, 8);
 
     const posts = communityPosts.filter(
       (p) =>
@@ -200,7 +277,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
     );
 
     return { students, posts, events };
-  }, [q]);
+  }, [q, liveStudents, communityPosts, upcomingEvents]);
 
   const totalResults = searchResults.students.length + searchResults.posts.length + searchResults.events.length;
   const showDropdown = isSearchFocused && hasQuery;

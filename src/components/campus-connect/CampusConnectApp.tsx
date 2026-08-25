@@ -220,23 +220,27 @@ export const CampusConnectApp: React.FC = () => {
     }
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) {
-        await upsertLiveProfile({
-          id: authData.user.id,
-          first_name: updated.firstName,
-          last_name: updated.lastName,
-          campus: updated.campus,
-          country: updated.country,
-          course: updated.course,
-          year_of_study: updated.yearOfStudy,
-          bio: updated.bio,
-          photos: updated.photos,
-          interests: updated.interests,
-          gender: updated.gender,
-          interested_in: updated.interestedIn,
-          verified: updated.verified,
-        });
+      const syncUser = await ensureAuthenticatedUser();
+      const syncId = syncUser?.id || (updated as any).id || userProfile?.id || getLocalUserId();
+      await upsertLiveProfile({
+        id: syncId,
+        first_name: updated.firstName,
+        last_name: updated.lastName,
+        campus: updated.campus,
+        country: updated.country,
+        course: updated.course,
+        year_of_study: updated.yearOfStudy,
+        bio: updated.bio,
+        photos: updated.photos,
+        interests: updated.interests,
+        gender: updated.gender,
+        interested_in: updated.interestedIn,
+        verified: updated.verified ?? true,
+      });
+
+      const refreshed = await fetchLiveDiscoverProfiles(syncId);
+      if (refreshed && refreshed.length > 0) {
+        setLiveProfiles(refreshed);
       }
     } catch (err) {
       console.warn("Could not push profile updates to Supabase:", err);
@@ -697,6 +701,7 @@ export const CampusConnectApp: React.FC = () => {
             {activeTab === "home" && (
                 <StudentHomeScreen
                   userProfile={userProfile}
+                  liveProfiles={liveProfiles}
                   onNavigateToDiscover={() => handleTabChange("discover")}
                   onNavigateToEvents={() => handleTabChange("events")}
                   onNavigateToCommunity={() => handleTabChange("communities")}
