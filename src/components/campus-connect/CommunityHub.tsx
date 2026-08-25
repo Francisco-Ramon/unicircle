@@ -20,6 +20,7 @@ import {
   createLiveEvent,
   uploadToStorage,
   subscribeToLiveCommunity,
+  fetchLiveDiscoverProfiles,
   getLocalUserId,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
@@ -267,6 +268,11 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
   const [eventCommentInput, setEventCommentInput] = useState("");
 
+  // Verified Community Members & Profile Modal State
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [selectedMemberProfile, setSelectedMemberProfile] = useState<any | null>(null);
+  const [liveCommunityMembers, setLiveCommunityMembers] = useState<any[]>([]);
+
   // Sync posts to localStorage
   const updatePosts = (newPosts: CommunityPost[]) => {
     setPosts(newPosts);
@@ -291,19 +297,38 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
   };
 
-  // Load live posts & events from Supabase and merge
+  // Load live posts, events & verified members from Supabase
   useEffect(() => {
     let isMounted = true;
     let unsubscribe: (() => void) | undefined;
 
     async function loadLiveData() {
       try {
-        const [livePostsData, liveEventsData] = await Promise.all([
+        const [livePostsData, liveEventsData, liveProfs] = await Promise.all([
           fetchLivePosts(activeInst.name),
           fetchLiveEvents(activeInst.name),
+          fetchLiveDiscoverProfiles(),
         ]);
 
         if (isMounted) {
+          if (liveProfs && liveProfs.length > 0) {
+            const formattedMembers = liveProfs.map((p) => ({
+              id: p.id,
+              name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
+              age: 21,
+              campus: p.campus || activeInst.name,
+              country: p.country || "Kenya",
+              course: p.course || "Student",
+              yearOfStudy: p.year_of_study || "3rd Year",
+              photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
+              interests: p.interests || ["Campus Life", "Tech"],
+              bio: p.bio || "Student on UniCircle looking to connect with peers!",
+              verified: true,
+              online: p.is_online || true,
+              gender: p.gender || "Female",
+            }));
+            setLiveCommunityMembers(formattedMembers);
+          }
           if (livePostsData && livePostsData.length > 0) {
             const formattedPosts: CommunityPost[] = livePostsData.map((lp) => ({
               id: lp.id,
@@ -1338,31 +1363,89 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       {activeTab === "members" && (
         <div className="space-y-4">
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
-              placeholder={`Search ${activeInst.shortName} students...`}
-              className="w-full bg-slate-900/80 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              value={memberSearchQuery}
+              onChange={(e) => setMemberSearchQuery(e.target.value)}
+              placeholder={`Search ${activeInst.shortName} verified members...`}
+              className="w-full bg-slate-900/80 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 shadow-md"
             />
           </div>
 
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Online Now</h3>
-          <div className="space-y-1">
-            {TWENTY_STUDENT_PROFILES.slice(0, 6).map((student) => (
-              <div key={student.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.03] transition">
-                <div className="relative">
-                  <img src={student.photos[0]} alt={student.name} className="w-10 h-10 rounded-xl object-cover" />
-                  {student.online && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-950" />}
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Verified Members ({activeInst.shortName})
+            </h3>
+            <span className="text-[11px] text-indigo-400 font-semibold">
+              {(() => {
+                const q = memberSearchQuery.trim().toLowerCase();
+                const all = [
+                  ...liveCommunityMembers,
+                  ...TWENTY_STUDENT_PROFILES.filter((s) => !liveCommunityMembers.some((lm) => lm.id === s.id || lm.name.toLowerCase() === s.name.toLowerCase())),
+                ];
+                const filtered = q ? all.filter((s) => s.name.toLowerCase().includes(q) || (s.course && s.course.toLowerCase().includes(q))) : all;
+                return `${filtered.length} students`;
+              })()}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {(() => {
+              const q = memberSearchQuery.trim().toLowerCase();
+              const allMembers = [
+                ...liveCommunityMembers,
+                ...TWENTY_STUDENT_PROFILES.filter((s) => !liveCommunityMembers.some((lm) => lm.id === s.id || lm.name.toLowerCase() === s.name.toLowerCase())),
+              ];
+              const filteredMembers = q
+                ? allMembers.filter((s) =>
+                    s.name.toLowerCase().includes(q) ||
+                    (s.course && s.course.toLowerCase().includes(q)) ||
+                    (s.campus && s.campus.toLowerCase().includes(q)) ||
+                    (s.interests && s.interests.some((i: string) => i.toLowerCase().includes(q)))
+                  )
+                : allMembers;
+
+              if (filteredMembers.length === 0) {
+                return (
+                  <div className="text-center py-10 bg-slate-900/40 rounded-2xl border border-white/5">
+                    <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                    <p className="text-xs text-slate-400">No members found matching "{memberSearchQuery}"</p>
+                  </div>
+                );
+              }
+
+              return filteredMembers.map((student) => (
+                <div
+                  key={student.id}
+                  onClick={() => setSelectedMemberProfile(student)}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-slate-900/60 border border-white/[0.04] hover:bg-white/[0.06] hover:border-indigo-500/30 transition cursor-pointer group"
+                >
+                  <div className="relative shrink-0">
+                    <img src={student.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600"} alt={student.name} className="w-11 h-11 rounded-xl object-cover" />
+                    {student.online && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-950" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5 truncate group-hover:text-indigo-300 transition-colors">
+                      {student.name}{student.age ? `, ${student.age}` : ""}
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    </h4>
+                    <p className="text-[11px] text-slate-400 truncate">{student.course} • {student.yearOfStudy || "Student"}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{student.campus}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMemberProfile(student);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 text-xs font-bold hover:bg-indigo-600 hover:text-white transition shadow-sm cursor-pointer shrink-0"
+                  >
+                    View Profile
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-white truncate">{student.name}, {student.age}</h4>
-                  <p className="text-[11px] text-slate-500 truncate">{student.course} • {student.yearOfStudy}</p>
-                </div>
-                <button className="px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 text-[11px] font-bold hover:bg-indigo-600 hover:text-white transition">
-                  View
-                </button>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -1701,6 +1784,118 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. INDIVIDUAL VERIFIED MEMBER PROFILE MODAL */}
+      {selectedMemberProfile && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl my-8 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedMemberProfile(null)}
+              className="absolute top-3.5 right-3.5 z-20 p-2 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black/80 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Profile Hero Photo */}
+            <div className="relative h-64 w-full overflow-hidden bg-slate-950">
+              <img
+                src={selectedMemberProfile.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"}
+                alt={selectedMemberProfile.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-black/30" />
+
+              <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-white flex items-center gap-1.5">
+                    {selectedMemberProfile.name}{selectedMemberProfile.age ? `, ${selectedMemberProfile.age}` : ""}
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  </h3>
+                  <p className="text-xs text-indigo-300 font-semibold flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {selectedMemberProfile.campus}
+                  </p>
+                </div>
+
+                {selectedMemberProfile.online && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold">
+                    Online Now
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Profile Details Body */}
+            <div className="p-5 space-y-4 text-xs">
+              <div className="space-y-1 bg-slate-950/60 p-3 rounded-2xl border border-white/5">
+                <p className="text-slate-400 font-medium">
+                  📚 Course: <span className="text-slate-200 font-bold">{selectedMemberProfile.course}</span> ({selectedMemberProfile.yearOfStudy || "Undergraduate"})
+                </p>
+                {selectedMemberProfile.country && (
+                  <p className="text-slate-400 font-medium">
+                    🌍 Country: <span className="text-slate-200 font-bold">{selectedMemberProfile.country}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Bio */}
+              <div>
+                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">About</h4>
+                <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/40 p-3 rounded-2xl border border-white/5 whitespace-pre-wrap">
+                  {selectedMemberProfile.bio || `Verified student at ${activeInst.name}. Passionate about campus connections!`}
+                </p>
+              </div>
+
+              {/* Interests */}
+              {selectedMemberProfile.interests && selectedMemberProfile.interests.length > 0 && (
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Interests</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedMemberProfile.interests.map((interest: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] font-semibold"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedMemberProfile(null);
+                    if (onNavigate) {
+                      onNavigate({ tab: "chat" });
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Say Hello / Chat
+                </button>
+
+                <button
+                  onClick={() => {
+                    const profId = selectedMemberProfile.id;
+                    setSelectedMemberProfile(null);
+                    if (onNavigate) {
+                      onNavigate({ tab: "discover", profileId: profId, profileView: "details" });
+                    }
+                  }}
+                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  Discovery
+                </button>
               </div>
             </div>
           </div>
