@@ -56,135 +56,8 @@ interface CommunityPost {
   comments: PostComment[];
 }
 
-const INITIAL_POSTS: CommunityPost[] = [
-  {
-    id: "p1",
-    authorId: "author_brian_omondi",
-    authorName: "Brian Omondi",
-    authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-    authorCourse: "Medicine & Surgery • 4th Year",
-    timeAgo: "2 hours ago",
-    content: "Setting up a weekend study group for 3rd & 4th year med students at the Chiromo Campus library. All verified students welcome! 🩺📚",
-    likes: 42,
-    commentsCount: 2,
-    userLiked: false,
-    comments: [
-      {
-        id: "c1-1",
-        authorName: "Mercy Mwangi",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-        authorCourse: "Nursing • 3rd Year",
-        timeAgo: "1 hour ago",
-        content: "Count me in! What time are we meeting on Saturday?",
-        likes: 5,
-        userLiked: true,
-      },
-      {
-        id: "c1-2",
-        authorName: "Kevin Wafula",
-        authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
-        authorCourse: "Computer Science • 3rd Year",
-        timeAgo: "30 mins ago",
-        content: "Can CS majors tag along for quiet study? Lib gets packed on weekends!",
-        likes: 2,
-        userLiked: false,
-      }
-    ]
-  },
-  {
-    id: "p2",
-    authorId: "author_amani_wanjiru",
-    authorName: "Amani Wanjiru",
-    authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-    authorCourse: "Law • 2nd Year",
-    timeAgo: "5 hours ago",
-    content: "Inter-Hall Debate Competition next Tuesday at Taifa Hall! 🏆 Come support Hall 9 vs Hall 4. Registration closes Friday.",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
-    likes: 68,
-    commentsCount: 1,
-    userLiked: true,
-    comments: [
-      {
-        id: "c2-1",
-        authorName: "Dennis Kipchumba",
-        authorAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80",
-        authorCourse: "Economics • 2nd Year",
-        timeAgo: "3 hours ago",
-        content: "Hall 9 taking the trophy home for sure 🔥🔥",
-        likes: 12,
-        userLiked: false,
-      }
-    ]
-  },
-  {
-    id: "p3",
-    authorId: "author_kevin_wafula",
-    authorName: "Kevin Wafula",
-    authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
-    authorCourse: "Computer Science • 3rd Year",
-    timeAgo: "8 hours ago",
-    content: "Just finished my first AI project using TensorFlow! Looking for teammates for the upcoming East Africa AI Challenge. Drop a comment if interested 💡",
-    likes: 35,
-    commentsCount: 2,
-    userLiked: false,
-    comments: [
-      {
-        id: "c3-1",
-        authorName: "Alex Chen",
-        authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-        authorCourse: "Computer Science & AI • 3rd Year",
-        timeAgo: "6 hours ago",
-        content: "Definitely interested! I work with PyTorch and NLP models. Sent you a DM on UniCircle!",
-        likes: 8,
-        userLiked: true,
-      },
-      {
-        id: "c3-2",
-        authorName: "Fatuma Hassan",
-        authorAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
-        authorCourse: "Software Engineering • 4th Year",
-        timeAgo: "4 hours ago",
-        content: "Need a UI/UX designer for the project pitch presentation?",
-        likes: 4,
-        userLiked: false,
-      }
-    ]
-  },
-];
-
-const INITIAL_COMMUNITY_EVENTS: CampusEvent[] = [
-  {
-    id: "ce1",
-    title: "Taifa Hall Debate & Cultural Night 🏆",
-    category: "Party",
-    date: "Tue, Aug 18",
-    time: "6:00 PM - 10:00 PM",
-    location: "Taifa Hall, Main Campus",
-    campus: "University of Nairobi",
-    organizer: "UoN Debating Society",
-    rsvpCount: 145,
-    maxCapacity: 300,
-    userRsvpd: true,
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
-    description: "Annual debate showdown followed by music and networking! Register using the link below if you are a contestant.",
-    redirectUrl: "https://forms.gle/uon-debate-registration",
-    attendees: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
-    ],
-    comments: [
-      {
-        id: "cec-1",
-        authorName: "Amani Wanjiru",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-        content: "Make sure to register via the Google Form redirect link before Friday!",
-        timeAgo: "3 hours ago",
-        likes: 9,
-        userLiked: true
-      }
-    ]
-  }
-];
+const INITIAL_POSTS: CommunityPost[] = [];
+const INITIAL_COMMUNITY_EVENTS: CampusEvent[] = [];
 
 import { AppNavState } from "@/lib/navigationHistory";
 
@@ -1034,28 +907,54 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               return true;
             });
 
-            if (activeTab === "following" && visiblePosts.length === 0) {
+            if (visiblePosts.length === 0) {
+              if (activeTab === "following") {
+                return (
+                  <div className="text-center py-12 px-6 bg-slate-900/60 rounded-3xl border border-white/10 space-y-3 my-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">No Posts in Following Feed Yet</h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                      You haven't followed any campus creators yet. Tap <span className="text-indigo-400 font-bold">+ Follow</span> on other students' posts in the Campus Feed to see their posts appear here!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("feed");
+                        if (typeof window !== "undefined") {
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                      }}
+                      className="mt-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Explore Campus Feed</span>
+                    </button>
+                  </div>
+                );
+              }
               return (
                 <div className="text-center py-12 px-6 bg-slate-900/60 rounded-3xl border border-white/10 space-y-3 my-4">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
-                    <Users className="w-6 h-6" />
+                    <MessageSquare className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-white">No Posts in Following Feed Yet</h3>
+                  <h3 className="text-base font-bold text-white">No Campus Posts Yet</h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                    You haven't followed any campus creators yet. Tap <span className="text-indigo-400 font-bold">+ Follow</span> on other students' posts in the Campus Feed to see their posts appear here!
+                    Be the first student to share an update, start a discussion, or post a photo on campus!
                   </p>
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab("feed");
+                      setShowNewPost(true);
                       if (typeof window !== "undefined") {
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }
                     }}
                     className="mt-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
                   >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Explore Campus Feed</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create First Post</span>
                   </button>
                 </div>
               );
@@ -1393,10 +1292,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           <div className="space-y-2">
             {(() => {
               const q = memberSearchQuery.trim().toLowerCase();
-              const allMembers = [
-                ...liveCommunityMembers,
-                ...TWENTY_STUDENT_PROFILES.filter((s) => !liveCommunityMembers.some((lm) => lm.id === s.id || lm.name.toLowerCase() === s.name.toLowerCase())),
-              ];
+              const allMembers = liveCommunityMembers;
               const filteredMembers = q
                 ? allMembers.filter((s) =>
                     s.name.toLowerCase().includes(q) ||

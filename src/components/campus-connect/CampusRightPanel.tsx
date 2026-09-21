@@ -1,18 +1,20 @@
 import React from "react";
 import { Users, Calendar, ShieldCheck, Sparkles, MapPin, ChevronRight, UserPlus, ArrowRight, Activity } from "lucide-react";
-import { TWENTY_STUDENT_PROFILES, StudentProfile } from "./StudentProfilesDataset";
-import { SAMPLE_EVENTS, CampusEvent } from "./CampusEventsHub";
+import { StudentProfile } from "./DiscoverDeck";
+import { CampusEvent } from "./CampusEventsHub";
 import { AppNavState } from "@/lib/navigationHistory";
 
 interface Props {
   onNavigate: (state: AppNavState) => void;
   userProfile?: any;
+  liveProfiles?: any[];
+  liveEvents?: any[];
   themeMode?: "light" | "dark" | "system";
 }
 
-export const CampusRightPanel: React.FC<Props> = ({ onNavigate, userProfile, themeMode = "dark" }) => {
-  const suggestedProfiles = TWENTY_STUDENT_PROFILES.slice(0, 4);
-  const upcomingEvents = SAMPLE_EVENTS.slice(0, 3);
+export const CampusRightPanel: React.FC<Props> = ({ onNavigate, userProfile, liveProfiles = [], liveEvents = [], themeMode = "dark" }) => {
+  const suggestedProfiles = liveProfiles.slice(0, 4);
+  const upcomingEvents = liveEvents.slice(0, 3);
 
   const isLight = themeMode === "light";
 
@@ -63,39 +65,43 @@ export const CampusRightPanel: React.FC<Props> = ({ onNavigate, userProfile, the
         </div>
 
         <div className="space-y-3">
-          {suggestedProfiles.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2.5 group">
-              <div
-                onClick={() => onNavigate({ tab: "discover" })}
-                className="flex items-center gap-2.5 min-w-0 cursor-pointer"
-              >
-                <div className="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10">
-                  <img src={p.photos[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
-                  {p.verified && (
-                    <span className="absolute bottom-0 right-0 p-0.5 bg-emerald-500 rounded-full text-slate-950">
-                      <ShieldCheck className="w-2.5 h-2.5" />
-                    </span>
-                  )}
+          {suggestedProfiles.length === 0 ? (
+            <p className="text-[11px] text-slate-400 py-2 text-center">No other students registered yet</p>
+          ) : (
+            suggestedProfiles.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-2.5 group">
+                <div
+                  onClick={() => onNavigate({ tab: "discover" })}
+                  className="flex items-center gap-2.5 min-w-0 cursor-pointer"
+                >
+                  <div className="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10">
+                    <img src={p.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600"} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                    {p.verified && (
+                      <span className="absolute bottom-0 right-0 p-0.5 bg-emerald-500 rounded-full text-slate-950">
+                        <ShieldCheck className="w-2.5 h-2.5" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className={`text-xs font-bold truncate group-hover:text-indigo-400 transition ${
+                      isLight ? "text-slate-900" : "text-white"
+                    }`}>
+                      {p.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">{p.course} • {p.campus}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h4 className={`text-xs font-bold truncate group-hover:text-indigo-400 transition ${
-                    isLight ? "text-slate-900" : "text-white"
-                  }`}>
-                    {p.name}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 truncate">{p.course} • {p.campus}</p>
-                </div>
-              </div>
 
-              <button
-                onClick={() => onNavigate({ tab: "discover" })}
-                className="p-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition shrink-0 cursor-pointer"
-                title="Connect"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+                <button
+                  onClick={() => onNavigate({ tab: "discover" })}
+                  className="p-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition shrink-0 cursor-pointer"
+                  title="Connect"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -119,30 +125,34 @@ export const CampusRightPanel: React.FC<Props> = ({ onNavigate, userProfile, the
         </div>
 
         <div className="space-y-3">
-          {upcomingEvents.map((evt) => (
-            <div
-              key={evt.id}
-              onClick={() => onNavigate({ tab: "events", eventId: evt.id })}
-              className={`p-3 rounded-2xl border transition cursor-pointer group ${
-                isLight ? "bg-white border-slate-200 hover:border-indigo-400" : "bg-slate-950/60 border-white/5 hover:border-white/20"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 text-[9px] font-bold">
-                  {evt.category}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">{evt.date}</span>
+          {upcomingEvents.length === 0 ? (
+            <p className="text-[11px] text-slate-400 py-2 text-center">No upcoming events scheduled</p>
+          ) : (
+            upcomingEvents.map((evt) => (
+              <div
+                key={evt.id}
+                onClick={() => onNavigate({ tab: "events", eventId: evt.id })}
+                className={`p-3 rounded-2xl border transition cursor-pointer group ${
+                  isLight ? "bg-white border-slate-200 hover:border-indigo-400" : "bg-slate-950/60 border-white/5 hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 text-[9px] font-bold">
+                    {evt.category}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">{evt.date}</span>
+                </div>
+                <h4 className={`text-xs font-bold mt-1.5 truncate group-hover:text-indigo-400 transition ${
+                  isLight ? "text-slate-900" : "text-white"
+                }`}>
+                  {evt.title}
+                </h4>
+                <p className="text-[10px] text-slate-400 truncate mt-0.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-slate-500 shrink-0" /> {evt.location}
+                </p>
               </div>
-              <h4 className={`text-xs font-bold mt-1.5 truncate group-hover:text-indigo-400 transition ${
-                isLight ? "text-slate-900" : "text-white"
-              }`}>
-                {evt.title}
-              </h4>
-              <p className="text-[10px] text-slate-400 truncate mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-slate-500 shrink-0" /> {evt.location}
-              </p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 

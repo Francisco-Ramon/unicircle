@@ -315,8 +315,8 @@ export const CampusConnectApp: React.FC = () => {
   };
 
   // Connections State
-  const [matches, setMatches] = useState<StudentProfile[]>([TWENTY_STUDENT_PROFILES[0], TWENTY_STUDENT_PROFILES[1], TWENTY_STUDENT_PROFILES[3]]);
-  const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(TWENTY_STUDENT_PROFILES[0]);
+  const [matches, setMatches] = useState<StudentProfile[]>([]);
+  const [activeChatMatch, setActiveChatMatch] = useState<StudentProfile | null>(null);
   const [celebratedMatch, setCelebratedMatch] = useState<StudentProfile | null>(null);
   const [liveProfiles, setLiveProfiles] = useState<StudentProfile[]>([]);
 
@@ -714,7 +714,7 @@ export const CampusConnectApp: React.FC = () => {
               {activeTab === "discover" && (
                 <DiscoverDeck
                   currentProfile={userProfile}
-                  profiles={[...liveProfiles, ...TWENTY_STUDENT_PROFILES.filter((s) => !liveProfiles.some((lp) => lp.id === s.id))]}
+                  profiles={liveProfiles}
                   onSwipeLike={handleSwipeLike}
                   onSwipePass={handleSwipePass}
                   onSwipeSuperLike={handleSwipeSuperLike}
@@ -843,6 +843,7 @@ export const CampusConnectApp: React.FC = () => {
           <CampusRightPanel
             onNavigate={handleNavigate}
             userProfile={userProfile}
+            liveProfiles={liveProfiles}
             themeMode={themeMode}
           />
         </div>

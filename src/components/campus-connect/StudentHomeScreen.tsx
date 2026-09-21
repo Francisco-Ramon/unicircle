@@ -40,7 +40,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const activeFriends = TWENTY_STUDENT_PROFILES.slice(0, 5);
+  const activeFriends = liveStudents.slice(0, 5);
 
   const [liveStudents, setLiveStudents] = useState<any[]>(() => {
     if (liveProfiles && liveProfiles.length > 0) {
@@ -70,41 +70,10 @@ export const StudentHomeScreen: React.FC<Props> = ({
         }
       } catch (e) {}
     }
-    return [
-      {
-        id: "hp1",
-        authorName: "Amani Wanjiru",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-        campus: "University of Nairobi",
-        timeAgo: "2 hours ago",
-        title: "Inter-Hall Debate Competition Next Tuesday! 🏆",
-        content: "Main Campus Taifa Hall will be hosting the annual Inter-Hall Moots. Come support Hall 9 vs Hall 4!",
-        likes: 68,
-        comments: 24,
-      },
-    ];
+    return [];
   });
 
-  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([
-    {
-      id: "he1",
-      title: "Nairobi Student Tech Summit 2026",
-      date: "Fri, Aug 14",
-      venue: "UoN Taifa Hall",
-      organizer: "UoN Tech Society",
-      attendeesCount: 340,
-      image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
-    },
-    {
-      id: "he2",
-      title: "Kampala Inter-Campus Music Fest",
-      date: "Sat, Aug 22",
-      venue: "Makerere Freedom Square",
-      organizer: "Mak Guild Council",
-      attendeesCount: 520,
-      image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
-    },
-  ]);
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
   // Load live students, posts, and events on mount + Realtime Subscriptions
   useEffect(() => {
