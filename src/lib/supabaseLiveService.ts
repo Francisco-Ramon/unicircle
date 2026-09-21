@@ -324,25 +324,26 @@ export async function upsertLiveProfile(profile: any): Promise<boolean> {
 // --------------------------------------------------------------------------
 export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
   try {
-    let query = supabase
+    const { data: postsData, error } = await (supabase
       .from("posts" as any)
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (campus && campus !== "All Campuses") {
-      query = query.eq("campus", campus);
-    }
-
-    const { data: postsData, error } = await (query as any);
+      .limit(60) as any);
 
     if (error) {
       console.error("fetchLivePosts error from Supabase:", error);
       return [];
     }
 
-    const rawPosts: any[] = postsData || [];
+    let rawPosts: any[] = postsData || [];
     if (rawPosts.length === 0) return [];
+
+    // Prioritize matching campus posts, followed by other campus posts
+    if (campus && campus !== "All Campuses") {
+      const match = rawPosts.filter((p) => p.campus === campus);
+      const others = rawPosts.filter((p) => p.campus !== campus);
+      rawPosts = [...match, ...others];
+    }
 
     const authorIds = Array.from(new Set(rawPosts.map((p) => p.author_id).filter(Boolean)));
     let authorMap: Record<string, LiveProfile> = {};
@@ -363,7 +364,7 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
       return {
         id: p.id,
         author_id: p.author_id,
-        campus: p.campus || "University",
+        campus: p.campus || "University of Nairobi",
         content: p.content || "",
         image_url: p.image_url || null,
         likes_count: p.likes_count || 0,
@@ -371,12 +372,12 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
         created_at: p.created_at || new Date().toISOString(),
         profiles: author ? {
           id: author.id,
-          first_name: author.first_name,
-          last_name: author.last_name,
-          campus: author.campus || "",
+          first_name: author.first_name || "Verified",
+          last_name: author.last_name || "Student",
+          campus: author.campus || p.campus || "University",
           course: author.course || "Student",
           year_of_study: author.year_of_study || "3rd Year",
-          photos: author.photos || [],
+          photos: (author.photos && author.photos.length > 0) ? author.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600"],
           interests: author.interests || [],
           gender: author.gender || "Female",
           bio: author.bio || "",
