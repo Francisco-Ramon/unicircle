@@ -1,6 +1,11 @@
 import { safeSetItem } from "@/lib/safeStorage";
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft, MessageSquare } from "lucide-react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import {
+  Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2,
+  MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip,
+  ArrowLeft, MessageSquare, Menu, Plus, Users, BellOff, Star,
+  Sparkles, Check, X, Camera, Heart, UserPlus
+} from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
 import {
   dispatchAppNotification,
@@ -14,6 +19,7 @@ import {
   getOrCreateConversation,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
+import { AppNavState } from "@/lib/navigationHistory";
 
 export interface ChatMessage {
   id: string;
@@ -26,7 +32,30 @@ export interface ChatMessage {
   durationSec?: number;
 }
 
-import { AppNavState } from "@/lib/navigationHistory";
+export interface ConversationItem {
+  id: string;
+  name: string;
+  isGroup: boolean;
+  avatar?: string;
+  online?: boolean;
+  isMuted?: boolean;
+  isFavorite?: boolean;
+  unreadCount?: number;
+  lastMessage: string;
+  lastMessageSender?: string;
+  timestamp: string;
+  studentProfile?: StudentProfile;
+}
+
+export interface StoryItem {
+  id: string;
+  userId: string;
+  name: string;
+  avatar: string;
+  hasUnseenStory: boolean;
+  storyImage?: string;
+  storyText?: string;
+}
 
 interface Props {
   activeMatch: StudentProfile | null;
@@ -34,22 +63,288 @@ interface Props {
   onSelectMatch: (match: StudentProfile) => void;
   navState?: AppNavState;
   onNavigate?: (state: AppNavState) => void;
+  onNavigateToDiscover?: () => void;
+  currentUser?: any;
 }
 
-const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
+// Built-in default chat conversations perfectly matching the user's screenshot layout
+const DEFAULT_CONVERSATIONS: ConversationItem[] = [
+  {
+    id: "conv-emma-smith",
+    name: "Emma Smith",
+    isGroup: false,
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80",
+    online: true,
+    isFavorite: true,
+    unreadCount: 2,
+    lastMessage: "Hey! Are we still on for tonight?",
+    timestamp: "09:41 AM",
+    studentProfile: {
+      id: "conv-emma-smith",
+      name: "Emma Smith",
+      age: 21,
+      gender: "Female",
+      campus: "University of Nairobi",
+      course: "Design & Fine Art",
+      yearOfStudy: "3rd Year",
+      distanceKm: 0.8,
+      compatibilityScore: 96,
+      verified: true,
+      online: true,
+      intentMode: "Friendship",
+      photos: [
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80"
+      ],
+      bio: "UI/UX enthusiast, coffee lover, and graphic illustrator. Let's create cool stuff!",
+      interests: ["UI/UX", "Art", "Coffee", "Photography"],
+      prompts: [{ question: "A typical Sunday looks like", answer: "Sketching at an outdoor cafe with matcha latte" }],
+      height: "168 cm",
+      lifestyle: { smoking: "Non-smoker", drinking: "Social drinker" }
+    }
+  },
+  {
+    id: "conv-james-anderson",
+    name: "James Anderson",
+    isGroup: false,
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80",
+    online: true,
+    isFavorite: true,
+    unreadCount: 1,
+    lastMessage: "That was so much fun! 😄",
+    timestamp: "09:30 AM",
+    studentProfile: {
+      id: "conv-james-anderson",
+      name: "James Anderson",
+      age: 22,
+      gender: "Male",
+      campus: "Kenyatta University",
+      course: "Software Engineering",
+      yearOfStudy: "4th Year",
+      distanceKm: 2.1,
+      compatibilityScore: 94,
+      verified: true,
+      online: true,
+      intentMode: "Networking",
+      photos: [
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=80"
+      ],
+      bio: "Full-stack developer & hackathon organizer. Always down for tech talks and hack sprints.",
+      interests: ["React", "AI", "Hackathons", "Cycling"],
+      prompts: [{ question: "My favorite tech stack", answer: "TypeScript, Next.js, and Supabase" }],
+      height: "182 cm",
+      lifestyle: { smoking: "Non-smoker", drinking: "Social drinker" }
+    }
+  },
+  {
+    id: "group-design-squad",
+    name: "Design Squad",
+    isGroup: true,
+    avatar: "",
+    isMuted: true,
+    isFavorite: true,
+    unreadCount: 5,
+    lastMessage: "Here is the latest update",
+    lastMessageSender: "Olivia",
+    timestamp: "08:15 AM",
+  },
+  {
+    id: "conv-olivia-brown",
+    name: "Olivia Brown",
+    isGroup: false,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+    online: false,
+    isFavorite: false,
+    unreadCount: 1,
+    lastMessage: "Can you send me the file?",
+    timestamp: "Yesterday",
+    studentProfile: {
+      id: "conv-olivia-brown",
+      name: "Olivia Brown",
+      age: 20,
+      gender: "Female",
+      campus: "Strathmore University",
+      course: "Business Information Tech",
+      yearOfStudy: "2nd Year",
+      distanceKm: 3.4,
+      compatibilityScore: 91,
+      verified: true,
+      online: false,
+      intentMode: "Study Partner",
+      photos: [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"
+      ],
+      bio: "FinTech researcher & product designer. Looking for group study buddies.",
+      interests: ["FinTech", "Product Design", "Economics", "Podcasts"],
+      prompts: [{ question: "Currently reading", answer: "The Lean Startup by Eric Ries" }],
+      height: "170 cm",
+      lifestyle: { smoking: "Non-smoker", drinking: "Non-drinker" }
+    }
+  },
+  {
+    id: "conv-daniel-lewis",
+    name: "Daniel Lewis",
+    isGroup: false,
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80",
+    online: false,
+    isFavorite: false,
+    unreadCount: 0,
+    lastMessage: "Thanks! See you tomorrow.",
+    timestamp: "Yesterday",
+    studentProfile: {
+      id: "conv-daniel-lewis",
+      name: "Daniel Lewis",
+      age: 23,
+      gender: "Male",
+      campus: "JKUAT",
+      course: "Mechanical Engineering",
+      yearOfStudy: "4th Year",
+      distanceKm: 5.2,
+      compatibilityScore: 89,
+      verified: true,
+      online: false,
+      intentMode: "Friendship",
+      photos: [
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80"
+      ],
+      bio: "Robotics builder and drone racer. Passionate about 3D printing and CAD.",
+      interests: ["Robotics", "CAD", "Drones", "Rock Climbing"],
+      prompts: [{ question: "Best weekend project", answer: "Building custom autonomous quadcopters" }],
+      height: "179 cm",
+      lifestyle: { smoking: "Non-smoker", drinking: "Social drinker" }
+    }
+  },
+  {
+    id: "group-family-group",
+    name: "Family Group",
+    isGroup: true,
+    avatar: "",
+    isMuted: false,
+    isFavorite: false,
+    unreadCount: 3,
+    lastMessage: "Don't forget dinner 😊",
+    lastMessageSender: "Mom",
+    timestamp: "Mon",
+  },
+  {
+    id: "group-campus-tech-circle",
+    name: "Campus Tech Circle",
+    isGroup: true,
+    avatar: "",
+    isMuted: false,
+    isFavorite: false,
+    unreadCount: 0,
+    lastMessage: "Hackathon registrations close this Friday at midnight!",
+    lastMessageSender: "Admin",
+    timestamp: "Sun",
+  }
+];
 
-const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSelectMatch, navState, onNavigate }) => {
+const DEFAULT_INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
+  "conv-emma-smith": [
+    { id: "m-e-1", senderId: "conv-emma-smith", text: "Hey! How was your presentation today?", timestamp: "09:38 AM", isRead: true, type: "text" },
+    { id: "m-e-2", senderId: "me", text: "It went super well! The lecturers loved the prototype.", timestamp: "09:40 AM", isRead: true, type: "text" },
+    { id: "m-e-3", senderId: "conv-emma-smith", text: "Hey! Are we still on for tonight?", timestamp: "09:41 AM", isRead: false, type: "text" }
+  ],
+  "conv-james-anderson": [
+    { id: "m-j-1", senderId: "me", text: "Loved the hackathon pitch you gave yesterday!", timestamp: "09:25 AM", isRead: true, type: "text" },
+    { id: "m-j-2", senderId: "conv-james-anderson", text: "That was so much fun! 😄", timestamp: "09:30 AM", isRead: false, type: "text" }
+  ],
+  "group-design-squad": [
+    { id: "m-d-1", senderId: "Kevin", text: "Did everyone check the new Figma components?", timestamp: "08:10 AM", isRead: true, type: "text" },
+    { id: "m-d-2", senderId: "Olivia", text: "Here is the latest update", timestamp: "08:15 AM", isRead: false, type: "text" }
+  ],
+  "conv-olivia-brown": [
+    { id: "m-o-1", senderId: "conv-olivia-brown", text: "Can you send me the file?", timestamp: "Yesterday", isRead: false, type: "text" }
+  ],
+  "conv-daniel-lewis": [
+    { id: "m-dl-1", senderId: "me", text: "I'll bring the Arduino sensor kits to the lab.", timestamp: "Yesterday", isRead: true, type: "text" },
+    { id: "m-dl-2", senderId: "conv-daniel-lewis", text: "Thanks! See you tomorrow.", timestamp: "Yesterday", isRead: true, type: "text" }
+  ],
+  "group-family-group": [
+    { id: "m-f-1", senderId: "Mom", text: "Don't forget dinner 😊", timestamp: "Mon", isRead: false, type: "text" }
+  ]
+};
+
+const DEFAULT_STORIES: StoryItem[] = [
+  {
+    id: "story-emma",
+    userId: "conv-emma-smith",
+    name: "Emma",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    hasUnseenStory: true,
+    storyText: "Working on new UI illustrations in the campus library 🎨☕"
+  },
+  {
+    id: "story-james",
+    userId: "conv-james-anderson",
+    name: "James",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    hasUnseenStory: true,
+    storyText: "Hackathon kickoff in 2 hours! Let's win this 🚀💻"
+  },
+  {
+    id: "story-olivia",
+    userId: "conv-olivia-brown",
+    name: "Olivia",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    hasUnseenStory: true,
+    storyText: "Sunrise on campus grounds ✨🌿"
+  },
+  {
+    id: "story-daniel",
+    userId: "conv-daniel-lewis",
+    name: "Daniel",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    hasUnseenStory: true,
+    storyText: "Drone testing session at the main field 🛸💨"
+  }
+];
+
+type FilterTab = "all" | "groups" | "unread" | "favorites";
+
+const RealTimeChatSuiteContent: React.FC<Props> = ({
+  activeMatch,
+  matches,
+  onSelectMatch,
+  navState,
+  onNavigate,
+  onNavigateToDiscover,
+  currentUser,
+}) => {
   const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Filter Pill State
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Selected Active Conversation
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
+    if (navState?.tab === "chat" && navState.matchId) {
+      return navState.matchId;
+    }
+    return null;
+  });
+
+  // Stories modal / Creator State
+  const [activeStoryModal, setActiveStoryModal] = useState<StoryItem | null>(null);
+  const [showStoryCreator, setShowStoryCreator] = useState(false);
+  const [newStoryText, setNewStoryText] = useState("");
+  const [userStory, setUserStory] = useState<{ text: string; time: string } | null>(null);
+
+  // Message Map State (Cached & Syncable)
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("unicircle_chat_messages");
+        const saved = localStorage.getItem("unicircle_chat_messages_v2");
         if (saved) return JSON.parse(saved);
       } catch (err) {
         console.warn("Failed to load chat messages from localStorage:", err);
       }
     }
-    return INITIAL_MESSAGES;
+    return DEFAULT_INITIAL_MESSAGES;
   });
 
   const updateMessagesMap = (updater: (prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>) => {
@@ -57,7 +352,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
       const next = updater(prev);
       if (typeof window !== "undefined") {
         try {
-          safeSetItem("unicircle_chat_messages", JSON.stringify(next));
+          safeSetItem("unicircle_chat_messages_v2", JSON.stringify(next));
         } catch (e) {
           console.warn("Failed to save chat messages to localStorage:", e);
         }
@@ -66,33 +361,94 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
     });
   };
 
+  // Chat inputs & states
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
-  const currentMatch = (navState?.tab === "chat" && navState.matchId)
-    ? (matches.find((m) => m.id === navState.matchId) || activeMatch || matches[0] || null)
-    : (activeMatch || matches[0] || null);
+  // Merge Live Matches with Default Conversations
+  const allConversations: ConversationItem[] = useMemo(() => {
+    const list: ConversationItem[] = [...DEFAULT_CONVERSATIONS];
+    const existingIds = new Set(list.map((c) => c.id));
 
-  // Connect to Supabase Realtime Conversation for the active match
+    // Append dynamic matches from Discover / Swiping
+    matches.forEach((m) => {
+      if (!existingIds.has(m.id)) {
+        list.push({
+          id: m.id,
+          name: m.name,
+          isGroup: false,
+          avatar: m.photos[0] || "",
+          online: m.online ?? true,
+          isFavorite: false,
+          unreadCount: 0,
+          lastMessage: `Matched! Say hi to ${m.name}`,
+          timestamp: "Just now",
+          studentProfile: m,
+        });
+      }
+    });
+
+    return list;
+  }, [matches]);
+
+  // Active Conversation Object
+  const currentConversation = useMemo(() => {
+    const targetId = (navState?.tab === "chat" && navState.matchId) ? navState.matchId : selectedConvId;
+    if (!targetId) return null;
+    return allConversations.find((c) => c.id === targetId) || null;
+  }, [selectedConvId, navState?.matchId, allConversations]);
+
+  // Handle Redirect to Discover Tab
+  const handleRedirectToDiscover = () => {
+    if (onNavigateToDiscover) {
+      onNavigateToDiscover();
+    } else if (onNavigate) {
+      onNavigate({ tab: "discover" });
+    }
+  };
+
+  // Select a conversation item
+  const handleSelectConversation = (conv: ConversationItem) => {
+    setSelectedConvId(conv.id);
+    if (conv.studentProfile) {
+      onSelectMatch(conv.studentProfile);
+    }
+    if (onNavigate) {
+      onNavigate({ tab: "chat", matchId: conv.id, chatView: "chat" });
+    }
+    // Mark as read in local view
+    if (conv.unreadCount && conv.unreadCount > 0) {
+      conv.unreadCount = 0;
+    }
+  };
+
+  // Back to list on mobile
+  const handleBackToList = () => {
+    setSelectedConvId(null);
+    if (onNavigate) {
+      onNavigate({ tab: "chat", chatView: "list" });
+    }
+  };
+
+  // Live Supabase real-time sync for selected conversation
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     async function initLiveChat() {
-      if (!currentMatch) return;
+      if (!currentConversation || currentConversation.isGroup) return;
       try {
         const { data: authData } = await supabase.auth.getUser();
-        if (authData?.user && currentMatch.id.length > 10) {
-          const convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
+        if (authData?.user && currentConversation.id.length > 10) {
+          const convId = await getOrCreateConversation(authData.user.id, currentConversation.id);
           if (convId) {
             setActiveConversationId(convId);
             const liveMsgs = await fetchConversationMessages(convId);
             if (liveMsgs && liveMsgs.length > 0) {
               const formatted: ChatMessage[] = liveMsgs.map((m) => ({
                 id: m.id,
-                senderId: m.sender_id === authData.user.id ? "me" : currentMatch.id,
+                senderId: m.sender_id === authData.user.id ? "me" : currentConversation.id,
                 text: m.content,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 isRead: m.is_read,
@@ -101,15 +457,14 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
               }));
               updateMessagesMap((prev) => ({
                 ...prev,
-                [currentMatch.id]: formatted,
+                [currentConversation.id]: formatted,
               }));
             }
 
-            // Subscribe to real live incoming WebSocket messages from the other user
             unsubscribe = subscribeToLiveMessages(convId, (newLiveMsg) => {
               const incoming: ChatMessage = {
                 id: newLiveMsg.id,
-                senderId: newLiveMsg.sender_id === authData.user.id ? "me" : currentMatch.id,
+                senderId: newLiveMsg.sender_id === authData.user.id ? "me" : currentConversation.id,
                 text: newLiveMsg.content,
                 timestamp: new Date(newLiveMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 isRead: newLiveMsg.is_read,
@@ -118,13 +473,13 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
               };
               updateMessagesMap((prev) => ({
                 ...prev,
-                [currentMatch.id]: [...(prev[currentMatch.id] || []).filter((x) => x.id !== incoming.id), incoming],
+                [currentConversation.id]: [...(prev[currentConversation.id] || []).filter((x) => x.id !== incoming.id), incoming],
               }));
             });
           }
         }
       } catch (err) {
-        console.warn("Could not connect to live chat room:", err);
+        console.warn("Could not connect to live room:", err);
       }
     }
 
@@ -132,11 +487,46 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [currentMatch?.id]);
+  }, [currentConversation?.id]);
 
+  // Send Message
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !currentConversation) return;
+    const textToSend = inputText.trim();
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: "me",
+      text: textToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isRead: true,
+      type: "text",
+    };
+
+    updateMessagesMap((prev) => ({
+      ...prev,
+      [currentConversation.id]: [...(prev[currentConversation.id] || []), newMsg],
+    }));
+    setInputText("");
+
+    // Push to Supabase if live user
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user && activeConversationId) {
+        await sendLiveChatMessage({
+          conversationId: activeConversationId,
+          senderId: authData.user.id,
+          content: textToSend,
+        });
+      }
+    } catch (e) {
+      console.warn("Could not push message:", e);
+    }
+  };
+
+  // Image Upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0 && currentMatch) {
+    if (files && files.length > 0 && currentConversation) {
       const file = files[0];
       const publicUrl = await uploadToStorage(file, "chat_media");
       const fileUrl = publicUrl || URL.createObjectURL(file);
@@ -153,91 +543,14 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
 
       updateMessagesMap((prev) => ({
         ...prev,
-        [currentMatch.id]: [...(prev[currentMatch.id] || []), imgMsg],
+        [currentConversation.id]: [...(prev[currentConversation.id] || []), imgMsg],
       }));
-
-      // Send to Supabase live database
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData?.user) {
-          let convId = activeConversationId;
-          if (!convId && currentMatch.id.length > 10) {
-            convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
-            if (convId) setActiveConversationId(convId);
-          }
-          if (convId) {
-            await sendLiveChatMessage({
-              conversationId: convId,
-              senderId: authData.user.id,
-              content: "Shared a photo",
-              mediaUrl: publicUrl || undefined,
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("Could not push image message to Supabase:", e);
-      }
     }
   };
 
-  const activeMessages = currentMatch ? (messagesMap[currentMatch.id] || []) : [];
-  const mobileView = (navState?.tab === "chat" && (navState.chatView === "chat" || navState.matchId)) ? "chat" : "list";
-
-  const handleSelectMatchInternal = (m: StudentProfile) => {
-    onSelectMatch(m);
-    if (onNavigate) {
-      onNavigate({ tab: "chat", matchId: m.id, chatView: "chat" });
-    }
-  };
-
-  const handleMobileBack = () => {
-    if (typeof window !== "undefined") {
-      window.history.back();
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !currentMatch) return;
-    const textToSend = inputText.trim();
-    const newMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      senderId: "me",
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isRead: true,
-      type: "text",
-    };
-
-    updateMessagesMap((prev) => ({
-      ...prev,
-      [currentMatch.id]: [...(prev[currentMatch.id] || []), newMsg],
-    }));
-    setInputText("");
-
-    // Send to Supabase live database
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) {
-        let convId = activeConversationId;
-        if (!convId && currentMatch.id.length > 10) {
-          convId = await getOrCreateConversation(authData.user.id, currentMatch.id);
-          if (convId) setActiveConversationId(convId);
-        }
-        if (convId) {
-          await sendLiveChatMessage({
-            conversationId: convId,
-            senderId: authData.user.id,
-            content: textToSend,
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("Could not push live message to Supabase:", e);
-    }
-  };
-
+  // Voice Note Send
   const handleSendVoiceNote = () => {
-    if (!currentMatch) return;
+    if (!currentConversation) return;
     const voiceMsg: ChatMessage = {
       id: `voice-${Date.now()}`,
       senderId: "me",
@@ -247,164 +560,387 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
       type: "voice",
       durationSec: recordingSeconds || 5,
     };
-    setMessagesMap((prev) => ({
+    updateMessagesMap((prev) => ({
       ...prev,
-      [currentMatch.id]: [...(prev[currentMatch.id] || []), voiceMsg],
+      [currentConversation.id]: [...(prev[currentConversation.id] || []), voiceMsg],
     }));
     setIsRecording(false);
     setRecordingSeconds(0);
   };
 
-  const handleDeleteMessage = (msgId: string) => {
-    if (!currentMatch) return;
-    setMessagesMap((prev) => ({
-      ...prev,
-      [currentMatch.id]: (prev[currentMatch.id] || []).filter((m) => m.id !== msgId),
-    }));
-  };
+  // Filter conversations
+  const filteredConversations = useMemo(() => {
+    return allConversations.filter((conv) => {
+      // 1. Filter Tab
+      if (activeTab === "groups" && !conv.isGroup) return false;
+      if (activeTab === "unread" && (!conv.unreadCount || conv.unreadCount <= 0)) return false;
+      if (activeTab === "favorites" && !conv.isFavorite) return false;
 
-  const filteredMatches = matches.filter((m) =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.campus.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      // 2. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = conv.name.toLowerCase().includes(q);
+        const matchesMsg = conv.lastMessage.toLowerCase().includes(q);
+        const matchesSender = conv.lastMessageSender?.toLowerCase().includes(q);
+        if (!matchesName && !matchesMsg && !matchesSender) return false;
+      }
+
+      return true;
+    });
+  }, [allConversations, activeTab, searchQuery]);
+
+  const activeMessages = currentConversation ? (messagesMap[currentConversation.id] || []) : [];
+  const isChatViewActive = Boolean(currentConversation && (navState?.chatView === "chat" || selectedConvId));
 
   return (
-    <div className="w-full max-w-5xl mx-auto h-[82vh] md:h-[78vh] bg-slate-900 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row backdrop-blur-2xl">
-      {/* 1. Conversations List Sidebar (Hidden on mobile if chat view active) */}
-      <div className={`w-full md:w-80 bg-slate-950 border-r border-white/10 flex flex-col h-full shrink-0 ${
-        mobileView === "chat" ? "hidden md:flex" : "flex"
+    <div className="w-full max-w-4xl mx-auto h-[86vh] md:h-[82vh] bg-[#0A0E17] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row relative">
+      
+      {/* ─── 1. CONVERSATIONS LIST SCREEN (Matches Screenshot) ─── */}
+      <div className={`w-full md:w-[380px] lg:w-[400px] bg-[#080C14] border-r border-white/5 flex flex-col h-full shrink-0 ${
+        isChatViewActive ? "hidden md:flex" : "flex"
       }`}>
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-white/10">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-white tracking-tight">Verified Messages</h3>
-            <span className="px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-xs font-bold">
-              {matches.length} Active
-            </span>
+        
+        {/* Top Header Bar */}
+        <div className="p-4 md:p-5 border-b border-white/5 flex flex-col gap-3 shrink-0">
+          <div className="flex items-center justify-between">
+            {/* Left Hamburger & Title */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
+                title="Menu"
+              >
+                <Menu className="w-5 h-5 stroke-[2.2]" />
+              </button>
+              <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                Chats
+              </h1>
+            </div>
+
+            {/* Right Action Icons: Search & Plus Button */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className={`p-2.5 rounded-full transition cursor-pointer ${
+                  isSearchOpen ? "bg-purple-600/20 text-purple-400" : "text-slate-300 hover:text-white hover:bg-white/5"
+                }`}
+                title="Search Chats"
+              >
+                <Search className="w-5 h-5 stroke-[2.2]" />
+              </button>
+
+              {/* PLUS ICON: Redirects to Discover where user sees people */}
+              <button
+                type="button"
+                onClick={handleRedirectToDiscover}
+                className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-purple-600/30 transition-transform cursor-pointer"
+                title="Discover New People"
+              >
+                <Plus className="w-5 h-5 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
 
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search chats..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-            />
+          {/* Collapsible Search Input */}
+          {isSearchOpen && (
+            <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+              <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search messages, people, groups..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-9 py-2 bg-slate-900/90 border border-white/10 rounded-2xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Stories / Online Friends Row (Horizontal Scroll) */}
+        <div className="px-4 py-3.5 border-b border-white/5 overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex items-center gap-3.5 min-w-max">
+            {/* 1. "Your Story" Item */}
+            <div
+              onClick={() => setShowStoryCreator(true)}
+              className="flex flex-col items-center gap-1.5 cursor-pointer group"
+            >
+              <div className="relative w-14 h-14 rounded-full p-0.5 bg-gradient-to-br from-purple-500/30 to-indigo-500/30 flex items-center justify-center">
+                <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-white/10 group-hover:scale-105 transition-transform">
+                  {currentUser?.photos?.[0] ? (
+                    <img src={currentUser.photos[0]} alt="You" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-5 h-5 text-purple-300" />
+                  )}
+                </div>
+                {/* Purple Plus Badge */}
+                <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md border-2 border-[#080C14]">
+                  <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-300 group-hover:text-white truncate max-w-[60px]">
+                {userStory ? "Shared" : "Your Story"}
+              </span>
+            </div>
+
+            {/* 2. Active Contacts Stories */}
+            {DEFAULT_STORIES.map((story) => (
+              <div
+                key={story.id}
+                onClick={() => setActiveStoryModal(story)}
+                className="flex flex-col items-center gap-1.5 cursor-pointer group"
+              >
+                {/* Rainbow / Gradient Border Ring */}
+                <div className="w-14 h-14 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <div className="w-full h-full rounded-full overflow-hidden border-2 border-[#080C14]">
+                    <img
+                      src={story.avatar}
+                      alt={story.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-300 group-hover:text-white truncate max-w-[60px]">
+                  {story.name}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Match Conversations List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {filteredMatches.map((m) => {
-            const isSelected = currentMatch?.id === m.id;
-            const msgs = messagesMap[m.id] || [];
-            const lastMsg = msgs[msgs.length - 1];
+        {/* Filter Tabs / Pills Row: All, Groups, Unread, Favorites */}
+        <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+          {[
+            { id: "all", label: "All" },
+            { id: "groups", label: "Groups" },
+            { id: "unread", label: "Unread" },
+            { id: "favorites", label: "Favorites" },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
             return (
-              <div
-                key={m.id}
-                onClick={() => handleSelectMatchInternal(m)}
-                className={`p-3 rounded-2xl cursor-pointer transition flex items-center gap-3 ${
-                  isSelected
-                    ? "bg-indigo-600/20 border border-indigo-500/40 shadow-lg shadow-indigo-600/10"
-                    : "hover:bg-white/5 border border-transparent"
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as FilterTab)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? "bg-purple-600 text-white shadow-md shadow-purple-600/30 scale-105"
+                    : "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <div className="relative w-11 h-11 shrink-0">
-                  <img src={m.photos[0]} alt={m.name} className="w-full h-full object-cover rounded-full" />
-                  {m.online && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline">
-                    <h4 className="text-xs font-bold text-white truncate">{m.name}</h4>
-                    <span className="text-[10px] text-slate-400">{lastMsg?.timestamp || "New"}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {lastMsg ? lastMsg.text : `Matched! Say hi to ${m.name}`}
-                  </p>
-                </div>
-              </div>
+                {tab.label}
+              </button>
             );
           })}
         </div>
+
+        {/* Conversations List Scrollable Area */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 divide-y divide-white/[0.03]">
+          {filteredConversations.length > 0 ? (
+            filteredConversations.map((conv) => {
+              const isSelected = selectedConvId === conv.id;
+              const msgs = messagesMap[conv.id] || [];
+              const latestMsg = msgs[msgs.length - 1];
+              const displayMsg = latestMsg ? latestMsg.text : conv.lastMessage;
+              const displayTime = latestMsg ? latestMsg.timestamp : conv.timestamp;
+
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => handleSelectConversation(conv)}
+                  className={`p-3 rounded-2xl cursor-pointer transition-all duration-150 flex items-center gap-3.5 group ${
+                    isSelected
+                      ? "bg-purple-600/15 border border-purple-500/30 shadow-lg"
+                      : "hover:bg-white/5 border border-transparent"
+                  }`}
+                >
+                  {/* Left Avatar / Group Icon */}
+                  {conv.isGroup ? (
+                    /* Squircle Group Icon */
+                    <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shrink-0">
+                      <Users className="w-6 h-6 stroke-[2]" />
+                    </div>
+                  ) : (
+                    /* Circular Direct Contact Avatar */
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden shrink-0 border border-white/10">
+                      <img
+                        src={conv.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"}
+                        alt={conv.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {conv.online && (
+                        <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#080C14]" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Middle: Title & Message Preview */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <h3 className="text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                        {conv.name}
+                      </h3>
+                      <span className="text-[11px] text-slate-400 shrink-0 font-medium ml-2">
+                        {displayTime}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-400 truncate leading-relaxed">
+                        {conv.lastMessageSender && (
+                          <span className="text-slate-300 font-semibold mr-1">
+                            {conv.lastMessageSender}:
+                          </span>
+                        )}
+                        {displayMsg}
+                      </p>
+
+                      {/* Right Badges: Muted Icon & Unread Pill */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {conv.isMuted && (
+                          <BellOff className="w-3.5 h-3.5 text-slate-500" />
+                        )}
+                        {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
+                          <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-purple-600 text-white text-[10px] font-black flex items-center justify-center shadow-md shadow-purple-600/30">
+                            {conv.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                <Search className="w-6 h-6" />
+              </div>
+              <p className="text-xs text-slate-400">No conversations found in this category.</p>
+              <button
+                type="button"
+                onClick={handleRedirectToDiscover}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition cursor-pointer"
+              >
+                Discover Campus Students
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 2. Main Chat Thread Window (Hidden on mobile if list view active) */}
-      <div className={`flex-1 flex flex-col h-full bg-slate-900/60 ${
-        mobileView === "list" ? "hidden md:flex" : "flex"
+      {/* ─── 2. ACTIVE CHAT THREAD VIEW (Responsive on Mobile & Desktop) ─── */}
+      <div className={`flex-1 flex flex-col h-full bg-[#090D16]/90 backdrop-blur-xl ${
+        !isChatViewActive ? "hidden md:flex" : "flex"
       }`}>
-        {currentMatch ? (
+        {currentConversation ? (
           <>
-            {/* Chat Header with Mobile Back Button */}
-            <div className="p-3 md:p-4 border-b border-white/10 bg-slate-950/80 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                {/* Back Arrow for Mobile Screen */}
+            {/* Chat Thread Header */}
+            <div className="p-3.5 md:p-4 border-b border-white/5 bg-[#080C14]/95 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                {/* Back Button to List (Mobile & Tablet) */}
                 <button
-                  onClick={handleMobileBack}
-                  className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition"
-                  title="Back to messages"
+                  type="button"
+                  onClick={handleBackToList}
+                  className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer shrink-0"
+                  title="Back to chats list"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
                 </button>
 
-                <div className="relative w-9 h-9 md:w-10 md:h-10 shrink-0">
-                  <img src={currentMatch.photos[0]} alt={currentMatch.name} className="w-full h-full object-cover rounded-full" />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-950" />
-                </div>
+                {/* Avatar */}
+                {currentConversation.isGroup ? (
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                    <Users className="w-5 h-5" />
+                  </div>
+                ) : (
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/10">
+                    <img
+                      src={currentConversation.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"}
+                      alt={currentConversation.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {currentConversation.online && (
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-[#080C14]" />
+                    )}
+                  </div>
+                )}
 
+                {/* Name & Status */}
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-xs md:text-sm font-bold text-white truncate">{currentMatch.name}</h3>
-                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] md:text-[10px] font-bold shrink-0">
-                      <ShieldCheck className="w-3 h-3" /> Verified
-                    </span>
+                    <h2 className="text-sm font-bold text-white truncate">
+                      {currentConversation.name}
+                    </h2>
+                    {!currentConversation.isGroup && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-bold shrink-0">
+                        <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[10px] md:text-[11px] text-slate-400 truncate">{currentMatch.campus} • {currentMatch.course}</p>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {currentConversation.isGroup
+                      ? "Campus Group • 28 Members"
+                      : currentConversation.online
+                      ? "Online now"
+                      : "Active recently"}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px]">
-                  <Lock className="w-3 h-3" /> E2EE Secured
+              {/* Call & Security Badges */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-medium">
+                  <Lock className="w-2.5 h-2.5" /> E2EE
                 </span>
+                <button
+                  type="button"
+                  onClick={handleRedirectToDiscover}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
+                  title="Find more peers"
+                >
+                  <UserPlus className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Messages Scroll Area */}
+            {/* Chat Messages Scroll Container */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {activeMessages.map((msg) => {
                 const isMe = msg.senderId === "me";
                 return (
                   <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"} group`}>
                     <div className="flex items-center gap-2 max-w-[85%] sm:max-w-[75%]">
-                      {isMe && (
-                        <button
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-0 group-hover:opacity-100 transition p-1 text-slate-500 hover:text-red-400"
-                          title="Delete message"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
                       <div
-                        className={`p-3.5 rounded-2xl text-xs leading-relaxed relative ${
+                        className={`p-3.5 rounded-2xl text-xs leading-relaxed relative shadow-md ${
                           isMe
-                            ? "bg-gradient-to-r from-indigo-600 to-pink-600 text-white rounded-br-none shadow-md shadow-indigo-600/20"
-                            : "bg-slate-950 border border-white/10 text-slate-200 rounded-bl-none"
+                            ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-br-none shadow-purple-600/20"
+                            : "bg-slate-900 border border-white/10 text-slate-200 rounded-bl-none"
                         }`}
                       >
                         {msg.type === "image" && msg.mediaUrl ? (
                           <div className="space-y-1">
-                            <img src={msg.mediaUrl} alt="Shared photo" className="rounded-xl max-h-56 w-full object-cover border border-white/10" />
+                            <img
+                              src={msg.mediaUrl}
+                              alt="Shared photo"
+                              className="rounded-xl max-h-56 w-full object-cover border border-white/10"
+                            />
                             {msg.text && msg.text !== "Shared a photo" && <p className="pt-1">{msg.text}</p>}
                           </div>
                         ) : msg.type === "voice" ? (
                           <div className="flex items-center gap-3 min-w-[180px]">
                             <button
+                              type="button"
                               onClick={() => setPlayingVoiceId(playingVoiceId === msg.id ? null : msg.id)}
                               className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
                             >
@@ -434,10 +970,11 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
                   </div>
                 );
               })}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Bar */}
-            <div className="p-3 border-t border-white/10 bg-slate-950 shrink-0">
+            <div className="p-3 border-t border-white/5 bg-[#080C14] shrink-0">
               <input
                 type="file"
                 ref={chatFileInputRef}
@@ -452,10 +989,18 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
                     <Mic className="w-4 h-4 text-red-400 animate-spin shrink-0" /> Recording Voice Note ({recordingSeconds}s)...
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => setIsRecording(false)} className="px-3 py-1 text-xs text-slate-400 hover:text-white">
+                    <button
+                      type="button"
+                      onClick={() => setIsRecording(false)}
+                      className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                    >
                       Cancel
                     </button>
-                    <button onClick={handleSendVoiceNote} className="px-3 py-1 rounded-xl bg-red-500 text-white text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={handleSendVoiceNote}
+                      className="px-3 py-1 rounded-xl bg-red-500 text-white text-xs font-bold"
+                    >
                       Send
                     </button>
                   </div>
@@ -468,7 +1013,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
                     className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0"
                     title="Attach Photo"
                   >
-                    <Image className="w-4 h-4 text-pink-400" />
+                    <Image className="w-4 h-4 text-purple-400" />
                   </button>
 
                   <button
@@ -485,17 +1030,18 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
 
                   <input
                     type="text"
-                    placeholder={`Send message to ${currentMatch.name}...`}
+                    placeholder={`Message ${currentConversation.name}...`}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                    className="flex-1 px-4 py-2.5 bg-slate-900 border border-white/10 rounded-2xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 min-w-0"
+                    className="flex-1 px-4 py-2.5 bg-slate-900 border border-white/10 rounded-2xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 min-w-0"
                   />
 
                   <button
+                    type="button"
                     onClick={handleSendMessage}
                     disabled={!inputText.trim()}
-                    className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition shadow-lg shadow-indigo-600/30 shrink-0"
+                    className="p-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white transition shadow-lg shadow-purple-600/30 shrink-0 cursor-pointer"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -504,11 +1050,134 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({ activeMatch, matches, onSel
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-xs">
-            Select a verified student match to begin chatting.
+          /* Empty placeholder if no chat selected on desktop */
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-purple-600/10 text-purple-400 flex items-center justify-center">
+              <MessageSquare className="w-8 h-8 stroke-[1.75]" />
+            </div>
+            <div className="max-w-xs space-y-1">
+              <h3 className="text-base font-bold text-white">Select a conversation</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Choose a direct student chat or campus group to start messaging in real-time.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRedirectToDiscover}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold shadow-lg shadow-purple-600/20 hover:scale-105 transition cursor-pointer"
+            >
+              Find Friends on Discover
+            </button>
           </div>
         )}
       </div>
+
+      {/* ─── Story Viewer Modal ─── */}
+      {activeStoryModal && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setActiveStoryModal(null)}
+        >
+          <div
+            className="bg-[#0D121F] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-purple-500">
+                  <img src={activeStoryModal.avatar} alt={activeStoryModal.name} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">{activeStoryModal.name}</h4>
+                  <span className="text-[10px] text-purple-400 font-medium">Campus Story • Today</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveStoryModal(null)}
+                className="p-1.5 rounded-full bg-white/5 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-900/30 to-indigo-900/30 border border-purple-500/20 min-h-[140px] flex items-center justify-center text-center">
+              <p className="text-sm font-medium text-purple-100 leading-relaxed">
+                "{activeStoryModal.storyText || "Having a wonderful time on campus!"}"
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const targetConv = allConversations.find((c) => c.id === activeStoryModal.userId);
+                setActiveStoryModal(null);
+                if (targetConv) handleSelectConversation(targetConv);
+              }}
+              className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-2"
+            >
+              <Send className="w-3.5 h-3.5" /> Send Direct Reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Story Creator Modal ─── */}
+      {showStoryCreator && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setShowStoryCreator(false)}
+        >
+          <div
+            className="bg-[#0D121F] border border-white/10 rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-400" /> Share Your Campus Story
+              </h3>
+              <button
+                onClick={() => setShowStoryCreator(false)}
+                className="p-1.5 rounded-full bg-white/5 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <textarea
+              rows={3}
+              placeholder="What are you up to on campus? (Study session, club event, food, etc.)..."
+              value={newStoryText}
+              onChange={(e) => setNewStoryText(e.target.value)}
+              className="w-full p-3.5 bg-slate-900 border border-white/10 rounded-2xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none"
+            />
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStoryCreator(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (newStoryText.trim()) {
+                    setUserStory({ text: newStoryText.trim(), time: "Just now" });
+                    setShowStoryCreator(false);
+                    setNewStoryText("");
+                  }
+                }}
+                disabled={!newStoryText.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition"
+              >
+                Publish Story
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -532,14 +1201,14 @@ class ChatSuiteErrorBoundary extends React.Component<{ children: React.ReactNode
     if (this.state.hasError) {
       return (
         <div className="w-full max-w-2xl mx-auto p-8 rounded-3xl bg-slate-900 border border-white/10 text-center space-y-4 my-8">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
             <MessageSquare className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-bold text-white">UniCircle Direct Messaging</h2>
           <p className="text-xs text-slate-400 font-medium">Chat messages are loading. Tap below to reload.</p>
           <button
             onClick={() => this.setState({ hasError: false })}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition cursor-pointer"
           >
             Reload Direct Messages
           </button>

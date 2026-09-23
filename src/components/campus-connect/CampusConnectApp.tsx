@@ -808,7 +808,9 @@ export const CampusConnectApp: React.FC = () => {
                 <RealTimeChatSuite
                   activeMatch={activeChatMatch}
                   matches={matches}
+                  currentUser={userProfile}
                   onSelectMatch={(m) => setActiveChatMatch(m)}
+                  onNavigateToDiscover={() => handleTabChange("discover")}
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
