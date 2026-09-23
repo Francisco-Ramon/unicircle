@@ -129,6 +129,11 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
   const selectedEvent = events.find((e) => e.id === selectedEventId) || null;
   const eventViewMode = (navState?.tab === "events" && navState.eventView) ? navState.eventView : "details";
   const showHostModal = (navState?.tab === "events" && navState.modal === "host-event");
+  const setShowHostModal = (show: boolean) => {
+    if (onNavigate) {
+      onNavigate({ tab: "events", modal: show ? "host-event" : undefined });
+    }
+  };
 
   const [eventCommentInput, setEventCommentInput] = useState("");
 

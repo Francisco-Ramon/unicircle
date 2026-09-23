@@ -8,9 +8,9 @@ export interface LiveProfile {
   first_name: string;
   last_name: string;
   gender: string;
-  interested_in: string;
+  interested_in?: string;
   campus: string;
-  country: string;
+  country?: string;
   course: string;
   year_of_study: string;
   bio: string;
@@ -26,6 +26,7 @@ export interface LivePost {
   campus: string;
   content: string;
   image_url?: string;
+  visibility?: string;
   likes_count: number;
   comments_count: number;
   created_at: string;

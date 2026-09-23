@@ -40,8 +40,6 @@ export const StudentHomeScreen: React.FC<Props> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const activeFriends = liveStudents.slice(0, 5);
-
   const [liveStudents, setLiveStudents] = useState<any[]>(() => {
     if (liveProfiles && liveProfiles.length > 0) {
       return liveProfiles.map((p) => ({
@@ -59,6 +57,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
     }
     return [];
   });
+
+  const activeFriends = liveStudents.slice(0, 5);
 
   const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
