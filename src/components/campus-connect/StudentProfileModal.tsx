@@ -95,11 +95,12 @@ export const StudentProfileModal: React.FC<Props> = ({
 
     // Dispatch app notification
     dispatchAppNotification({
-      type: "match",
-      title: "Friend Request Sent! 🤝",
-      body: `You sent a friendship request to ${student.name}.`,
-      actorName: userProfile?.firstName || "You",
-      actorAvatar: userProfile?.photos?.[0] || "",
+      type: "friend_request",
+      fromName: userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim() : "Verified Student",
+      fromAvatar: userProfile?.photos?.[0] || "",
+      fromUniversity: userProfile?.campus || "University of Nairobi",
+      message: `sent you a friendship request.`,
+      entityId: student.id,
     });
 
     if (onRequestFriendship) {

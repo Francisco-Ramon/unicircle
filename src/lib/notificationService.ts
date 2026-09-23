@@ -258,12 +258,28 @@ export function saveStoredNotifications(notifs: AppNotification[]) {
   }
 }
 
+// Synchronous read of stored preferences
+export function getStoredNotificationPreferences(): NotificationPreferences {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return normalizePreferences(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn("Failed to parse local notification preferences", e);
+    }
+  }
+  return { ...DEFAULT_NOTIFICATION_PREFERENCES };
+}
+
 export function dispatchAppNotification(
   notifData: Omit<AppNotification, "id" | "timeAgo" | "read" | "createdAt">,
-  prefs: NotificationPreferences
+  prefs?: NotificationPreferences
 ): boolean {
+  const effectivePrefs = prefs || getStoredNotificationPreferences();
   // Check preference before creating notification
-  if (!isNotificationTypeAllowed(notifData.type, prefs)) {
+  if (!isNotificationTypeAllowed(notifData.type, effectivePrefs)) {
     console.log(`Notification creation skipped: ${notifData.type} preference is OFF`);
     return false;
   }
