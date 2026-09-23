@@ -214,31 +214,35 @@ export const UserProfileStudio: React.FC<Props> = ({
                 <p className="text-xs text-slate-400 mt-0.5">{profile.course} • {profile.yearOfStudy}</p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-center sm:justify-start mt-3 sm:mt-0">
                 <button
+                  type="button"
                   onClick={() => setShowEditDetailsModal(true)}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer"
+                  className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-xs font-bold text-white transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer"
                   title="Edit your name, course, goals, and details"
                 >
                   <Edit3 className="w-4 h-4" /> Edit Profile
                 </button>
 
-                <button
-                  onClick={handleShareProfile}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-xs font-bold text-indigo-300 transition flex items-center gap-1.5 shadow-md cursor-pointer"
-                  title="Share profile or invite friends to chat"
-                >
-                  <Share2 className="w-4 h-4 text-indigo-400" /> Share & Invite
-                </button>
-
                 {onNavigateToSettings && (
                   <button
+                    type="button"
                     onClick={onNavigateToSettings}
-                    className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-slate-300 transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-xs font-bold text-indigo-300 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                    title="Access Settings & Control Center"
                   >
                     <Settings className="w-4 h-4 text-indigo-400" /> Settings
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={handleShareProfile}
+                  className="px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-slate-300 transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Share profile or invite friends"
+                >
+                  <Share2 className="w-4 h-4 text-indigo-400" /> Share
+                </button>
               </div>
             </div>
 

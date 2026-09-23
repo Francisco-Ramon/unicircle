@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import {
   Settings, User, Shield, Bell, Eye, Moon, Sun, Monitor, Palette,
   Globe, Zap, HelpCircle, Info, LogOut, ChevronRight, Lock, Check,
-  Sliders, ShieldCheck, Trash2, Smartphone, Volume2, AlertTriangle, RefreshCw, BarChart3
+  Sliders, ShieldCheck, Trash2, Smartphone, Volume2, AlertTriangle, RefreshCw, BarChart3,
+  ArrowLeft
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -136,29 +137,65 @@ export const SettingsScreen: React.FC<Props> = ({
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 py-2">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-            <Settings className="w-6 h-6 text-indigo-400" />
-            Settings & Control Center
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">Manage your account, appearance, safety, and privacy preferences</p>
+      {/* Header with Back Button */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {onNavigateToTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTab("profile")}
+              className="p-2 rounded-xl bg-slate-900/80 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer shrink-0"
+              title="Back to Profile"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+              <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
+              Settings & Control Center
+            </h1>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Manage your account, appearance, safety, and privacy preferences</p>
+          </div>
         </div>
       </div>
 
-      {/* 2-Column Responsive Layout (Categories Navigation + Active Section Content) */}
+      {/* Mobile Horizontal Category Pills (< md) */}
+      <div className="flex md:hidden overflow-x-auto gap-2 pb-1 no-scrollbar -mx-1 px-1">
+        {CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          const isActive = activeCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition shrink-0 cursor-pointer ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "bg-slate-900/80 border border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : cat.color}`} />
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 2-Column Responsive Layout (Desktop Categories Sidebar + Active Section Content) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Left Categories Sidebar */}
-        <div className="md:col-span-1 space-y-1">
+        {/* Desktop Left Categories Sidebar (hidden on mobile) */}
+        <div className="hidden md:block md:col-span-1 space-y-1">
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.id;
             return (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setActiveCategory(cat.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
                   isActive
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                     : "text-slate-400 hover:text-white hover:bg-white/5"
