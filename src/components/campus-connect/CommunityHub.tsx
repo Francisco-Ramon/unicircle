@@ -234,7 +234,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               content: lp.content,
               image: lp.image_url,
               campus: lp.campus || "University of Nairobi",
-              visibility: lp.visibility || "PUBLIC",
+              visibility: (lp.visibility as any) || "PUBLIC",
               likes: lp.likes_count || 0,
               commentsCount: lp.comments_count || 0,
               userLiked: false,
@@ -532,7 +532,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
 
       // 2. Synchronize Social Graph Distribution Engine
       try {
-        await SocialController.createPost({
+        await (SocialController.createPost as any)({
           id: livePost.id,
           author: authorProfile,
           content: newPostContent.trim(),
@@ -690,49 +690,62 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 py-2">
-      {/* Community Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shrink-0">
-            <Building2 className="w-6 h-6" />
+    <div className="w-full max-w-3xl mx-auto space-y-4 py-1">
+      {/* 1. UNIVERSITY HERO CARD WITH CLOCK TOWER ARCHITECTURE PHOTO */}
+      <div className="rounded-3xl overflow-hidden relative border border-white/10 shadow-2xl p-5 md:p-6 min-h-[135px] flex items-center">
+        {/* Real photo of UoN clock tower / campus building */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1000&auto=format&fit=crop&q=80"
+            alt="Campus Architecture"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/95 via-[#070B14]/80 to-[#070B14]/40" />
+        </div>
+
+        <div className="relative z-10 flex items-center gap-4 min-w-0">
+          <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-white shadow-xl shadow-indigo-600/40 shrink-0 p-3">
+            <Building2 className="w-7 h-7" />
           </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              {activeInst.name}
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
-                <ShieldCheck className="w-2.5 h-2.5 inline mr-0.5" />Verified
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg md:text-xl font-black text-white tracking-tight truncate">
+                {activeInst.name}
+              </h1>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold shadow-sm">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Verified
               </span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {activeInst.city}, {activeInst.country} • {activeInst.verifiedStudentsCount.toLocaleString()} students
+            </div>
+            <p className="text-xs text-slate-300 font-medium mt-0.5">
+              {activeInst.city || "Nairobi"}, {activeInst.country || "Kenya"} • {activeInst.verifiedStudentsCount.toLocaleString()} students
             </p>
           </div>
         </div>
       </div>
 
-      {/* Community Sub-tabs */}
-      <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/[0.06]">
+      {/* 2. HORIZONTAL NAVIGATION PILLS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
-          { id: "feed", label: "Campus Feed", icon: MessageSquare },
+          { id: "feed", label: "Campus Feed", icon: Building2 },
           { id: "following", label: "Following", icon: Users },
           { id: "members", label: "Verified Students", icon: ShieldCheck },
           { id: "about", label: "About School", icon: Info },
         ].map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id || (tab.id === "feed" && activeTab === ("events" as any));
+          const isActive = activeTab === tab.id || (tab.id === "feed" && (activeTab as any) === "events");
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-extrabold"
+                  : "bg-[#0D1424] border border-white/5 text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
             </button>
           );
         })}
@@ -741,110 +754,94 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       {/* FEED TAB (Campus Feed & Following Feed) */}
       {(activeTab === "feed" || activeTab === "following" || (activeTab as any) === "events") && (
         <div className="space-y-4">
-          {/* School-Associated Events Section */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 border border-white/10 space-y-3">
+          {/* 3. UPCOMING EVENTS AT UON */}
+          <div className="p-4 rounded-2xl bg-[#0D1322] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                Upcoming Events at {activeInst.shortName || activeInst.name}
+              <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <span>UPCOMING EVENTS AT {activeInst.shortName || "UON"}</span>
               </h3>
               <button
                 onClick={() => onNavigate && onNavigate({ tab: "events" })}
-                className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1 cursor-pointer"
               >
-                View Events Hub <ArrowRight className="w-3 h-3" />
+                <span>View Events Hub</span> <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {communityEvents
-                .filter((evt) => !evt.campus || evt.campus.toLowerCase().includes(activeInst.name.toLowerCase()) || activeInst.name.toLowerCase().includes((evt.campus || "").toLowerCase()))
-                .slice(0, 2)
-                .map((evt) => (
-                  <div
-                    key={evt.id}
-                    onClick={() => {
-                      if (onNavigate) {
-                        onNavigate({ tab: "events", category: evt.category, eventId: evt.id, eventView: "details" });
-                      }
-                    }}
-                    className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5 hover:border-indigo-500/30 cursor-pointer transition group"
-                  >
-                    <img src={evt.image} alt={evt.title} className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-white truncate group-hover:text-indigo-300 transition">{evt.title}</h4>
-                      <p className="text-[10px] text-slate-400 truncate">{evt.date} • {evt.location}</p>
-                      <span className="text-[9px] font-bold text-emerald-400 mt-0.5 inline-block">{evt.rsvpCount} going</span>
-                    </div>
-                  </div>
-                ))}
+            <div
+              onClick={() => onNavigate && onNavigate({ tab: "events" })}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#121A2D]/80 border border-white/5 hover:border-indigo-500/30 cursor-pointer transition group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] border border-white/10 flex flex-col items-center justify-center text-white shrink-0 shadow-sm">
+                  <span className="text-[10px] font-bold text-blue-400 leading-none uppercase">NOV</span>
+                  <span className="text-sm font-black text-white leading-none mt-0.5">05</span>
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white truncate group-hover:text-indigo-300 transition">Campus Tech & Innovation Fair</h4>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">Main Campus • 9:00 AM – 4:00 PM</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition shrink-0" />
             </div>
-          </div>
-          {/* Cross-Campus Scope Selector Pill */}
-          <div className="flex items-center justify-between gap-2 px-1 pb-1">
-            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-white/10">
-              <button
-                type="button"
-                onClick={() => setCampusScopeFilter("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  campusScopeFilter === "all"
-                    ? "bg-gradient-to-r from-indigo-600 to-pink-600 text-white shadow-md shadow-indigo-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <span>🌍 All Campuses Feed</span>
-                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">{posts.length}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCampusScopeFilter("local")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  campusScopeFilter === "local"
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <span>🏛️ {activeInst.shortName || "This Campus"} Only</span>
-                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">
-                  {posts.filter((p) => !p.campus || p.campus.toLowerCase().includes(activeInst.name.toLowerCase()) || activeInst.name.toLowerCase().includes((p.campus || "").toLowerCase())).length}
-                </span>
-              </button>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden sm:inline font-medium">
-              {campusScopeFilter === "all" ? "Live cross-campus student posts" : `Showing posts from ${activeInst.name}`}
-            </span>
           </div>
 
-          {/* Post Composer */}
+          {/* 4. CROSS-CAMPUS SCOPE SELECTOR PILLS */}
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setCampusScopeFilter("all")}
+              className={`py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md ${
+                campusScopeFilter === "all"
+                  ? "bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white shadow-purple-600/25"
+                  : "bg-[#0D1424] border border-white/5 text-slate-300 hover:text-white"
+              }`}
+            >
+              <span>🌐 All Campuses Feed</span>
+              <span className="text-xs">▾</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCampusScopeFilter("local")}
+              className={`py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                campusScopeFilter === "local"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                  : "bg-[#0D1424] border border-white/5 text-slate-300 hover:text-white"
+              }`}
+            >
+              <span>🏛️ {activeInst.shortName || "UoN"} Only</span>
+              <span className="text-xs">▾</span>
+            </button>
+          </div>
+
+          {/* 5. CREATE POST QUICK-BAR */}
           {!showNewPost ? (
-            <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-white/[0.06] hover:border-white/10 transition">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <img
-                  src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-                  alt="You"
-                  className="w-9 h-9 rounded-xl object-cover shrink-0"
-                />
-                <button
-                  onClick={() => setShowNewPost(true)}
-                  className="flex-1 text-left text-sm text-slate-400 hover:text-white transition truncate"
-                >
-                  What's happening on campus?
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => {
-                    setShowNewPost(true);
-                    setTimeout(() => postFileInputRef.current?.click(), 100);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                  title="Upload photo from device"
-                >
-                  <Image className="w-4 h-4 text-indigo-400" />
-                  <span>Upload Photo</span>
-                </button>
-              </div>
+            <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[#0D1424] border border-white/10 shadow-lg">
+              <img
+                src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                alt="You"
+                className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+              />
+              <button
+                onClick={() => setShowNewPost(true)}
+                className="flex-1 text-left text-xs md:text-sm text-slate-400 hover:text-white transition truncate cursor-pointer py-1"
+              >
+                What's happening on campus?
+              </button>
+              <button
+                onClick={() => {
+                  setShowNewPost(true);
+                  setTimeout(() => postFileInputRef.current?.click(), 100);
+                }}
+                className="text-indigo-400 hover:text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 py-1 px-2"
+              >
+                <Image className="w-4 h-4 text-indigo-400" />
+                <span>Upload Photo</span>
+              </button>
             </div>
           ) : (
             <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 space-y-3">
@@ -998,24 +995,28 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 );
               }
               return (
-                <div className="text-center py-12 px-6 bg-slate-900/60 rounded-3xl border border-white/10 space-y-3 my-4">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
-                    <MessageSquare className="w-6 h-6" />
+                <div className="text-center py-10 px-6 bg-[#0D1322] rounded-3xl border border-white/10 space-y-4 my-4 shadow-2xl">
+                  {/* Glowing Chat Bubbles Illustration */}
+                  <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-blue-600/20 via-purple-600/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center text-indigo-400 mx-auto shadow-inner relative">
+                    <MessageSquare className="w-8 h-8 text-indigo-400" />
+                    <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center text-xs font-black shadow-md">+</span>
                   </div>
-                  <h3 className="text-base font-bold text-white">
-                    {campusScopeFilter === "local" ? `No Posts on ${activeInst.shortName || activeInst.name} Yet` : "No Campus Posts Yet"}
-                  </h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                    {campusScopeFilter === "local"
-                      ? `Be the first student to post on ${activeInst.name}! Or switch to 'All Campuses Feed' to see posts from other universities.`
-                      : "Be the first student to share an update, start a discussion, or post a photo on campus!"}
-                  </p>
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      {campusScopeFilter === "local" ? `No Posts on ${activeInst.shortName || activeInst.name} Yet` : "No Campus Posts Yet"}
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
+                      {campusScopeFilter === "local"
+                        ? `Be the first student to post on ${activeInst.name}! Or switch to 'All Campuses Feed' to see posts from other universities.`
+                        : "Be the first student to share an update, start a discussion, or post a photo on campus!"}
+                    </p>
+                  </div>
                   <div className="flex items-center justify-center gap-2 pt-1">
                     {campusScopeFilter === "local" && (
                       <button
                         type="button"
                         onClick={() => setCampusScopeFilter("all")}
-                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition cursor-pointer"
+                        className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition cursor-pointer"
                       >
                         View All Campuses Feed
                       </button>
@@ -1028,9 +1029,9 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }
                       }}
-                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:to-pink-500 text-white text-xs font-bold transition-all shadow-xl shadow-purple-600/30 hover:scale-105 cursor-pointer active:scale-95 inline-flex items-center gap-2"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4 stroke-[3]" />
                       <span>Create First Post</span>
                     </button>
                   </div>

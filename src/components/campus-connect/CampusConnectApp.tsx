@@ -802,7 +802,7 @@ export const CampusConnectApp: React.FC = () => {
             {activeTab === "profile" && (
               <CampusTabErrorBoundary tabName="Profile Studio" onReset={() => handleTabChange("profile")}>
                 <UserProfileStudio
-                  profile={userProfile}
+                  profile={userProfile || DEFAULT_FREE_PROFILE}
                   onUpdateProfile={handleUpdateProfile}
                   onLaunchLivenessScan={() => setShowVerificationStudio(true)}
                   onNavigateToSettings={() => handleTabChange("settings")}

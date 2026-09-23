@@ -126,7 +126,15 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
 
   // Selected event derived from navState (or local fallback)
   const selectedEventId = (navState?.tab === "events") ? navState.eventId : undefined;
-  const selectedEvent = events.find((e) => e.id === selectedEventId) || null;
+  const [localSelectedEvent, setLocalSelectedEvent] = useState<CampusEvent | null>(null);
+  const selectedEvent = localSelectedEvent || events.find((e) => e.id === selectedEventId) || null;
+  const setSelectedEvent = (val: CampusEvent | null | ((prev: CampusEvent | null) => CampusEvent | null)) => {
+    if (typeof val === "function") {
+      setLocalSelectedEvent(val(selectedEvent));
+    } else {
+      setLocalSelectedEvent(val);
+    }
+  };
   const eventViewMode = (navState?.tab === "events" && navState.eventView) ? navState.eventView : "details";
   const showHostModal = (navState?.tab === "events" && navState.modal === "host-event");
   const setShowHostModal = (show: boolean) => {
