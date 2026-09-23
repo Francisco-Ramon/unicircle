@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Building2, MessageSquare, ThumbsUp, PlusCircle, Plus, ShieldCheck,
-  Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
+  Users, Calendar, Info, Search, X, Image, Camera, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
@@ -819,73 +819,105 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           </div>
 
           {/* 5. CREATE POST QUICK-BAR */}
-          {!showNewPost ? (
-            <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[#0D1424] border border-white/10 shadow-lg">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#0D1424] border border-white/10 shadow-lg">
+            <div className="relative shrink-0">
               <img
                 src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
                 alt="You"
-                className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+                className="w-11 h-11 rounded-full object-cover border border-white/10"
               />
+            </div>
+            
+            <div className="flex-1 flex items-center justify-between gap-2 p-1.5 pl-4 pr-1.5 rounded-2xl bg-[#090E1B] border border-white/10 shadow-inner">
               <button
+                type="button"
                 onClick={() => setShowNewPost(true)}
                 className="flex-1 text-left text-xs md:text-sm text-slate-400 hover:text-white transition truncate cursor-pointer py-1"
               >
                 What's happening on campus?
               </button>
+              
               <button
+                type="button"
                 onClick={() => {
                   setShowNewPost(true);
-                  setTimeout(() => postFileInputRef.current?.click(), 100);
+                  setTimeout(() => postFileInputRef.current?.click(), 150);
                 }}
-                className="text-indigo-400 hover:text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 py-1 px-2"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141C30] hover:bg-[#1A2540] border border-indigo-500/40 text-indigo-300 hover:text-white font-semibold text-xs transition-all cursor-pointer shrink-0 shadow-sm active:scale-95"
+                title="Upload Photo"
               >
                 <Image className="w-4 h-4 text-indigo-400" />
                 <span>Upload Photo</span>
               </button>
             </div>
-          ) : (
-            <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <img
-                  src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-                  alt="You"
-                  className="w-9 h-9 rounded-xl object-cover shrink-0"
-                />
-                <textarea
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  placeholder="Share with your campus community..."
-                  rows={3}
-                  autoFocus
-                  className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 resize-none focus:outline-none"
-                />
-              </div>
+          </div>
 
-              {newPostImage && (
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center max-h-80">
-                  <img src={newPostImage} alt="Attached preview" className="w-full max-h-80 object-contain rounded-2xl" />
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => postFileInputRef.current?.click()}
-                      className="px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black/90 text-xs font-bold text-white transition backdrop-blur-md cursor-pointer"
-                    >
-                      Change Photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewPostImage("")}
-                      className="p-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition backdrop-blur-md cursor-pointer"
-                      title="Remove image"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+          {/* DEDICATED POST COMPOSER MODAL / SHEET */}
+          {showNewPost && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+              <div className="bg-[#0D1322] border border-white/15 rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 max-h-[90vh] flex flex-col my-auto">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 to-pink-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white leading-tight">Create Campus Post</h3>
+                      <p className="text-[10px] text-slate-400">Share with {activeInst.shortName || "campus"} community</p>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewPost(false); setNewPostContent(""); setNewPostImage(""); }}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                <div className="flex items-center gap-2">
+                <div className="space-y-3 overflow-y-auto flex-1 pr-0.5 scrollbar-thin">
+                  {/* Author info & visibility badge */}
+                  <div className="flex items-center justify-between gap-2 bg-slate-900/50 p-2.5 rounded-2xl border border-white/5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                        alt="You"
+                        className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                          {userProfile?.firstName || "You"} {userProfile?.lastName || ""}
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        </p>
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1 truncate">
+                          <Building2 className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
+                          <span className="truncate">{activeInst.name}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <select
+                      value={postVisibility}
+                      onChange={(e) => setPostVisibility(e.target.value as any)}
+                      className="bg-slate-950 border border-white/10 text-[11px] font-semibold text-slate-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
+                    >
+                      <option value="PUBLIC">🌍 Public</option>
+                      <option value="FOLLOWERS_ONLY">👥 Followers</option>
+                    </select>
+                  </div>
+
+                  {/* Post text input */}
+                  <textarea
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    placeholder={`What's happening on campus? Share a question, study group, event update, or thought with ${activeInst.shortName || "peers"}...`}
+                    rows={4}
+                    autoFocus
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-2xl p-3.5 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:border-indigo-500 transition shadow-inner"
+                  />
+
+                  {/* Hidden file input */}
                   <input
                     type="file"
                     ref={postFileInputRef}
@@ -893,40 +925,85 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                     onChange={handlePostFileChange}
                     className="hidden"
                   />
+
+                  {/* Attached Photo Preview OR Modern Upload Photo Button */}
+                  {newPostImage ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center max-h-64 group">
+                      <img src={newPostImage} alt="Attached preview" className="w-full max-h-64 object-contain rounded-2xl" />
+                      <div className="absolute top-2 right-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => postFileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-black/80 hover:bg-black text-xs font-bold text-white transition backdrop-blur-md cursor-pointer flex items-center gap-1 shadow-lg"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-pink-400" />
+                          <span>Change</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewPostImage("");
+                            if (postFileInputRef.current) postFileInputRef.current.value = "";
+                          }}
+                          className="p-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white transition backdrop-blur-md cursor-pointer shadow-lg"
+                          title="Remove image"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => postFileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-dashed border-indigo-500/30 hover:border-indigo-400 text-indigo-300 hover:text-white font-bold text-xs transition-all cursor-pointer group shadow-sm active:scale-[0.99]"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600/30 to-pink-600/30 border border-indigo-500/30 flex items-center justify-center text-pink-300 group-hover:scale-110 transition-transform">
+                        <Camera className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-indigo-200 group-hover:text-white">Add Photo / Media from Device</p>
+                        <p className="text-[10px] text-slate-400">JPG, PNG, WEBP from camera or gallery</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+
+                {/* Modal Actions Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-white/10 shrink-0">
                   <button
                     type="button"
                     onClick={() => postFileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                    title="Upload Photo from Device"
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Image className="w-4 h-4 text-indigo-400" />
-                    <span>Upload Photo</span>
+                    <Image className="w-4 h-4 text-pink-400" />
+                    <span>{newPostImage ? "Change Photo" : "Upload Photo"}</span>
                   </button>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <select
-                    value={postVisibility}
-                    onChange={(e) => setPostVisibility(e.target.value as any)}
-                    className="bg-slate-950 border border-white/10 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="PUBLIC">🌍 Public</option>
-                    <option value="FOLLOWERS_ONLY">👥 Followers Only</option>
-                  </select>
-
-                  <button
-                    onClick={() => { setShowNewPost(false); setNewPostContent(""); setNewPostImage(""); }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreatePost}
-                    disabled={!newPostContent.trim() || isSubmittingPost}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  >
-                    {isSubmittingPost ? <span>Posting...</span> : <span>Post</span>}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowNewPost(false); setNewPostContent(""); setNewPostImage(""); }}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreatePost}
+                      disabled={!newPostContent.trim() || isSubmittingPost}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:to-pink-500 text-white text-xs font-bold transition-all shadow-lg shadow-purple-600/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      {isSubmittingPost ? (
+                        <span>Publishing...</span>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Publish Post</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1885,6 +1962,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           </div>
         </div>
       )}
+
+      {/* Mobile Floating Action Button for Instant Post Creation */}
+      <button
+        type="button"
+        onClick={() => setShowNewPost(true)}
+        className="fixed bottom-20 right-4 lg:hidden z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 text-white flex items-center justify-center shadow-2xl shadow-purple-600/50 hover:scale-105 active:scale-95 transition-transform cursor-pointer border border-white/20"
+        title="Create New Post"
+      >
+        <Plus className="w-6 h-6 stroke-[3]" />
+      </button>
     </div>
   );
 };

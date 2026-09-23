@@ -592,60 +592,90 @@ export const CampusConnectApp: React.FC = () => {
 
       {/* 2. TOP HEADER & MAIN CENTER WRAPPER */}
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
-        {/* Top Header Bar with Search, Quick Action Button, Chat, Notifications & User Avatar */}
+        {/* Top Header Bar */}
         <header className="sticky top-0 z-40 px-4 md:px-8 py-3 border-b border-white/5 bg-[#090D16]/95 backdrop-blur-xl flex items-center justify-between gap-4">
-          {/* Mobile brand fallback on small screens */}
-          <div
-            onClick={() => handleTabChange("home")}
-            className="lg:hidden flex items-center gap-2 cursor-pointer shrink-0"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-pink-500 p-0.5 flex items-center justify-center">
-              <span className="w-3 h-3 rounded-full border-2 border-white" />
+          {/* Mobile Header Layout (< lg) Matching Screenshot */}
+          <div className="lg:hidden flex items-center justify-between w-full">
+            <div
+              onClick={() => handleTabChange("home")}
+              className="flex items-center gap-2.5 cursor-pointer shrink-0"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-0.5 flex items-center justify-center shadow-lg shadow-purple-600/30">
+                <div className="w-full h-full rounded-full bg-[#090D16] flex items-center justify-center p-1">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-pink-400" />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1 font-black text-base tracking-tight leading-none">
+                  <span className="text-white">Uni</span>
+                  <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Circle</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
+                  Verified Campus Network
+                </span>
+              </div>
+            </div>
+
+            {/* Mobile Header Right Icons */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {/* Notification Bell in dark circle with red badge */}
+              <button
+                onClick={() => handleTabChange("notifications")}
+                className="w-10 h-10 rounded-full bg-[#101726] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition relative cursor-pointer shadow-md"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 rounded-full bg-[#F43F5E] text-white text-[9px] font-black min-w-[16px] h-[16px] flex items-center justify-center shadow-sm">
+                  {unreadNotifCount > 0 ? unreadNotifCount : 2}
+                </span>
+              </button>
+
+              {/* User Avatar in dark circle with chevron */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="flex items-center gap-1 p-1 pl-1 pr-2 rounded-full bg-[#101726] border border-white/10 hover:border-white/20 transition cursor-pointer"
+                >
+                  <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0">
+                    <img
+                      src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                      alt="User"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-[#101726]" />
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Search bar matching screenshot */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              placeholder="Search students, posts, communities..."
-              onClick={() => { if (activeTab !== "home") handleTabChange("home"); }}
-              className="w-full bg-[#101726] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition shadow-inner"
-            />
-          </div>
+          {/* Desktop Header Layout (lg+) */}
+          <div className="hidden lg:flex items-center justify-between w-full gap-4">
+            {/* Search bar matching screenshot */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search students, posts, communities..."
+                onClick={() => { if (activeTab !== "home") handleTabChange("home"); }}
+                className="w-full bg-[#101726] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition shadow-inner"
+              />
+            </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            {/* Purple Plus Action Button */}
-            <button
-              onClick={() => handleTabChange("communities")}
-              className="w-8 h-8 rounded-xl bg-[#5438DC] hover:bg-indigo-600 text-white flex items-center justify-center font-bold text-sm transition shadow-md shadow-indigo-600/30 cursor-pointer"
-              title="Create New Post / Event"
-            >
-              <Plus className="w-4 h-4 stroke-[3]" />
-            </button>
-
-            {/* Chats Icon */}
-            <button
-              onClick={() => handleTabChange("chat")}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition relative cursor-pointer"
-              title="Messages"
-            >
-              <MessageSquare className="w-5 h-5" />
-            </button>
-
-            {/* Notification Bell with Badge */}
-            <button
-              onClick={() => handleTabChange("notifications")}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition relative cursor-pointer"
-              title="Notifications"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 rounded-full bg-[#F43F5E] text-white text-[10px] font-black min-w-[17px] h-[17px] flex items-center justify-center shadow-sm">
-                4
-              </span>
-            </button>
+            {/* Right Action Controls */}
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+              {/* Notification Bell with Badge */}
+              <button
+                onClick={() => handleTabChange("notifications")}
+                className="w-10 h-10 rounded-full bg-[#101726] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/5 transition relative cursor-pointer shadow-sm"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 rounded-full bg-[#F43F5E] text-white text-[10px] font-black min-w-[17px] h-[17px] flex items-center justify-center shadow-sm">
+                  {unreadNotifCount > 0 ? unreadNotifCount : 2}
+                </span>
+              </button>
 
             {/* User Profile Avatar with Online Dot + Full Name */}
             <div className="relative">
@@ -714,7 +744,8 @@ export const CampusConnectApp: React.FC = () => {
               )}
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* 3. CENTER COLUMN MAIN CONTENT WRAPPER */}
         <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0 pb-24 lg:pb-6">
