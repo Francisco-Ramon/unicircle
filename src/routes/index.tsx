@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, ShieldCheck, UserPlus, LogIn, Sparkles } from "lucide-react";
 import { SplashScreen } from "@/components/campus-connect/SplashScreen";
 
 export const Route = createFileRoute("/")({
@@ -9,6 +10,23 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const { session } = useAuth();
+  const [hasAccount, setHasAccount] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      setHasAccount(true);
+    } else if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("unicircle_user_profile");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.email && !parsed.email.includes("student@unicircle.app")) {
+            setHasAccount(true);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [session]);
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden bg-[#070A10] text-white selection:bg-indigo-500 selection:text-white">
@@ -40,6 +58,34 @@ function LandingPage() {
             Uni<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-pink-500">Circle</span>
           </span>
         </div>
+
+        <div className="flex items-center gap-3">
+          {hasAccount ? (
+            <Link
+              to="/app"
+              className="px-5 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Open App
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                search={{ mode: "signin" } as any}
+                className="px-4 py-2 rounded-full text-slate-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/auth"
+                search={{ mode: "signup" } as any}
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Sign Up
+              </Link>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Main One-Screen Hero Content */}
@@ -64,16 +110,35 @@ function LandingPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
-          <Link
-            to="/app"
-            className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2"
-          >
-            Explore UniCircle Now
-            <ArrowRight className="w-5 h-5" />
-          </Link>
+          {hasAccount ? (
+            <Link
+              to="/app"
+              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2"
+            >
+              Explore UniCircle Now
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                search={{ mode: "signup" } as any}
+                className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <UserPlus className="w-5 h-5" />
+                Sign Up as Student
+              </Link>
+              <Link
+                to="/auth"
+                search={{ mode: "signin" } as any}
+                className="w-full sm:w-auto px-8 py-4 rounded-full bg-slate-900/90 border border-white/15 text-slate-200 hover:text-white hover:bg-slate-800 font-bold text-base md:text-lg shadow-xl hover:scale-[1.03] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogIn className="w-5 h-5 text-indigo-400" />
+                Sign In
+              </Link>
+            </>
+          )}
         </div>
-
-
       </main>
 
       {/* Minimal Footer */}

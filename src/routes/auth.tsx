@@ -23,8 +23,10 @@ function AuthPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
-    navigate({ to: "/app" });
-  }, [navigate]);
+    if (session?.user) {
+      navigate({ to: "/app" });
+    }
+  }, [session, navigate]);
 
   async function handleGoogleAuth() {
     setGoogleBusy(true);
