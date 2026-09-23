@@ -121,8 +121,20 @@ export const SettingsScreen: React.FC<Props> = ({
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("unicircle_user_profile");
+      localStorage.removeItem("unicircle_user_id");
+      localStorage.removeItem("unicircle_registered");
+      localStorage.removeItem("unicircle_last_active_tab");
+      localStorage.removeItem("unicircle_last_nav_hash");
+      window.location.href = "/auth";
+    }
   };
+
+
 
   const CATEGORIES = [
     { id: "account", label: "Account", icon: User, color: "text-indigo-400" },
@@ -257,25 +269,6 @@ export const SettingsScreen: React.FC<Props> = ({
                       <p className="text-[11px] text-slate-400">Verified student account with biometric facial liveness lock</p>
                     </div>
                   </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between flex-wrap sm:flex-nowrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <UserPlus className="w-6 h-6 text-indigo-400 shrink-0" />
-                    <div>
-                      <h4 className="text-xs font-bold text-indigo-300">Account Switcher & Authentication</h4>
-                      <p className="text-[11px] text-slate-400">Register a new real student account or sign into another account</p>
-                    </div>
-                  </div>
-                  {onOpenAuthModal && (
-                    <button
-                      type="button"
-                      onClick={onOpenAuthModal}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer whitespace-nowrap"
-                    >
-                      Sign In / Register
-                    </button>
-                  )}
                 </div>
 
                 <div className="pt-2 border-t border-white/10 flex gap-3">

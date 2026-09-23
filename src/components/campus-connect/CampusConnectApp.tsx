@@ -121,11 +121,10 @@ class CampusTabErrorBoundary extends React.Component<{ children: React.ReactNode
 }
 
 export const CampusConnectApp: React.FC = () => {
-  // 100% Free Direct Access: No login/account creation required
   const [isRegistered, setIsRegistered] = useState<boolean>(true);
   const [isBiometricVerified, setIsBiometricVerified] = useState<boolean>(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+
 
   // User Profile: Default to active verified student profile
   const [userProfile, setUserProfile] = useState<StudentProfileData | null>(() => {
@@ -518,16 +517,14 @@ export const CampusConnectApp: React.FC = () => {
     } catch (e) {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("unicircle_user_profile");
-      safeSetItem("unicircle_user_profile", JSON.stringify(DEFAULT_FREE_PROFILE));
+      localStorage.removeItem("unicircle_user_id");
+      localStorage.removeItem("unicircle_registered");
+      localStorage.removeItem("unicircle_last_active_tab");
+      localStorage.removeItem("unicircle_last_nav_hash");
+      window.location.href = "/auth";
     }
-    setUserProfile(DEFAULT_FREE_PROFILE);
-    setIsRegistered(true);
-    setIsBiometricVerified(true);
-    setShowVerificationStudio(false);
-    handleTabChange("home");
-    setShowUserDropdown(false);
-    toast.success("Feed refreshed in free access mode!");
   };
+
 
   const handleSwipeLike = async (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
@@ -687,14 +684,6 @@ export const CampusConnectApp: React.FC = () => {
                         <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => { setShowAuthModal(true); setShowUserDropdown(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition cursor-pointer"
-                      >
-                        <UserPlus className="w-4 h-4 text-emerald-400" /> Create Account / Sign In
-                      </button>
-
                       <div className="pt-1 border-t border-white/10">
                         <button
                           type="button"
@@ -798,14 +787,6 @@ export const CampusConnectApp: React.FC = () => {
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
                     >
                       <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => { setShowAuthModal(true); setShowUserDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition cursor-pointer"
-                    >
-                      <UserPlus className="w-4 h-4 text-emerald-400" /> Create Account / Sign In
                     </button>
 
                     <div className="pt-1 border-t border-white/10">
@@ -1021,23 +1002,7 @@ export const CampusConnectApp: React.FC = () => {
           handleTabChange("chat");
         }}
       />
-
-      {/* Real Account Registration & Sign-In Modal */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="relative w-full max-w-xl my-auto bg-slate-900/95 border border-white/15 rounded-3xl shadow-2xl overflow-hidden">
-            <RegistrationWizard
-              onComplete={(newProfile) => {
-                setUserProfile(newProfile);
-                setIsRegistered(true);
-                setShowAuthModal(false);
-                toast.success(`Active on UniCircle as ${newProfile.firstName}!`);
-              }}
-              onCancel={() => setShowAuthModal(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+

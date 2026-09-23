@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck, UserPlus, LogIn, Sparkles } from "lucide-react";
 import { SplashScreen } from "@/components/campus-connect/SplashScreen";
+import { RegistrationWizard, StudentProfileData } from "@/components/campus-connect/RegistrationWizard";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -10,7 +11,9 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [hasAccount, setHasAccount] = useState<boolean>(false);
+  const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (session?.user) {
@@ -27,6 +30,13 @@ function LandingPage() {
       }
     }
   }, [session]);
+
+  const handleRegistrationComplete = (newProfile: StudentProfileData) => {
+    setShowRegisterModal(false);
+    setHasAccount(true);
+    navigate({ to: "/app" });
+  };
+
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden bg-[#070A10] text-white selection:bg-indigo-500 selection:text-white">
@@ -72,17 +82,17 @@ function LandingPage() {
               <Link
                 to="/auth"
                 search={{ mode: "signin" } as any}
-                className="px-4 py-2 rounded-full text-slate-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition"
+                className="px-4 py-2 rounded-full text-slate-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition cursor-pointer"
               >
                 Sign In
               </Link>
-              <Link
-                to="/auth"
-                search={{ mode: "signup" } as any}
-                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5"
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(true)}
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" /> Sign Up
-              </Link>
+              </button>
             </>
           )}
         </div>
@@ -113,21 +123,21 @@ function LandingPage() {
           {hasAccount ? (
             <Link
               to="/app"
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               Explore UniCircle Now
               <ArrowRight className="w-5 h-5" />
             </Link>
           ) : (
             <>
-              <Link
-                to="/auth"
-                search={{ mode: "signup" } as any}
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(true)}
                 className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-base md:text-lg shadow-xl shadow-indigo-600/40 hover:shadow-indigo-600/60 hover:scale-[1.03] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <UserPlus className="w-5 h-5" />
                 Sign Up as Student
-              </Link>
+              </button>
               <Link
                 to="/auth"
                 search={{ mode: "signin" } as any}
@@ -140,6 +150,18 @@ function LandingPage() {
           )}
         </div>
       </main>
+
+      {/* Modal Registration Wizard on Landing Page */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-2xl my-8">
+            <RegistrationWizard
+              onComplete={handleRegistrationComplete}
+              onCancel={() => setShowRegisterModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Minimal Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10 text-xs text-slate-400">
@@ -156,3 +178,4 @@ function LandingPage() {
     </div>
   );
 }
+
