@@ -46,7 +46,7 @@ export const MatchCelebrationModal: React.FC<Props> = ({ matchedProfile, current
           {/* User Avatar */}
           <div className="relative w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-pink-500 to-indigo-500 shadow-2xl shadow-pink-500/40">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
+              src={currentUserProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"}
               alt="You"
               className="w-full h-full object-cover rounded-full"
             />

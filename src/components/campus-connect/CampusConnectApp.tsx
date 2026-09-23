@@ -836,6 +836,9 @@ export const CampusConnectApp: React.FC = () => {
                   onSwipeSuperLike={handleSwipeSuperLike}
                   onOpenFilters={() => setShowFilterDrawer(true)}
                   intentMode={intentMode}
+                  discoveryRadius={discoveryRadius}
+                  onChangeIntentMode={(m) => setIntentMode(m)}
+                  onChangeDiscoveryRadius={(r) => setDiscoveryRadius(r)}
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
@@ -1000,7 +1003,7 @@ export const CampusConnectApp: React.FC = () => {
         onStartChat={(m) => {
           setCelebratedMatch(null);
           setActiveChatMatch(m);
-          handleTabChange("chat");
+          handleNavigate({ tab: "chat", matchId: m.id, chatView: "chat" });
         }}
       />
     </div>

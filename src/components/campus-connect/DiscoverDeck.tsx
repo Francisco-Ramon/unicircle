@@ -44,6 +44,9 @@ interface Props {
   onSwipeSuperLike: (profile: StudentProfile) => void;
   onOpenFilters: () => void;
   intentMode: string;
+  discoveryRadius?: "MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL";
+  onChangeIntentMode?: (mode: string) => void;
+  onChangeDiscoveryRadius?: (radius: "MY_INSTITUTION" | "NEARBY" | "NATIONWIDE" | "INTERNATIONAL") => void;
   navState?: AppNavState;
   onNavigate?: (state: AppNavState) => void;
 }
@@ -56,6 +59,9 @@ export const DiscoverDeck: React.FC<Props> = ({
   onSwipeSuperLike,
   onOpenFilters,
   intentMode,
+  discoveryRadius = "NATIONWIDE",
+  onChangeIntentMode,
+  onChangeDiscoveryRadius,
   navState,
   onNavigate,
 }) => {
@@ -90,6 +96,7 @@ export const DiscoverDeck: React.FC<Props> = ({
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeQuickTab, setActiveQuickTab] = useState<string>("all");
   const [savedProfiles, setSavedProfiles] = useState<Set<string>>(new Set());
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [reportedProfiles, setReportedProfiles] = useState<Set<string>>(new Set());
@@ -99,14 +106,39 @@ export const DiscoverDeck: React.FC<Props> = ({
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const filteredProfiles = profiles.filter((student) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesName = student.name.toLowerCase().includes(q);
-    const matchesCampus = student.campus.toLowerCase().includes(q);
-    const matchesCourse = student.course.toLowerCase().includes(q);
-    const matchesBio = student.bio.toLowerCase().includes(q);
-    const matchesInterests = student.interests?.some((i) => i.toLowerCase().includes(q));
-    return matchesName || matchesCampus || matchesCourse || matchesBio || matchesInterests;
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesName = student.name.toLowerCase().includes(q);
+      const matchesCampus = student.campus.toLowerCase().includes(q);
+      const matchesCourse = student.course.toLowerCase().includes(q);
+      const matchesBio = student.bio.toLowerCase().includes(q);
+      const matchesInterests = student.interests?.some((i) => i.toLowerCase().includes(q));
+      if (!matchesName && !matchesCampus && !matchesCourse && !matchesBio && !matchesInterests) {
+        return false;
+      }
+    }
+
+    // 2. Discovery Scope Filter
+    if (discoveryRadius === "MY_INSTITUTION" || activeQuickTab === "my_campus") {
+      if (currentProfile?.campus && student.campus !== currentProfile.campus) return false;
+    } else if (discoveryRadius === "NEARBY" || activeQuickTab === "nearby") {
+      if ((student.distanceKm || 0) > 35 && student.campus !== currentProfile?.campus) return false;
+    }
+
+    // 3. Quick Mode Filter
+    if (activeQuickTab === "dating") {
+      if (student.intentMode && student.intentMode !== "Dating") return false;
+    } else if (activeQuickTab === "study") {
+      if (student.intentMode && student.intentMode !== "Study Partner") return false;
+    } else if (activeQuickTab === "networking") {
+      if (student.intentMode && student.intentMode !== "Networking") return false;
+    }
+
+    // 4. Blocked / Reported profiles
+    if (blockedProfiles.has(student.id)) return false;
+
+    return true;
   });
 
   const toggleSave = (id: string) => {
@@ -160,8 +192,15 @@ export const DiscoverDeck: React.FC<Props> = ({
     if (activePhotoIndex > 0) setActivePhotoIndex((i) => i - 1);
   };
 
+  const handleStartChatWithStudent = (student: StudentProfile, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (onNavigate) {
+      onNavigate({ tab: "chat", matchId: student.id, chatView: "chat" });
+    }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 py-2">
+    <div className="w-full max-w-4xl mx-auto space-y-5 py-2">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -191,12 +230,47 @@ export const DiscoverDeck: React.FC<Props> = ({
 
           <button
             onClick={onOpenFilters}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition shrink-0"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-300 transition shrink-0 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
             <span className="hidden sm:inline">Filters</span>
           </button>
         </div>
+      </div>
+
+      {/* Quick Filter Category Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        {[
+          { id: "all", label: "All Students" },
+          { id: "my_campus", label: currentProfile?.campus ? `My Campus (${currentProfile.campus.split(" ")[0]})` : "My Campus" },
+          { id: "nearby", label: "Nearby (<25km)" },
+          { id: "dating", label: "Dating & Romance" },
+          { id: "study", label: "Study Buddies" },
+          { id: "networking", label: "Networking" },
+        ].map((tab) => {
+          const isActive = activeQuickTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveQuickTab(tab.id);
+                if (tab.id === "my_campus" && onChangeDiscoveryRadius) onChangeDiscoveryRadius("MY_INSTITUTION");
+                else if (tab.id === "nearby" && onChangeDiscoveryRadius) onChangeDiscoveryRadius("NEARBY");
+                else if (tab.id === "dating" && onChangeIntentMode) onChangeIntentMode("Dating");
+                else if (tab.id === "study" && onChangeIntentMode) onChangeIntentMode("Study Partner");
+                else if (tab.id === "networking" && onChangeIntentMode) onChangeIntentMode("Networking");
+              }}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105"
+                  : "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Empty State when no search matches */}
@@ -205,13 +279,13 @@ export const DiscoverDeck: React.FC<Props> = ({
           <Search className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <h3 className="text-base font-bold text-white mb-1">No students found</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-            We couldn't find any verified students matching "{searchQuery}". Try a different name or clear the search.
+            We couldn't find any verified students matching your current filters. Try changing scope or clearing search.
           </p>
           <button
-            onClick={() => setSearchQuery("")}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition shadow-lg shadow-indigo-600/30"
+            onClick={() => { setSearchQuery(""); setActiveQuickTab("all"); }}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition shadow-lg shadow-indigo-600/30 cursor-pointer"
           >
-            Clear Search
+            Reset Filters
           </button>
         </div>
       )}
@@ -270,10 +344,16 @@ export const DiscoverDeck: React.FC<Props> = ({
 
             {/* Card Footer */}
             <div className="p-3 space-y-1.5">
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
-                <GraduationCap className="w-3 h-3 text-slate-500 shrink-0" />
-                {student.campus}
-              </p>
+              <div className="flex items-center justify-between text-[11px]">
+                <p className="text-slate-400 flex items-center gap-1 truncate font-medium">
+                  <GraduationCap className="w-3 h-3 text-slate-500 shrink-0" />
+                  {student.campus}
+                </p>
+                <span className="text-[10px] text-indigo-400 font-bold shrink-0">
+                  {student.distanceKm ? `${student.distanceKm}km` : "Nearby"}
+                </span>
+              </div>
+
               <p className="text-[11px] text-slate-500 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-slate-600 shrink-0" />
                 {student.country || "Kenya"} • {student.yearOfStudy}
@@ -281,7 +361,7 @@ export const DiscoverDeck: React.FC<Props> = ({
 
               {/* Mutual interests */}
               {student.interests.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
+                <div className="flex flex-wrap gap-1 pt-0.5">
                   {student.interests.slice(0, 2).map((interest) => (
                     <span key={interest} className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 text-[10px] font-medium">
                       {interest}
@@ -292,6 +372,29 @@ export const DiscoverDeck: React.FC<Props> = ({
                   )}
                 </div>
               )}
+
+              {/* Quick Card Action Buttons */}
+              <div className="pt-2 flex items-center gap-1.5 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSwipeLike(student);
+                  }}
+                  className="flex-1 py-1.5 rounded-xl bg-pink-600/20 hover:bg-pink-600 border border-pink-500/30 text-pink-300 hover:text-white text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                  title="Like / Match"
+                >
+                  <Heart className="w-3 h-3 fill-current" /> Connect
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleStartChatWithStudent(student, e)}
+                  className="p-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 text-indigo-300 hover:text-white transition cursor-pointer"
+                  title="Send Direct Message"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
