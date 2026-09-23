@@ -17,6 +17,9 @@ import {
   subscribeToLiveMessages,
   uploadToStorage,
   getOrCreateConversation,
+  compressImageFile,
+  convertBlobToBase64,
+  getLocalUserId,
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
 import { AppNavState } from "@/lib/navigationHistory";
@@ -24,6 +27,7 @@ import { AppNavState } from "@/lib/navigationHistory";
 export interface ChatMessage {
   id: string;
   senderId: string;
+  senderName?: string;
   text: string;
   timestamp: string;
   isRead: boolean;
@@ -316,6 +320,15 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Audio Recording & Playback refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const typingTimeoutRef = useRef<any>(null);
+  const typingSenderRef = useRef<((isTyping: boolean, senderName?: string) => void) | null>(null);
+
   // Filter Pill State
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -353,6 +366,12 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
   const [newStoryText, setNewStoryText] = useState("");
   const [userStory, setUserStory] = useState<{ text: string; time: string } | null>(null);
 
+  // Lightbox modal for shared images
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Remote typing status indicator
+  const [remoteTyping, setRemoteTyping] = useState<{ name: string; isTyping: boolean } | null>(null);
+
   // Message Map State (Cached & Syncable)
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
     if (typeof window !== "undefined") {
@@ -385,7 +404,6 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   // Available Friends Pool (For group additions)
   const availableFriends = useMemo(() => {
@@ -458,6 +476,97 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
     return allConversations.find((c) => c.id === targetId) || null;
   }, [selectedConvId, navState?.matchId, allConversations]);
 
+  // Auto scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messagesMap, selectedConvId]);
+
+  // Supabase Real-Time Live Message & Typing Subscription
+  useEffect(() => {
+    if (!currentConversation) return;
+    const conversationId = currentConversation.id;
+
+    // 1. Fetch any live stored messages from Supabase
+    fetchConversationMessages(conversationId).then((liveMsgs) => {
+      if (liveMsgs && liveMsgs.length > 0) {
+        const mapped: ChatMessage[] = liveMsgs.map((m) => ({
+          id: m.id,
+          senderId: m.sender_id === getLocalUserId() ? "me" : m.sender_id,
+          senderName: m.sender_name,
+          text: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isRead: true,
+          type: m.type || "text",
+          mediaUrl: m.media_url,
+          durationSec: m.duration_sec,
+        }));
+
+        updateMessagesMap((prev) => {
+          const currentList = prev[conversationId] || [];
+          const existingIds = new Set(currentList.map((x) => x.id));
+          const newEntries = mapped.filter((x) => !existingIds.has(x.id));
+          if (newEntries.length === 0) return prev;
+          return {
+            ...prev,
+            [conversationId]: [...currentList, ...newEntries],
+          };
+        });
+      }
+    });
+
+    // 2. Subscribe to Supabase Realtime broadcast & changes
+    const cleanup = subscribeToLiveMessages(conversationId, {
+      onNewMessage: (incomingMsg) => {
+        const isMyMsg = incomingMsg.sender_id === getLocalUserId();
+        const chatMsg: ChatMessage = {
+          id: incomingMsg.id,
+          senderId: isMyMsg ? "me" : incomingMsg.sender_id,
+          senderName: incomingMsg.sender_name,
+          text: incomingMsg.content,
+          timestamp: new Date(incomingMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isRead: true,
+          type: incomingMsg.type || "text",
+          mediaUrl: incomingMsg.media_url,
+          durationSec: incomingMsg.duration_sec,
+        };
+
+        updateMessagesMap((prev) => {
+          const list = prev[conversationId] || [];
+          if (list.some((m) => m.id === chatMsg.id)) return prev;
+          return {
+            ...prev,
+            [conversationId]: [...list, chatMsg],
+          };
+        });
+      },
+      onTyping: (data) => {
+        if (data.senderId !== getLocalUserId()) {
+          setRemoteTyping({
+            name: data.senderName || currentConversation.name,
+            isTyping: data.isTyping,
+          });
+          if (data.isTyping) {
+            setTimeout(() => {
+              setRemoteTyping((cur) => (cur?.isTyping ? { ...cur, isTyping: false } : cur));
+            }, 3000);
+          }
+        }
+      },
+    });
+
+    if (typeof cleanup === "object" && (cleanup as any).sendTypingStatus) {
+      typingSenderRef.current = (cleanup as any).sendTypingStatus;
+    } else {
+      typingSenderRef.current = null;
+    }
+
+    return () => {
+      if (typeof cleanup === "function") cleanup();
+      else if (typeof cleanup === "object" && cleanup) (cleanup as any)();
+      typingSenderRef.current = null;
+    };
+  }, [currentConversation?.id]);
+
   // Handle Redirect to Discover Tab
   const handleRedirectToDiscover = () => {
     if (onNavigateToDiscover) {
@@ -487,6 +596,20 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
     setSelectedConvId(null);
     if (onNavigate) {
       onNavigate({ tab: "chat", chatView: "list" });
+    }
+  };
+
+  // Typing change handler with debounce
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(e.target.value);
+    if (typingSenderRef.current) {
+      typingSenderRef.current(true, currentUser?.firstName || "Student");
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        if (typingSenderRef.current) {
+          typingSenderRef.current(false, currentUser?.firstName || "Student");
+        }
+      }, 1800);
     }
   };
 
@@ -586,9 +709,13 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
   const handleSendMessage = async () => {
     if (!inputText.trim() || !currentConversation) return;
     const textToSend = inputText.trim();
+    const myId = getLocalUserId();
+    const myName = currentUser?.firstName || "You";
+
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       senderId: "me",
+      senderName: myName,
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isRead: true,
@@ -601,32 +728,39 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
     }));
     setInputText("");
 
-    // Push to Supabase if 1-on-1 live user
+    if (typingSenderRef.current) {
+      typingSenderRef.current(false, myName);
+    }
+
+    // Push to Supabase Realtime & Postgres
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user && activeConversationId && !currentConversation.isGroup) {
-        await sendLiveChatMessage({
-          conversationId: activeConversationId,
-          senderId: authData.user.id,
-          content: textToSend,
-        });
-      }
+      await sendLiveChatMessage({
+        conversationId: currentConversation.id,
+        senderId: myId,
+        senderName: myName,
+        recipientId: currentConversation.studentProfile?.id,
+        content: textToSend,
+        messageType: "text",
+      });
     } catch (e) {
-      console.warn("Could not push message:", e);
+      console.warn("Could not push live message:", e);
     }
   };
 
-  // Image Upload
+  // Image Upload with Instant Compression & Lightbox
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0 && currentConversation) {
-      const file = files[0];
-      const publicUrl = await uploadToStorage(file, "chat_media");
-      const fileUrl = publicUrl || URL.createObjectURL(file);
+      const rawFile = files[0];
+      const { base64 } = await compressImageFile(rawFile, 1200, 0.82);
+      const fileUrl = base64 || URL.createObjectURL(rawFile);
+      const myId = getLocalUserId();
+      const myName = currentUser?.firstName || "You";
 
       const imgMsg: ChatMessage = {
         id: `img-${Date.now()}`,
         senderId: "me",
+        senderName: myName,
         text: "Shared a photo",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isRead: true,
@@ -638,31 +772,176 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
         ...prev,
         [currentConversation.id]: [...(prev[currentConversation.id] || []), imgMsg],
       }));
+
+      // Broadcast over live Supabase channel
+      try {
+        await sendLiveChatMessage({
+          conversationId: currentConversation.id,
+          senderId: myId,
+          senderName: myName,
+          recipientId: currentConversation.studentProfile?.id,
+          content: "Shared a photo",
+          messageType: "image",
+          mediaUrl: fileUrl,
+        });
+      } catch (err) {}
     }
   };
 
-  // Voice Note Send
-  const handleSendVoiceNote = () => {
+  // Start Real Microphone Recording
+  const handleStartRecording = async () => {
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    audioChunksRef.current = [];
+
+    // Ticker timer
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingSeconds((prev) => prev + 1);
+    }, 1000);
+
+    // Request actual mic stream if available
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = stream;
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        recorder.start();
+      }
+    } catch (err) {
+      console.warn("Microphone access note (fallback to simulated note):", err);
+    }
+  };
+
+  // Stop Recording and Send Voice Note
+  const handleSendVoiceNote = async () => {
     if (!currentConversation) return;
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+
+    const duration = Math.max(1, recordingSeconds);
+    const myId = getLocalUserId();
+    const myName = currentUser?.firstName || "You";
+
+    let audioDataUrl = "";
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        const recordedBlob = await new Promise<Blob>((resolve) => {
+          if (!mediaRecorderRef.current) return resolve(new Blob());
+          mediaRecorderRef.current.onstop = () => {
+            const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+            resolve(blob);
+          };
+          mediaRecorderRef.current.stop();
+        });
+
+        if (recordedBlob.size > 0) {
+          audioDataUrl = await convertBlobToBase64(recordedBlob);
+        }
+      } catch (e) {}
+    }
+
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current = null;
+    }
+
     const voiceMsg: ChatMessage = {
       id: `voice-${Date.now()}`,
       senderId: "me",
+      senderName: myName,
       text: "Voice message",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isRead: true,
       type: "voice",
-      durationSec: recordingSeconds || 5,
+      mediaUrl: audioDataUrl || undefined,
+      durationSec: duration,
     };
+
     updateMessagesMap((prev) => ({
       ...prev,
       [currentConversation.id]: [...(prev[currentConversation.id] || []), voiceMsg],
     }));
+
     setIsRecording(false);
     setRecordingSeconds(0);
+
+    // Broadcast over live channel
+    try {
+      await sendLiveChatMessage({
+        conversationId: currentConversation.id,
+        senderId: myId,
+        senderName: myName,
+        recipientId: currentConversation.studentProfile?.id,
+        content: "Voice message",
+        messageType: "voice",
+        mediaUrl: audioDataUrl,
+        durationSec: duration,
+      });
+    } catch (err) {}
+  };
+
+  // Cancel Voice Recording
+  const handleCancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {}
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    audioChunksRef.current = [];
+  };
+
+  // Voice Note Playback Toggle
+  const handleToggleVoicePlayback = (msgId: string, mediaUrl?: string, durationSec = 5) => {
+    if (playingVoiceId === msgId) {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+      }
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
+
+    if (mediaUrl) {
+      const audio = new Audio(mediaUrl);
+      audioElementRef.current = audio;
+      setPlayingVoiceId(msgId);
+      audio.play().catch(() => {});
+      audio.onended = () => setPlayingVoiceId(null);
+      audio.onerror = () => setPlayingVoiceId(null);
+    } else {
+      // Simulation if raw audio data not stored
+      setPlayingVoiceId(msgId);
+      setTimeout(() => {
+        setPlayingVoiceId((prev) => (prev === msgId ? null : prev));
+      }, durationSec * 1000);
+    }
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto h-[86vh] md:h-[82vh] bg-[#0A0E17] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row relative">
+
       
       {/* ─── 1. CONVERSATIONS LIST SCREEN (Matches Screenshot) ─── */}
       <div className={`w-full md:w-[380px] lg:w-[400px] bg-[#080C14] border-r border-white/5 flex flex-col h-full shrink-0 ${
@@ -1033,6 +1312,13 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
 
                 return (
                   <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"} group`}>
+                    {/* Show sender name for group chats if not me */}
+                    {currentConversation.isGroup && !isMe && msg.senderName && (
+                      <span className="text-[10px] text-purple-400 font-bold mb-1 pl-1">
+                        {msg.senderName}
+                      </span>
+                    )}
+
                     <div className="flex items-center gap-2 max-w-[85%] sm:max-w-[75%]">
                       <div
                         className={`p-3.5 rounded-2xl text-xs leading-relaxed relative shadow-md ${
@@ -1042,36 +1328,42 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
                         }`}
                       >
                         {msg.type === "image" && msg.mediaUrl ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1 cursor-pointer" onClick={() => setPreviewImage(msg.mediaUrl || null)}>
                             <img
                               src={msg.mediaUrl}
                               alt="Shared photo"
-                              className="rounded-xl max-h-56 w-full object-cover border border-white/10"
+                              className="rounded-xl max-h-64 w-full object-cover border border-white/10 hover:opacity-95 transition"
                             />
                             {msg.text && msg.text !== "Shared a photo" && <p className="pt-1">{msg.text}</p>}
                           </div>
                         ) : msg.type === "voice" ? (
-                          <div className="flex items-center gap-3 min-w-[180px]">
+                          <div className="flex items-center gap-3 min-w-[190px]">
                             <button
                               type="button"
-                              onClick={() => setPlayingVoiceId(playingVoiceId === msg.id ? null : msg.id)}
-                              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+                              onClick={() => handleToggleVoicePlayback(msg.id, msg.mediaUrl, msg.durationSec)}
+                              className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition active:scale-95 cursor-pointer"
+                              title={playingVoiceId === msg.id ? "Pause" : "Play"}
                             >
-                              {playingVoiceId === msg.id ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                              {playingVoiceId === msg.id ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
                             </button>
-                            <div className="flex-1 h-3 flex items-center gap-1">
-                              {[40, 70, 30, 90, 50, 80, 60, 40, 70, 30].map((h, i) => (
+                            <div className="flex-1 h-4 flex items-center gap-1">
+                              {[30, 60, 90, 45, 80, 50, 95, 40, 70, 35, 60, 85, 40, 75].map((h, i) => (
                                 <div
                                   key={i}
-                                  className={`w-1 rounded-full ${playingVoiceId === msg.id ? "bg-white animate-pulse" : "bg-white/40"}`}
-                                  style={{ height: `${h}%` }}
+                                  className={`w-1 rounded-full transition-all duration-200 ${
+                                    playingVoiceId === msg.id ? "bg-white animate-pulse" : "bg-white/40"
+                                  }`}
+                                  style={{
+                                    height: playingVoiceId === msg.id ? `${Math.min(100, h * 1.1)}%` : `${h * 0.7}%`,
+                                    animationDelay: `${(i % 5) * 0.15}s`,
+                                  }}
                                 />
                               ))}
                             </div>
-                            <span className="text-[10px] font-mono text-white/80">{msg.durationSec || 6}s</span>
+                            <span className="text-[10px] font-mono text-white/80 font-bold shrink-0">{msg.durationSec || 5}s</span>
                           </div>
                         ) : (
-                          <p>{msg.text}</p>
+                          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                         )}
 
                         <div className="flex items-center justify-end gap-1 text-[10px] text-white/60 mt-1">
@@ -1083,6 +1375,19 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
                   </div>
                 );
               })}
+
+              {/* Remote typing indicator */}
+              {remoteTyping && remoteTyping.isTyping && (
+                <div className="flex items-center gap-2 text-xs text-purple-400 italic animate-pulse pl-1">
+                  <span>{remoteTyping.name} is typing</span>
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0.2s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -1097,24 +1402,28 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
               />
 
               {isRecording ? (
-                <div className="flex items-center justify-between px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-2xl animate-pulse">
-                  <div className="flex items-center gap-2 text-xs font-bold text-red-300 truncate pr-2">
-                    <Mic className="w-4 h-4 text-red-400 animate-spin shrink-0" /> Recording Voice Note ({recordingSeconds}s)...
+                <div className="flex items-center justify-between px-4 py-2.5 bg-red-500/20 border border-red-500/30 rounded-2xl animate-pulse">
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-red-300 truncate pr-2">
+                    <span className="relative flex h-3 w-3 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    <Mic className="w-4 h-4 text-red-400 shrink-0" /> Recording Voice Note ({recordingSeconds}s)...
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setIsRecording(false)}
-                      className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                      onClick={handleCancelRecording}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white transition"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleSendVoiceNote}
-                      className="px-3 py-1 rounded-xl bg-red-500 text-white text-xs font-bold"
+                      className="px-4 py-1.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/30 transition cursor-pointer"
                     >
-                      Send
+                      Send Note
                     </button>
                   </div>
                 </div>
@@ -1123,7 +1432,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => chatFileInputRef.current?.click()}
-                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0"
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0 cursor-pointer"
                     title="Attach Photo"
                   >
                     <Image className="w-4 h-4 text-purple-400" />
@@ -1131,12 +1440,9 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsRecording(true);
-                      setRecordingSeconds(4);
-                    }}
-                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0"
-                    title="Voice Note"
+                    onClick={handleStartRecording}
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition shrink-0 cursor-pointer"
+                    title="Record Voice Note"
                   >
                     <Mic className="w-4 h-4 text-indigo-400" />
                   </button>
@@ -1145,7 +1451,7 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
                     type="text"
                     placeholder={`Message ${currentConversation.name}...`}
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
+                    onChange={handleInputChange}
                     onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                     className="flex-1 px-4 py-2.5 bg-slate-900 border border-white/10 rounded-2xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 min-w-0"
                   />
@@ -1445,6 +1751,32 @@ const RealTimeChatSuiteContent: React.FC<Props> = ({
                 Publish Story
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Image Fullscreen Lightbox Modal ─── */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-12 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImage}
+              alt="Preview"
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/20 shadow-2xl"
+            />
           </div>
         </div>
       )}
