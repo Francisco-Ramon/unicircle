@@ -49,6 +49,7 @@ interface CommunityPost {
   timeAgo: string;
   content: string;
   image?: string;
+  campus?: string;
   visibility?: PostVisibility;
   likes: number;
   commentsCount: number;
@@ -145,6 +146,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [selectedMemberProfile, setSelectedMemberProfile] = useState<any | null>(null);
   const [liveCommunityMembers, setLiveCommunityMembers] = useState<any[]>([]);
+  const [campusScopeFilter, setCampusScopeFilter] = useState<"all" | "local">("all");
 
   // Sync posts to localStorage
   const updatePosts = (newPosts: CommunityPost[]) => {
@@ -178,8 +180,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     async function loadLiveData() {
       try {
         const [livePostsData, liveEventsData, liveProfs] = await Promise.all([
-          fetchLivePosts(activeInst.name),
-          fetchLiveEvents(activeInst.name),
+          fetchLivePosts(),
+          fetchLiveEvents(),
           fetchLiveDiscoverProfiles(),
         ]);
 
@@ -214,6 +216,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               timeAgo: new Date(lp.created_at).toLocaleDateString(),
               content: lp.content,
               image: lp.image_url,
+              campus: lp.campus || "University of Nairobi",
               visibility: lp.visibility || "PUBLIC",
               likes: lp.likes_count || 0,
               commentsCount: lp.comments_count || 0,
@@ -760,6 +763,40 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 ))}
             </div>
           </div>
+          {/* Cross-Campus Scope Selector Pill */}
+          <div className="flex items-center justify-between gap-2 px-1 pb-1">
+            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+              <button
+                type="button"
+                onClick={() => setCampusScopeFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  campusScopeFilter === "all"
+                    ? "bg-gradient-to-r from-indigo-600 to-pink-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>🌍 All Campuses Feed</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">{posts.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCampusScopeFilter("local")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  campusScopeFilter === "local"
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>🏛️ {activeInst.shortName || "This Campus"} Only</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">
+                  {posts.filter((p) => !p.campus || p.campus.toLowerCase().includes(activeInst.name.toLowerCase()) || activeInst.name.toLowerCase().includes((p.campus || "").toLowerCase())).length}
+                </span>
+              </button>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden sm:inline font-medium">
+              {campusScopeFilter === "all" ? "Live cross-campus student posts" : `Showing posts from ${activeInst.name}`}
+            </span>
+          </div>
 
           {/* Post Composer */}
           {!showNewPost ? (
@@ -885,6 +922,15 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
           {(() => {
             const currentUserId = userProfile?.id || getLocalUserId();
             const visiblePosts = posts.filter((post) => {
+              // 1. Campus Scope Filter (All Campuses vs Local Campus)
+              if (campusScopeFilter === "local" && post.campus && activeInst.name) {
+                const pCamp = post.campus.toLowerCase();
+                const aCamp = activeInst.name.toLowerCase();
+                if (!pCamp.includes(aCamp) && !aCamp.includes(pCamp)) {
+                  return false;
+                }
+              }
+
               const effectiveAuthorId = post.authorId || `author_${post.id}`;
               const isOwnPost = Boolean(
                 (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
@@ -892,13 +938,13 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                 ((post as any).authorEmail && userProfile?.email && (post as any).authorEmail.toLowerCase() === userProfile.email.toLowerCase())
               );
 
-              // 1. If on "Following" feed: STRICTLY only show posts by authors you are actively following!
+              // 2. If on "Following" feed: STRICTLY only show posts by authors you are actively following!
               if (activeTab === "following") {
                 if (isOwnPost) return false;
                 return SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
               }
 
-              // 2. If post is marked FOLLOWERS_ONLY: only show if author or followed
+              // 3. If post is marked FOLLOWERS_ONLY: only show if author or followed
               if (post.visibility === "FOLLOWERS_ONLY") {
                 if (isOwnPost) return true;
                 return SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
@@ -939,23 +985,38 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                   <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
                     <MessageSquare className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-white">No Campus Posts Yet</h3>
+                  <h3 className="text-base font-bold text-white">
+                    {campusScopeFilter === "local" ? `No Posts on ${activeInst.shortName || activeInst.name} Yet` : "No Campus Posts Yet"}
+                  </h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                    Be the first student to share an update, start a discussion, or post a photo on campus!
+                    {campusScopeFilter === "local"
+                      ? `Be the first student to post on ${activeInst.name}! Or switch to 'All Campuses Feed' to see posts from other universities.`
+                      : "Be the first student to share an update, start a discussion, or post a photo on campus!"}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewPost(true);
-                      if (typeof window !== "undefined") {
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }
-                    }}
-                    className="mt-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create First Post</span>
-                  </button>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    {campusScopeFilter === "local" && (
+                      <button
+                        type="button"
+                        onClick={() => setCampusScopeFilter("all")}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition cursor-pointer"
+                      >
+                        View All Campuses Feed
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewPost(true);
+                        if (typeof window !== "undefined") {
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Create First Post</span>
+                    </button>
+                  </div>
                 </div>
               );
             }
@@ -986,7 +1047,16 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
                           <span className="px-1.5 py-0.2 text-[9px] rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">Followers Only</span>
                         )}
                       </h4>
-                      <p className="text-[11px] text-slate-500 truncate">{post.authorCourse} • {post.timeAgo}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="text-[11px] text-slate-400">{post.authorCourse}</span>
+                        {post.campus && (
+                          <span className="px-1.5 py-0.2 rounded-md bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/30 text-[10px] flex items-center gap-1">
+                            <Building2 className="w-2.5 h-2.5 text-indigo-400" />
+                            {post.campus}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-500">• {post.timeAgo}</span>
+                      </div>
                     </div>
                   </div>
 
