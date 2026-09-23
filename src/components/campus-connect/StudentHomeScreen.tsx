@@ -623,7 +623,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
     return trendingItems;
   }, [trendingItems, trendingFilter]);
 
-  // Direct Deep Redirection Handler for Trending items
+  // Direct Deep Redirection Handler for Trending items (Silently in background)
   const handleTrendingItemClick = (item: TrendingItem) => {
     if (item.type === "community") {
       if (onNavigate) {
@@ -631,32 +631,28 @@ export const StudentHomeScreen: React.FC<Props> = ({
       } else {
         onNavigateToCommunity();
       }
-      toast.success(`Redirecting to ${item.title}...`);
     } else if (item.type === "event") {
       if (onNavigate) {
         onNavigate({ tab: "events", eventId: item.sourceId, eventView: "details" });
       } else {
         onNavigateToEvents();
       }
-      toast.success(`Opening event: ${item.title}...`);
     } else if (item.type === "post" || item.type === "following_post") {
       const targetTab = item.type === "following_post" ? "following" : "feed";
       setFeedTab(targetTab);
       setActiveCommentPostId(item.sourceId);
-      toast.success("Redirected to trending discussion!");
       setTimeout(() => {
         const el = document.getElementById(item.sourceId);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-      }, 200);
+      }, 100);
     } else if (item.type === "student") {
       if (onNavigate) {
         onNavigate({ tab: "discover" });
       } else {
         onNavigateToDiscover();
       }
-      toast.info(`Opening ${item.title}'s student profile...`);
     }
   };
 
@@ -686,18 +682,18 @@ export const StudentHomeScreen: React.FC<Props> = ({
           )}
         </button>
 
-        {/* Tab 2: Trending with Distinct Fire Icon */}
+        {/* Tab 2: Trending with Yellow Fire Icon and Standard Website Colors */}
         <button
           type="button"
           onClick={() => setFeedTab("trending")}
           className="flex-1 py-3.5 text-center text-sm font-bold relative transition-colors cursor-pointer flex items-center justify-center gap-1.5"
         >
-          <span className="text-orange-500 text-base leading-none animate-pulse">🔥</span>
+          <Flame className="w-4 h-4 text-yellow-400 fill-yellow-400 shrink-0" />
           <span className={feedTab === "trending" ? "text-white font-extrabold text-sm" : "text-slate-400 hover:text-slate-200"}>
             Trending
           </span>
           {feedTab === "trending" && (
-            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-sm shadow-orange-500/50" />
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500" />
           )}
         </button>
 
@@ -720,24 +716,23 @@ export const StudentHomeScreen: React.FC<Props> = ({
       {feedTab === "trending" ? (
         <div className="space-y-4 animate-in fade-in duration-200">
           {/* Live Pulse Header Card */}
-          <div className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-orange-500/20 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-500/20 to-rose-500/0 rounded-full blur-2xl pointer-events-none" />
+          <div className="p-4 md:p-5 rounded-2xl bg-slate-900/90 border border-white/10 shadow-xl relative overflow-hidden">
             <div className="flex items-center justify-between gap-3 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 shrink-0">
-                  <Flame className="w-6 h-6 animate-pulse" />
+                <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-yellow-400 shadow-md shrink-0">
+                  <Flame className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-base font-black text-white tracking-tight">
                       Live Campus Trending
                     </h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-ping" />
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping" />
                       Live Radar
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
                     Popular events, viral discussions, active communities & rising students across campus.
                   </p>
                 </div>
@@ -762,7 +757,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
                   onClick={() => setTrendingFilter(chip.id as any)}
                   className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                     isActive
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25 font-extrabold"
+                      ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-600 text-white shadow-md shadow-indigo-600/25 font-extrabold"
                       : "bg-[#101726]/80 border border-white/10 text-slate-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
@@ -774,8 +769,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
           {/* Trending Hashtags & Topics Bar */}
           <div className="p-3 rounded-2xl bg-[#101726]/60 border border-white/5 flex items-center gap-2 overflow-x-auto scrollbar-none">
-            <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-              <Hash className="w-3.5 h-3.5" /> Topics:
+            <span className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider shrink-0 flex items-center gap-1">
+              <Hash className="w-3.5 h-3.5 text-yellow-400" /> Topics:
             </span>
             {[
               "#KUCCPSDeadline",
@@ -790,7 +785,6 @@ export const StudentHomeScreen: React.FC<Props> = ({
                 type="button"
                 onClick={() => {
                   setTrendingFilter("discussions");
-                  toast.info(`Filtering discussions for ${tag}`);
                 }}
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-[11px] font-semibold text-slate-300 hover:text-white transition whitespace-nowrap cursor-pointer"
               >
@@ -810,7 +804,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
               filteredTrendingItems.map((item) => {
                 const rankBadgeStyle =
                   item.rank === 1
-                    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-black shadow-md shadow-amber-500/30"
+                    ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-black shadow-md shadow-yellow-500/20"
                     : item.rank === 2
                     ? "bg-gradient-to-r from-slate-200 to-slate-400 text-black font-black"
                     : item.rank === 3
@@ -821,7 +815,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
                   <div
                     key={item.id}
                     onClick={() => handleTrendingItemClick(item)}
-                    className="bg-[#101726]/90 border border-white/10 hover:border-orange-500/40 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all cursor-pointer group hover:bg-[#131c2e] hover:shadow-2xl hover:shadow-orange-500/5 active:scale-[0.995]"
+                    className="bg-[#101726]/90 border border-white/10 hover:border-indigo-500/40 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all cursor-pointer group hover:bg-[#131c2e] hover:shadow-2xl active:scale-[0.995]"
                   >
                     {/* Item Header (Rank + Category + Engagement Pill) */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -830,13 +824,13 @@ export const StudentHomeScreen: React.FC<Props> = ({
                           #{item.rank}
                         </span>
                         <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[11px] font-bold flex items-center gap-1">
-                          <item.categoryIcon className="w-3 h-3 text-orange-400" />
+                          <item.categoryIcon className="w-3 h-3 text-indigo-400" />
                           {item.categoryLabel}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[11px] font-extrabold">
-                        <Flame className="w-3 h-3 text-orange-400" />
+                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[11px] font-bold">
+                        <Flame className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                         <span>{item.engagementLabel}</span>
                       </div>
                     </div>
@@ -849,10 +843,10 @@ export const StudentHomeScreen: React.FC<Props> = ({
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-black text-white group-hover:text-orange-300 transition line-clamp-2">
+                        <h3 className="text-sm font-black text-white group-hover:text-indigo-300 transition line-clamp-2">
                           {item.title}
                         </h3>
-                        <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                           {item.subtitle}
                         </p>
                         {item.tags && item.tags.length > 0 && (
@@ -874,7 +868,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
                       </span>
                       <button
                         type="button"
-                        className="flex items-center gap-1 font-bold text-orange-400 group-hover:text-orange-300 transition cursor-pointer"
+                        className="flex items-center gap-1 font-bold text-indigo-400 group-hover:text-indigo-300 transition cursor-pointer"
                       >
                         <span>{item.actionLabel}</span>
                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
