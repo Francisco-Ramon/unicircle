@@ -955,7 +955,6 @@ export const CampusConnectApp: React.FC = () => {
             { id: "communities", label: "Community", icon: Users },
             { id: "events", label: "Events", icon: Calendar },
             { id: "chat", label: "Chats", icon: MessageSquare, badge: matches.length > 0 ? matches.length : undefined },
-            { id: "profile", label: "Profile", icon: User },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
