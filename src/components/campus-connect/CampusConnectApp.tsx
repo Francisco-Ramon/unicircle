@@ -636,6 +636,7 @@ export const CampusConnectApp: React.FC = () => {
               {/* User Avatar in dark circle with chevron */}
               <div className="relative">
                 <button
+                  type="button"
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
                   className="flex items-center gap-1 p-1 pl-1 pr-2 rounded-full bg-[#101726] border border-white/10 hover:border-white/20 transition cursor-pointer"
                 >
@@ -649,6 +650,56 @@ export const CampusConnectApp: React.FC = () => {
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
+
+                {/* Mobile User Dropdown Menu */}
+                {showUserDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowUserDropdown(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-[#101726] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                      <div className="px-3 py-2 border-b border-white/10">
+                        <p className="text-xs font-bold text-white truncate">{userProfile?.firstName || "Student"} {userProfile?.lastName || ""}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University of Nairobi"}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => { handleTabChange("profile"); setShowUserDropdown(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
+                      >
+                        <User className="w-4 h-4 text-indigo-400" /> My Profile
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { handleTabChange("settings"); setShowUserDropdown(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
+                      >
+                        <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { handleTabChange("chart"); setShowUserDropdown(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
+                      >
+                        <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
+                      </button>
+
+                      <div className="pt-1 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUserDropdown(false);
+                            handleSignOut();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4" /> Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -670,6 +721,7 @@ export const CampusConnectApp: React.FC = () => {
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
               {/* Notification Bell with Badge */}
               <button
+                type="button"
                 onClick={() => handleTabChange("notifications")}
                 className="w-10 h-10 rounded-full bg-[#101726] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/5 transition relative cursor-pointer shadow-sm"
                 title="Notifications"
@@ -683,6 +735,7 @@ export const CampusConnectApp: React.FC = () => {
             {/* User Profile Avatar with Online Dot + Full Name */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
                 className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-white/5 transition cursor-pointer"
               >
@@ -705,45 +758,52 @@ export const CampusConnectApp: React.FC = () => {
 
               {/* User Dropdown Menu */}
               {showUserDropdown && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-[#101726] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
-                  <div className="px-3 py-2 border-b border-white/10">
-                    <p className="text-xs font-bold text-white truncate">{userProfile?.firstName || "Francisco"} {userProfile?.lastName || "Odhiambo"}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University of Nairobi"}</p>
-                  </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowUserDropdown(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-[#101726] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                    <div className="px-3 py-2 border-b border-white/10">
+                      <p className="text-xs font-bold text-white truncate">{userProfile?.firstName || "Francisco"} {userProfile?.lastName || "Odhiambo"}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University of Nairobi"}</p>
+                    </div>
 
-                  <button
-                    onClick={() => { handleTabChange("profile"); setShowUserDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
-                  >
-                    <User className="w-4 h-4 text-indigo-400" /> My Profile
-                  </button>
-
-                  <button
-                    onClick={() => { handleTabChange("settings"); setShowUserDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
-                  >
-                    <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
-                  </button>
-
-                  <button
-                    onClick={() => { handleTabChange("chart"); setShowUserDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
-                  >
-                    <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
-                  </button>
-
-                  <div className="pt-1 border-t border-white/10">
                     <button
-                      onClick={() => {
-                        setShowUserDropdown(false);
-                        handleSignOut();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                      type="button"
+                      onClick={() => { handleTabChange("profile"); setShowUserDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
                     >
-                      <LogOut className="w-4 h-4" /> Sign Out
+                      <User className="w-4 h-4 text-indigo-400" /> My Profile
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { handleTabChange("settings"); setShowUserDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
+                    >
+                      <Settings className="w-4 h-4 text-purple-400" /> Settings & Privacy
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { handleTabChange("chart"); setShowUserDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
+                    >
+                      <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
+                    </button>
+
+                    <div className="pt-1 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          handleSignOut();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" /> Sign Out
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>

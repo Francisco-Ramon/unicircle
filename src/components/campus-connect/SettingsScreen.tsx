@@ -266,59 +266,46 @@ export const SettingsScreen: React.FC<Props> = ({
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-white">Appearance & Theme Personalization</h3>
-                <p className="text-xs text-slate-400">Customize accent colors, theme mode, and visual density</p>
+                <p className="text-xs text-slate-400">Choose between UniCircle Dark (Default) and Pure White interface themes</p>
               </div>
 
-              {/* Theme Mode Selector */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">Theme Mode</label>
-                <div className="grid grid-cols-3 gap-3">
+              {/* Theme Mode Selector: Only Dark Default & Pure White */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">Select Theme</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { id: "dark", label: "Dark Mode", icon: Moon },
-                    { id: "light", label: "Light Mode", icon: Sun },
-                    { id: "system", label: "System Default", icon: Monitor },
+                    { id: "dark", label: "Dark (Default)", desc: "Deep midnight campus dark theme with high contrast", icon: Moon, bgPreview: "bg-[#080C14] border-indigo-500/40" },
+                    { id: "light", label: "Pure White", desc: "Clean, ultra-crisp pure white interface", icon: Sun, bgPreview: "bg-white text-slate-900 border-slate-200" },
                   ].map((mode) => {
                     const Icon = mode.icon;
                     const isSel = currentMode === mode.id;
                     return (
                       <button
                         key={mode.id}
+                        type="button"
                         onClick={() => handleModeChange(mode.id as ThemeMode)}
-                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition ${
+                        className={`flex flex-col items-start p-5 rounded-3xl border transition-all duration-200 cursor-pointer text-left relative overflow-hidden ${
                           isSel
-                            ? "bg-indigo-600/20 border-indigo-500 text-white font-bold"
-                            : "bg-slate-950/60 border-white/10 text-slate-400 hover:text-white"
+                            ? "bg-indigo-600/15 border-indigo-500 text-white shadow-xl shadow-indigo-600/20 ring-2 ring-indigo-500/40"
+                            : "bg-slate-950/60 border-white/10 text-slate-300 hover:text-white hover:border-white/20 hover:bg-white/5"
                         }`}
                       >
-                        <Icon className="w-5 h-5 mb-1.5 text-indigo-400" />
-                        <span className="text-xs">{mode.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Accent Color Selector */}
-              <div className="space-y-3 pt-2">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">Accent Theme Color</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {ACCENT_THEMES.map((acc) => {
-                    const isSelected = currentAccent === acc.id;
-                    return (
-                      <button
-                        key={acc.id}
-                        onClick={() => handleAccentChange(acc.id)}
-                        className={`flex items-center gap-3 p-3 rounded-2xl border transition text-left ${
-                          isSelected
-                            ? "bg-slate-950 border-indigo-500 text-white font-bold ring-2 ring-indigo-500/40"
-                            : "bg-slate-950/60 border-white/10 text-slate-300 hover:bg-white/5"
-                        }`}
-                      >
-                        <span className="text-lg">{acc.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold">{acc.name}</p>
+                        <div className="flex items-center justify-between w-full mb-3">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner ${
+                            isSel ? "bg-indigo-600 text-white shadow-indigo-500/30" : "bg-white/5 text-slate-400"
+                          }`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          {isSel ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold">
+                              <Check className="w-3.5 h-3.5" /> Active
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 font-medium">Tap to apply</span>
+                          )}
                         </div>
-                        {isSelected && <Check className="w-4 h-4 text-indigo-400 shrink-0" />}
+                        <span className="text-sm font-bold text-white tracking-tight">{mode.label}</span>
+                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{mode.desc}</p>
                       </button>
                     );
                   })}
@@ -332,7 +319,7 @@ export const SettingsScreen: React.FC<Props> = ({
                   <select
                     value={fontSize}
                     onChange={(e) => setFontSize(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="Small">Small (Compact)</option>
                     <option value="Default">Default (Recommended)</option>
@@ -346,7 +333,7 @@ export const SettingsScreen: React.FC<Props> = ({
                   <select
                     value={density}
                     onChange={(e) => setDensity(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="Comfortable">Comfortable</option>
                     <option value="Compact">Compact</option>

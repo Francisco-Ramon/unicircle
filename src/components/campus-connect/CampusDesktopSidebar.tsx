@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Home, Search, Users, Calendar, MessageSquare, Bell, Settings,
-  LogOut, ShieldCheck, CheckCircle2
+  LogOut, ShieldCheck, CheckCircle2, User
 } from "lucide-react";
 import { TabType } from "@/lib/navigationHistory";
 
@@ -33,6 +33,7 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
     { id: "events", label: "Campus Events", icon: Calendar },
     { id: "chat", label: "Chats", icon: MessageSquare, badge: activeMatchesCount > 0 ? activeMatchesCount : 4 },
     { id: "notifications", label: "Notifications", icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : 4 },
+    { id: "profile", label: "My Profile", icon: User },
   ];
 
   return (
@@ -102,10 +103,12 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-medium transition-colors cursor-pointer ${
                 activeTab === "settings"
                   ? "bg-[#4F46E5] text-white font-semibold shadow-lg shadow-indigo-600/30"
+                  : isLight
+                  ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
-              <Settings className="w-5 h-5 text-slate-400" />
+              <Settings className={`w-5 h-5 ${activeTab === "settings" ? "text-white stroke-[2.2]" : "text-slate-400"}`} />
               <span>Settings</span>
             </button>
 
