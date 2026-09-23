@@ -71,7 +71,7 @@ export class SocialController {
     };
 
     // 2. Persist to PostgreSQL (Supabase) in background
-    supabase.from("posts" as any).insert({
+    Promise.resolve(supabase.from("posts" as any).insert({
       id: post.id,
       author_id: post.authorId,
       campus: post.campus,
@@ -80,7 +80,7 @@ export class SocialController {
       likes_count: 0,
       comments_count: 0,
       created_at: post.createdAt,
-    }).then(() => {}).catch(() => {});
+    })).catch(() => {});
 
     // 3. Publish POST_CREATED Event through EventBus
     await EventBus.publish<Post>({

@@ -82,12 +82,12 @@ export class SocialGraphService {
     persistLocalGraph();
 
     // Sync to Supabase swipes / follows table in background
-    supabase.from("swipes" as any).upsert({
+    Promise.resolve(supabase.from("swipes" as any).upsert({
       swiper_id: followerId,
       target_id: followingId,
       action: "like",
       created_at: new Date().toISOString()
-    }, { onConflict: "swiper_id,target_id" }).then(() => {}).catch(() => {});
+    }, { onConflict: "swiper_id,target_id" })).catch(() => {});
 
     return true;
   }
@@ -104,10 +104,9 @@ export class SocialGraphService {
     }
     persistLocalGraph();
 
-    supabase.from("swipes" as any)
+    Promise.resolve(supabase.from("swipes" as any)
       .delete()
-      .match({ swiper_id: followerId, target_id: followingId })
-      .then(() => {}).catch(() => {});
+      .match({ swiper_id: followerId, target_id: followingId })).catch(() => {});
 
     return true;
   }

@@ -77,7 +77,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
             return (
               <Link
                 key={item.label}
-                to={item.to}
+                to={item.to as any}
                 className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                   active
                     ? "bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/40 text-white"

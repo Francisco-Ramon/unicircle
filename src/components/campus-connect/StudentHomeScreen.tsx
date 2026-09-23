@@ -1,8 +1,21 @@
 import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Search, Sparkles, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight, Building2, X, Users, MapPin, GraduationCap, UserCheck } from "lucide-react";
-import { TWENTY_STUDENT_PROFILES } from "./StudentProfilesDataset";
-import { fetchLivePosts, fetchLiveEvents, fetchLiveDiscoverProfiles, getLocalUserId, subscribeToLiveCommunity } from "@/lib/supabaseLiveService";
+import {
+  Search, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight,
+  Building2, X, Users, MapPin, GraduationCap, UserCheck, CheckCircle2,
+  Image, Video, Edit3, MoreHorizontal, Share2, Sparkles, Send, Plus
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  fetchLivePosts,
+  fetchLiveEvents,
+  fetchLiveDiscoverProfiles,
+  createLivePost,
+  likeLivePost,
+  uploadToStorage,
+  getLocalUserId,
+  subscribeToLiveCommunity
+} from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { SocialController } from "@/lib/social/socialController";
@@ -17,6 +30,61 @@ interface Props {
   onNavigate?: (state: AppNavState) => void;
 }
 
+const DEFAULT_REFERENCE_POSTS = [
+  {
+    id: "ref_post_1",
+    authorId: "auth_brian_okoth",
+    authorName: "Brian Okoth",
+    authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    campus: "University of Nairobi",
+    timeAgo: "2h",
+    content: "Anyone going to the Engineering Career Fair this Friday? I'm looking for opportunities in power systems and automation. Let's link up! 💯",
+    likes: 24,
+    comments: 8,
+    commentsCount: 8,
+    userLiked: false,
+  },
+  {
+    id: "ref_post_2",
+    authorId: "auth_jane_wanjiku",
+    authorName: "Jane Wanjiku",
+    authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    campus: "UoN Campus",
+    timeAgo: "3h",
+    content: "The library at UoN is such a vibe at this time. Just finished my revision and feeling good. Keep pushing guys! 👊",
+    likes: 56,
+    comments: 12,
+    commentsCount: 12,
+    userLiked: false,
+  },
+  {
+    id: "ref_post_3",
+    authorId: "auth_kevin_akinyi",
+    authorName: "Kevin Akinyi",
+    authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    campus: "Engineering Faculty",
+    timeAgo: "5h",
+    content: "Does anyone have the control systems 3 notes (especially the state space section)? I'm struggling with it. We can study together if you're also interested.",
+    likes: 18,
+    comments: 6,
+    commentsCount: 6,
+    userLiked: false,
+  },
+  {
+    id: "ref_post_4",
+    authorId: "auth_stella_mwangi",
+    authorName: "Stella Mwangi",
+    authorAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80",
+    campus: "UoN Campus",
+    timeAgo: "6h",
+    content: "Good morning everyone! Don't forget the KUCCPS online application deadline is next week. Make sure you've submitted your documents. 🙏",
+    likes: 42,
+    comments: 15,
+    commentsCount: 15,
+    userLiked: false,
+  },
+];
+
 export const StudentHomeScreen: React.FC<Props> = ({
   userProfile,
   liveProfiles = [],
@@ -25,570 +93,549 @@ export const StudentHomeScreen: React.FC<Props> = ({
   onNavigateToCommunity,
   onNavigate,
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  // Feed Filter Tabs: "feed" | "following" | "students"
+  const [feedTab, setFeedTab] = useState<"feed" | "following" | "students">("feed");
 
-  // Close search dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setIsSearchFocused(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Create Post State
+  const [newPostContent, setNewPostContent] = useState("");
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const initialLiveStudents = useMemo(() => {
-    if (liveProfiles && liveProfiles.length > 0) {
-      return liveProfiles.map((p) => ({
-        id: p.id,
-        name: p.name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
-        campus: p.campus || "University of Nairobi",
-        course: p.course || "Student",
-        year: p.yearOfStudy || p.year_of_study || "3rd Year",
-        photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
-        interests: p.interests || ["Campus Life", "Tech"],
-        bio: p.bio || "",
-        verified: p.verified ?? true,
-        online: p.online ?? p.is_online ?? false,
-      }));
-    }
-    return [];
-  }, [liveProfiles]);
+  // Active user data
+  const currentUserId = userProfile?.id || getLocalUserId();
+  const userCampus = userProfile?.campus || "University of Nairobi";
 
-  const [liveStudents, setLiveStudents] = useState<any[]>(initialLiveStudents);
-
-  useEffect(() => {
-    if (initialLiveStudents.length > 0 && liveStudents.length === 0) {
-      setLiveStudents(initialLiveStudents);
-    }
-  }, [initialLiveStudents]);
-
-  const activeFriends = liveStudents.slice(0, 5);
-
-  const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
+  // Feed Posts
+  const [posts, setPosts] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("unicircle_community_posts");
+        const saved = localStorage.getItem("unicircle_home_feed_posts");
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.length > 0) return parsed;
         }
       } catch (e) {}
     }
-    return [];
+    return DEFAULT_REFERENCE_POSTS;
   });
 
-  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  // Live Students pool
+  const [liveStudents, setLiveStudents] = useState<any[]>([]);
 
-  // Load live students, posts, and events on mount + Realtime Subscriptions
+  // Load posts & profiles on mount
   useEffect(() => {
     let isMounted = true;
     let unsubscribePosts: (() => void) | undefined;
 
-    // 1. Fetch live database students from Supabase profiles
-    fetchLiveDiscoverProfiles().then((profs) => {
+    // 1. Fetch live posts
+    fetchLivePosts().then((dbPosts) => {
       if (!isMounted) return;
-      if (profs && profs.length > 0) {
-        const formattedStudents = profs.map((p) => ({
-          id: p.id,
-          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
-          campus: p.campus || "University of Nairobi",
-          course: p.course || "Student",
-          year: p.year_of_study || "3rd Year",
-          photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
-          interests: p.interests || ["Campus Life", "Tech"],
-          bio: p.bio || "",
-          verified: true,
-          online: p.is_online || false,
-        }));
-        setLiveStudents(formattedStudents);
-      }
-    }).catch(() => {});
-
-    // 2. Fetch live posts and events
-    Promise.all([fetchLivePosts(), fetchLiveEvents()]).then(([livePosts, liveEvents]) => {
-      if (!isMounted) return;
-      if (livePosts && livePosts.length > 0) {
-        const formatted = livePosts.map((lp) => ({
+      if (dbPosts && dbPosts.length > 0) {
+        const formatted = dbPosts.map((lp) => ({
           id: lp.id,
+          authorId: lp.author_id,
           authorName: lp.profiles?.first_name
             ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
             : "Verified Student",
-          authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-          authorCourse: `${lp.profiles?.course || "Student"} • ${lp.profiles?.year_of_study || "3rd Year"}`,
-          campus: lp.campus || "University of Nairobi",
-          timeAgo: new Date(lp.created_at).toLocaleDateString(),
-          title: lp.content.substring(0, 45),
+          authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          campus: lp.campus || userCampus,
+          timeAgo: formatTimeAgo(lp.created_at),
           content: lp.content,
           image: lp.image_url,
           likes: lp.likes_count || 0,
           comments: lp.comments_count || 0,
           commentsCount: lp.comments_count || 0,
-          authorId: lp.author_id,
+          userLiked: false,
         }));
-        setCommunityPosts(formatted);
+
+        // Merge DB posts with default reference posts (avoid duplicates)
+        const dbIds = new Set(formatted.map((p) => p.id));
+        const merged = [...formatted, ...DEFAULT_REFERENCE_POSTS.filter((p) => !dbIds.has(p.id))];
+        setPosts(merged);
         if (typeof window !== "undefined") {
-          safeSetItem("unicircle_community_posts", JSON.stringify(formatted));
+          safeSetItem("unicircle_home_feed_posts", JSON.stringify(merged));
         }
       }
+    }).catch((err) => console.warn("HomeScreen posts load:", err));
 
-      if (liveEvents && liveEvents.length > 0) {
-        const formattedEvts = liveEvents.map((le) => ({
-          id: le.id,
-          title: le.title,
-          date: le.date,
-          venue: le.location,
-          organizer: "Campus Student",
-          attendeesCount: le.rsvp_count || 12,
-          image: le.image,
-        }));
-        setUpcomingEvents(formattedEvts);
+    // 2. Fetch live profiles
+    fetchLiveDiscoverProfiles().then((profs) => {
+      if (!isMounted) return;
+      if (profs && profs.length > 0) {
+        setLiveStudents(profs);
       }
-    }).catch((err) => console.warn("HomeScreen live load:", err));
+    }).catch(() => {});
 
-    // 3. Realtime Community Posts listener
+    // 3. Subscribe to realtime new posts
     unsubscribePosts = subscribeToLiveCommunity({
-      onNewPost: (newLivePost) => {
+      onNewPost: (incoming) => {
         if (!isMounted) return;
-        const incomingPost = {
-          id: newLivePost.id,
-          authorName: newLivePost.profiles?.first_name
-            ? `${newLivePost.profiles.first_name} ${newLivePost.profiles.last_name || ""}`.trim()
+        const newPost = {
+          id: incoming.id,
+          authorId: incoming.author_id,
+          authorName: incoming.profiles?.first_name
+            ? `${incoming.profiles.first_name} ${incoming.profiles.last_name || ""}`.trim()
             : "Verified Student",
-          authorAvatar: newLivePost.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-          authorCourse: "Campus Student",
-          campus: newLivePost.campus || "University of Nairobi",
+          authorAvatar: incoming.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          campus: incoming.campus || userCampus,
           timeAgo: "Just now",
-          title: newLivePost.content.substring(0, 45),
-          content: newLivePost.content,
-          image: newLivePost.image_url,
+          content: incoming.content,
+          image: incoming.image_url,
           likes: 0,
           comments: 0,
           commentsCount: 0,
-          authorId: newLivePost.author_id,
+          userLiked: false,
         };
 
-        setCommunityPosts((prev) => {
-          const dedupe = prev.filter((p) => p.id !== incomingPost.id);
-          const next = [incomingPost, ...dedupe];
+        setPosts((prev) => {
+          const dedupe = prev.filter((p) => p.id !== newPost.id);
+          const next = [newPost, ...dedupe];
           if (typeof window !== "undefined") {
-            safeSetItem("unicircle_community_posts", JSON.stringify(next));
+            safeSetItem("unicircle_home_feed_posts", JSON.stringify(next));
           }
           return next;
         });
       },
     });
 
-    // 4. Realtime profiles listener: newly registered students appear in search instantly
-    const profileChannel = supabase
-      .channel("unicircle-profiles-realtime-search")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        (payload) => {
-          const p: any = payload.new;
-          if (p && p.id && isMounted) {
-            const formattedItem = {
-              id: p.id,
-              name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
-              campus: p.campus || "University of Nairobi",
-              course: p.course || "Student",
-              year: p.year_of_study || "3rd Year",
-              photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
-              interests: p.interests || ["Campus Life", "Tech"],
-              bio: p.bio || "",
-              verified: true,
-              online: p.is_online || false,
-            };
-            setLiveStudents((prev) => [formattedItem, ...prev.filter((item) => item.id !== formattedItem.id)]);
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       isMounted = false;
       if (unsubscribePosts) unsubscribePosts();
-      supabase.removeChannel(profileChannel);
     };
-  }, []);
+  }, [userCampus]);
 
-  // ─── Search Logic Across Live Supabase Database & Profiles ───
-  const q = searchQuery.trim().toLowerCase();
-  const hasQuery = q.length > 0;
+  // Handle Create Post
+  const handlePublishPost = async () => {
+    if (!newPostContent.trim() && !selectedImage) {
+      toast.error("Please enter some text or select an image for your post.");
+      return;
+    }
 
-  const searchResults = useMemo(() => {
-    if (!hasQuery) return { students: [], posts: [], events: [] };
+    try {
+      setIsSubmittingPost(true);
+      let uploadedImageUrl: string | undefined;
 
-    // Combine live database profiles and student dataset, deduplicating
-    const allStudentsPool = [
-      ...liveStudents,
-      ...TWENTY_STUDENT_PROFILES.filter((s) => !liveStudents.some((ls) => ls.id === s.id || ls.name.toLowerCase() === s.name.toLowerCase())),
-    ];
+      if (selectedImage) {
+        uploadedImageUrl = await uploadToStorage(selectedImage, "post_images");
+      }
 
-    const students = allStudentsPool.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.campus && s.campus.toLowerCase().includes(q)) ||
-        (s.course && s.course.toLowerCase().includes(q)) ||
-        (s.bio && s.bio.toLowerCase().includes(q)) ||
-        (s.interests && s.interests.some((i: string) => i.toLowerCase().includes(q)))
-    ).slice(0, 8);
+      const created = await createLivePost({
+        author_id: currentUserId,
+        campus: userCampus,
+        content: newPostContent.trim(),
+        image_url: uploadedImageUrl,
+      });
 
-    const posts = communityPosts.filter(
-      (p) =>
-        (p.title && p.title.toLowerCase().includes(q)) ||
-        (p.content && p.content.toLowerCase().includes(q)) ||
-        (p.authorName && p.authorName.toLowerCase().includes(q)) ||
-        (p.campus && p.campus.toLowerCase().includes(q))
+      const newPostEntry = {
+        id: created?.id || `post_${Date.now()}`,
+        authorId: currentUserId,
+        authorName: `${userProfile?.firstName || "Student"} ${userProfile?.lastName || ""}`.trim(),
+        authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+        campus: userCampus,
+        timeAgo: "Just now",
+        content: newPostContent.trim(),
+        image: uploadedImageUrl,
+        likes: 0,
+        comments: 0,
+        commentsCount: 0,
+        userLiked: false,
+      };
+
+      setPosts((prev) => [newPostEntry, ...prev]);
+      setNewPostContent("");
+      setSelectedImage(null);
+      setImagePreviewUrl(null);
+      toast.success("Post published to campus feed!");
+    } catch (err: any) {
+      console.error("Publish post error:", err);
+      toast.error("Unable to publish post. Please check your connection.");
+    } finally {
+      setIsSubmittingPost(false);
+    }
+  };
+
+  // Handle Like
+  const handleToggleLike = async (postId: string) => {
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          const nextLiked = !p.userLiked;
+          const nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+          return { ...p, userLiked: nextLiked, likes: nextCount };
+        }
+        return p;
+      })
     );
 
-    const events = upcomingEvents.filter(
-      (e) =>
-        (e.title && e.title.toLowerCase().includes(q)) ||
-        ((e.venue || (e as any).location) && (e.venue || (e as any).location).toLowerCase().includes(q)) ||
-        (e.organizer && e.organizer.toLowerCase().includes(q))
-    );
+    try {
+      await likeLivePost(postId, currentUserId);
+    } catch (e) {}
+  };
 
-    return { students, posts, events };
-  }, [q, liveStudents, communityPosts, upcomingEvents]);
-
-  const totalResults = searchResults.students.length + searchResults.posts.length + searchResults.events.length;
-  const showDropdown = isSearchFocused && hasQuery;
+  // Filtered posts based on active feed tab
+  const displayedPosts = useMemo(() => {
+    if (feedTab === "following") {
+      return posts.filter((p) => SocialGraphService.isFollowing(currentUserId, p.authorId) || p.authorId === currentUserId);
+    }
+    return posts;
+  }, [posts, feedTab, currentUserId]);
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-8 py-2">
-      {/* 1. Welcome Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            Welcome back{userProfile?.firstName ? `, ${userProfile.firstName}` : ""} 👋
-          </h1>
-          <p className="text-xs md:text-sm text-slate-400 mt-1">
-            {userProfile?.campus || "Verified Campus Network"} • {userProfile?.yearOfStudy || "3rd Year"}
-          </p>
-        </div>
-
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-pink-600 p-0.5 shadow-lg shrink-0">
-          <img
-            src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-            alt="Profile"
-            className="w-full h-full object-cover rounded-[14px]"
-          />
-        </div>
-      </div>
-
-      {/* 2. Search Bar with Live Results */}
-      <div className="relative" ref={searchRef}>
-        <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5 z-10" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={() => setIsSearchFocused(true)}
-          placeholder="Search students, events, or community posts..."
-          className="w-full bg-slate-900/90 border border-white/10 rounded-2xl pl-11 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-lg"
-        />
-        {hasQuery && (
-          <button
-            onClick={() => { setSearchQuery(""); setIsSearchFocused(false); }}
-            className="absolute right-3 top-3 p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* ─── Live Search Results Dropdown ─── */}
-        {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40 z-30 max-h-[60vh] overflow-y-auto">
-            {totalResults === 0 ? (
-              <div className="p-6 text-center">
-                <Search className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-400 font-medium">No results for "{searchQuery}"</p>
-                <p className="text-xs text-slate-500 mt-1">Try searching by name, campus, course, or interest</p>
-              </div>
-            ) : (
-              <div className="py-2">
-                {/* Student Results */}
-                {searchResults.students.length > 0 && (
-                  <div>
-                    <div className="px-4 py-2 flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 text-indigo-400" />
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Students</span>
-                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.students.length} found</span>
-                    </div>
-                    {searchResults.students.map((student) => (
-                      <button
-                        key={student.id}
-                        onClick={() => {
-                          if (onNavigate) {
-                            onNavigate({ tab: "discover", profileId: student.id, profileView: "details" });
-                          } else {
-                            onNavigateToDiscover();
-                          }
-                          setSearchQuery("");
-                          setIsSearchFocused(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
-                      >
-                        <img src={student.photos[0]} alt={student.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="text-xs font-bold text-white truncate">{student.name}, {student.age}</h4>
-                            {student.verified && <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />}
-                            {student.online && <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />}
-                          </div>
-                          <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-                            <GraduationCap className="w-3 h-3 shrink-0" /> {student.course}
-                          </p>
-                          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-                            <MapPin className="w-2.5 h-2.5 shrink-0" /> {student.campus}
-                          </p>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Community Post Results */}
-                {searchResults.posts.length > 0 && (
-                  <div className={searchResults.students.length > 0 ? "border-t border-white/5" : ""}>
-                    <div className="px-4 py-2 flex items-center gap-2">
-                      <MessageSquare className="w-3.5 h-3.5 text-pink-400" />
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Community Posts</span>
-                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.posts.length} found</span>
-                    </div>
-                    {searchResults.posts.map((post) => (
-                      <button
-                        key={post.id}
-                        onClick={() => {
-                          if (onNavigate) {
-                            onNavigate({ tab: "communities", postId: post.id });
-                          } else {
-                            onNavigateToCommunity();
-                          }
-                          setSearchQuery("");
-                          setIsSearchFocused(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
-                      >
-                        <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-bold text-white truncate">{post.title || post.content}</h4>
-                          <p className="text-[11px] text-slate-400 truncate">{post.authorName} • {post.campus}</p>
-                          <p className="text-[10px] text-slate-500">❤️ {post.likes || 0} • 💬 {Array.isArray(post.comments) ? post.comments.length : (post.commentsCount || (typeof post.comments === 'number' ? post.comments : 0))}</p>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Event Results */}
-                {searchResults.events.length > 0 && (
-                  <div className={(searchResults.students.length > 0 || searchResults.posts.length > 0) ? "border-t border-white/5" : ""}>
-                    <div className="px-4 py-2 flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Events</span>
-                      <span className="ml-auto text-[10px] text-slate-500">{searchResults.events.length} found</span>
-                    </div>
-                    {searchResults.events.map((event) => (
-                      <button
-                        key={event.id}
-                        onClick={() => { onNavigateToEvents(); setSearchQuery(""); setIsSearchFocused(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition text-left"
-                      >
-                        <img src={event.image} alt={event.title} className="w-10 h-10 rounded-xl object-cover shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-bold text-white truncate">{event.title}</h4>
-                          <p className="text-[11px] text-slate-400 truncate">{event.venue} • {event.date}</p>
-                          <p className="text-[10px] text-slate-500">{event.attendeesCount} Going</p>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* View All footer */}
-                <div className="border-t border-white/5 px-4 py-2.5 flex items-center justify-center">
-                  <span className="text-[11px] text-slate-500">{totalResults} result{totalResults !== 1 ? "s" : ""} for "<span className="text-indigo-400 font-semibold">{searchQuery}</span>"</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 3. Recently Active Friends */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Active Friends</h2>
-          <button onClick={onNavigateToDiscover} className="text-xs text-indigo-400 font-semibold hover:underline">
-            Find More
-          </button>
-        </div>
-
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-          {activeFriends.map((friend) => (
-            <div key={friend.id} onClick={onNavigateToDiscover} className="flex flex-col items-center gap-1.5 shrink-0 w-16 cursor-pointer group">
-              <div className="relative w-14 h-14 rounded-2xl p-0.5 bg-gradient-to-tr from-indigo-500 to-pink-500">
-                <img
-                  src={friend.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"}
-                  alt={friend.name || "Student"}
-                  className="w-full h-full object-cover rounded-[14px] group-hover:scale-105 transition-transform"
-                />
-                {friend.online && (
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-950" />
-                )}
-              </div>
-              <span className="text-[11px] font-semibold text-slate-300 truncate w-full text-center">
-                {(friend.name || "Student").split(" ")[0]}
-              </span>
+    <div className="w-full space-y-4">
+      {/* 1. CAMPUS HEADER CARD */}
+      <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl transition-all">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            {/* University Crest Emblem */}
+            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-md">
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/University_of_Nairobi_Coat_of_arms.png/300px-University_of_Nairobi_Coat_of_arms.png"
+                alt="University Crest"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80";
+                }}
+                className="w-full h-full object-contain"
+              />
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* 4. Continuous Feed: Community Posts */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Community Posts</h2>
-          <button onClick={onNavigateToCommunity} className="text-xs text-indigo-400 font-semibold hover:underline">
-            View All
-          </button>
-        </div>
-
-        {communityPosts.map((post) => {
-          const currentUserId = userProfile?.id || getLocalUserId();
-          const effectiveAuthorId = post.authorId || `author_${post.id}`;
-          const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
-          
-          const isOwnPost = Boolean(
-            (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
-            (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase())) ||
-            ((post as any).authorEmail && userProfile?.email && (post as any).authorEmail.toLowerCase() === userProfile.email.toLowerCase())
-          );
-
-          return (
-            <div
-              key={post.id}
-              className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 shadow-lg space-y-3 transition"
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  onClick={onNavigateToCommunity}
-                  className="flex items-center gap-3 cursor-pointer min-w-0"
-                >
-                  <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-white flex items-center gap-1 truncate">
-                      {post.authorName} <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    </h4>
-                    <p className="text-[11px] text-slate-400 truncate">{post.campus} • {post.timeAgo}</p>
-                  </div>
-                </div>
-
-                {isOwnPost ? (
-                  <span className="px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-300 text-[10px] font-bold border border-indigo-500/20">
-                    You
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-1.5 truncate">
+                  <span>{userCampus}</span>
+                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 fill-blue-500 text-white" />
                   </span>
-                ) : (
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (isFollowingAuthor) {
-                        SocialGraphService.unfollowUser(currentUserId, effectiveAuthorId);
-                      } else {
-                        await SocialController.followUser({
-                          id: currentUserId,
-                          email: userProfile?.email || "student@unicircle.app",
-                          firstName: userProfile?.firstName || "Student",
-                          lastName: userProfile?.lastName || "",
-                          campus: userProfile?.campus || "University of Nairobi",
-                          course: userProfile?.course || "Student",
-                          yearOfStudy: userProfile?.yearOfStudy || "3rd Year",
-                          bio: userProfile?.bio || "",
-                          photos: userProfile?.photos || [],
-                          interests: userProfile?.interests || [],
-                          gender: userProfile?.gender || "Female",
-                          verified: true,
-                          isOnline: true,
-                        }, effectiveAuthorId);
-                      }
-                      setCommunityPosts((prev) => [...prev]);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 ${
-                      isFollowingAuthor
-                        ? "bg-white/10 text-slate-300 hover:bg-white/15 border border-white/10"
-                        : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
-                    }`}
-                  >
-                    {isFollowingAuthor ? (
-                      <>
-                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Following</span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>+ Follow</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
+                </h1>
 
-              <div onClick={onNavigateToCommunity} className="cursor-pointer">
-                <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{post.content}</p>
-              </div>
-
-              {post.image && (
-                <div onClick={onNavigateToCommunity} className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center max-h-[500px] cursor-pointer">
-                  <img src={post.image} alt="Post attachment" className="w-full max-h-[500px] object-contain rounded-2xl" />
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Verified</span>
                 </div>
-              )}
-
-              <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-white/10">
-                <span>❤️ {post.likes || 0} Likes</span>
-                <span>💬 {Array.isArray(post.comments) ? post.comments.length : (post.commentsCount || (typeof post.comments === 'number' ? post.comments : 0))} Comments</span>
               </div>
-            </div>
-          );
-        })}
-      </div>
 
-      {/* 5. Upcoming Campus Events */}
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Upcoming Campus Events</h2>
-          <button onClick={onNavigateToEvents} className="text-xs text-indigo-400 font-semibold hover:underline">
-            See All Events
+              <p className="text-xs text-slate-400 mt-0.5">
+                Campus community
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigateToCommunity()}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
+            title="Options"
+          >
+            <MoreHorizontal className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {upcomingEvents.map((event) => (
-            <div key={event.id} className="bg-slate-900/90 border border-white/10 rounded-3xl overflow-hidden shadow-lg group">
-              <div className="relative h-32 overflow-hidden">
-                <img src={event.image} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent" />
-                <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-indigo-950/80 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold">
-                  {event.date}
-                </span>
-              </div>
-              <div className="p-4 space-y-1">
-                <h4 className="text-sm font-bold text-white truncate">{event.title}</h4>
-                <p className="text-xs text-slate-400">{event.venue} • {event.attendeesCount} Going</p>
-              </div>
-            </div>
-          ))}
+        {/* Feed Navigation Tabs */}
+        <div className="flex items-center gap-6 mt-6 pt-4 border-t border-white/5 text-sm">
+          <button
+            onClick={() => setFeedTab("feed")}
+            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
+              feedTab === "feed"
+                ? "text-white border-b-2 border-indigo-500"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Campus Feed
+          </button>
+
+          <button
+            onClick={() => setFeedTab("following")}
+            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
+              feedTab === "following"
+                ? "text-white border-b-2 border-indigo-500"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Following
+          </button>
+
+          <button
+            onClick={() => {
+              if (feedTab === "students") {
+                onNavigateToDiscover();
+              } else {
+                setFeedTab("students");
+              }
+            }}
+            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
+              feedTab === "students"
+                ? "text-white border-b-2 border-indigo-500"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Students
+          </button>
         </div>
       </div>
+
+      {/* 2. CREATE POST CARD ("What's happening on campus?") */}
+      {feedTab !== "students" && (
+        <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+              alt="User"
+              className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+            />
+            <div className="flex-1 min-w-0">
+              <input
+                type="text"
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handlePublishPost();
+                  }
+                }}
+                placeholder="What's happening on campus?"
+                className="w-full bg-[#162035]/60 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+              />
+            </div>
+          </div>
+
+          {/* Optional selected image preview */}
+          {imagePreviewUrl && (
+            <div className="relative rounded-xl overflow-hidden max-h-48 border border-white/10 bg-black/40">
+              <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+              <button
+                onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }}
+                className="absolute top-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSelectedImage(file);
+                setImagePreviewUrl(URL.createObjectURL(file));
+              }
+            }}
+          />
+
+          <div className="flex items-center justify-between pt-2 border-t border-white/5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition cursor-pointer"
+              >
+                <Image className="w-4 h-4 text-indigo-400" />
+                <span>Photo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  toast.info("Video uploads supported up to 50MB via campus feed.");
+                  fileInputRef.current?.click();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition cursor-pointer"
+              >
+                <Video className="w-4 h-4 text-pink-400" />
+                <span>Video</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigateToCommunity()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition cursor-pointer"
+              >
+                <Edit3 className="w-4 h-4 text-emerald-400" />
+                <span>Post</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={isSubmittingPost}
+              onClick={handlePublishPost}
+              className="px-6 py-2 rounded-xl bg-[#5438DC] hover:bg-indigo-600 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmittingPost ? "Posting..." : "Post"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. STUDENTS TAB VIEW (If user clicked "Students") */}
+      {feedTab === "students" && (
+        <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-400" />
+              <span>Verified Students on {userCampus}</span>
+            </h3>
+            <button
+              onClick={onNavigateToDiscover}
+              className="text-xs text-indigo-400 font-semibold hover:underline"
+            >
+              Discover Mode
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {liveStudents.slice(0, 8).map((student) => (
+              <div
+                key={student.id}
+                onClick={() => onNavigate?.({ tab: "discover", profileId: student.id })}
+                className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer"
+              >
+                <img
+                  src={student.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
+                  alt={student.first_name}
+                  className="w-11 h-11 rounded-xl object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-bold text-white truncate">
+                    {student.first_name} {student.last_name || ""}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 truncate">{student.course} • {student.year_of_study}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4. FEED POSTS LIST */}
+      {feedTab !== "students" && (
+        <div className="space-y-4">
+          {displayedPosts.length === 0 ? (
+            <div className="p-8 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
+              <p className="text-sm font-semibold text-white">No posts in this feed yet</p>
+              <p className="text-xs text-slate-400">Be the first to share what's happening on campus!</p>
+            </div>
+          ) : (
+            displayedPosts.map((post) => {
+              const isLiked = post.userLiked;
+
+              return (
+                <div
+                  key={post.id}
+                  className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-3 transition-all hover:border-white/15"
+                >
+                  {/* Post Author Header */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={post.authorAvatar}
+                        alt={post.authorName}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-white truncate">
+                          {post.authorName}
+                        </h4>
+                        <p className="text-xs text-slate-400 truncate">
+                          {post.timeAgo} • {post.campus}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onNavigateToCommunity()}
+                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Post Content */}
+                  <div className="pt-1">
+                    <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+                  </div>
+
+                  {/* Post Image Attachment */}
+                  {post.image && (
+                    <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 max-h-[450px] flex items-center justify-center">
+                      <img
+                        src={post.image}
+                        alt="Post media"
+                        className="w-full max-h-[450px] object-cover rounded-2xl"
+                      />
+                    </div>
+                  )}
+
+                  {/* Post Actions Footer */}
+                  <div className="flex items-center gap-6 pt-3 border-t border-white/5 text-xs text-slate-400 font-medium">
+                    {/* Like */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleLike(post.id)}
+                      className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        isLiked ? "text-pink-500 font-bold" : "hover:text-white"
+                      }`}
+                    >
+                      <Heart className={`w-4 h-4 ${isLiked ? "fill-pink-500 text-pink-500" : ""}`} />
+                      <span>{post.likes}</span>
+                    </button>
+
+                    {/* Comments */}
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToCommunity()}
+                      className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>{post.comments || post.commentsCount || 0}</span>
+                    </button>
+
+                    {/* Share */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: `${post.authorName} on UniCircle`,
+                            text: post.content,
+                            url: window.location.href,
+                          }).catch(() => {});
+                        } else {
+                          navigator.clipboard.writeText(`${post.authorName}: "${post.content}" - on UniCircle ${window.location.href}`);
+                          toast.success("Post link copied to clipboard!");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ml-auto"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>Share</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+function formatTimeAgo(dateStr: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+  } catch {
+    return "1h";
+  }
+}
