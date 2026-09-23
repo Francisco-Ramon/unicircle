@@ -3,7 +3,8 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, Calendar, MessageSquare, ShieldCheck, Heart, UserPlus, ArrowRight,
   Building2, X, Users, MapPin, GraduationCap, UserCheck, CheckCircle2,
-  Image, Camera, Video, Edit3, MoreHorizontal, Share2, Sparkles, Send, Plus
+  Image, Camera, Video, Edit3, MoreHorizontal, Share2, Sparkles, Send, Plus,
+  Flame, TrendingUp, Zap, Compass, ExternalLink, Award, Hash
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,9 +18,28 @@ import {
   subscribeToLiveCommunity
 } from "@/lib/supabaseLiveService";
 import { supabase } from "@/integrations/supabase/client";
+import { INSTITUTIONS_DATA } from "./UniversityDatabase";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { SocialController } from "@/lib/social/socialController";
 import { AppNavState } from "@/lib/navigationHistory";
+
+export interface TrendingItem {
+  id: string;
+  rank: number;
+  type: "post" | "event" | "community" | "student" | "following_post";
+  categoryLabel: string;
+  categoryIcon: any;
+  title: string;
+  subtitle: string;
+  engagementLabel: string;
+  image?: string;
+  sourceId: string;
+  tags?: string[];
+  actionLabel: string;
+  authorName?: string;
+  authorAvatar?: string;
+  campus?: string;
+}
 
 interface Props {
   userProfile: any;
@@ -154,8 +174,11 @@ export const StudentHomeScreen: React.FC<Props> = ({
   onNavigateToCommunity,
   onNavigate,
 }) => {
-  // Feed Filter Tabs: "feed" | "following" | "students"
-  const [feedTab, setFeedTab] = useState<"feed" | "following" | "students">("feed");
+  // Feed Filter Tabs: "feed" | "trending" | "following"
+  const [feedTab, setFeedTab] = useState<"feed" | "trending" | "following">("feed");
+
+  // Trending Category Filter
+  const [trendingFilter, setTrendingFilter] = useState<"all" | "discussions" | "events" | "communities" | "students">("all");
 
   // Create Post State
   const [newPostContent, setNewPostContent] = useState("");
@@ -444,6 +467,199 @@ export const StudentHomeScreen: React.FC<Props> = ({
     }
   };
 
+  // Dynamic Trending Items Pool (Ranked across posts, events, communities & students)
+  const trendingItems = useMemo<TrendingItem[]>(() => {
+    const list: TrendingItem[] = [];
+
+    // 1. Hot Discussions & Viral Posts (Ranked by Likes & Comments engagement)
+    const sortedPosts = [...posts].sort((a, b) => {
+      const scoreA = (a.likes || 0) * 2 + (a.commentsCount || a.comments || 0) * 3;
+      const scoreB = (b.likes || 0) * 2 + (b.commentsCount || b.comments || 0) * 3;
+      return scoreB - scoreA;
+    });
+
+    sortedPosts.slice(0, 3).forEach((p) => {
+      const isFollowing = SocialGraphService.isFollowing(currentUserId, p.authorId);
+      list.push({
+        id: `trend_post_${p.id}`,
+        rank: 0,
+        type: isFollowing ? "following_post" : "post",
+        categoryLabel: isFollowing ? "Trending From Following" : "Trending Discussion",
+        categoryIcon: MessageSquare,
+        title: p.content.length > 80 ? `${p.content.substring(0, 80)}...` : p.content,
+        subtitle: `${p.authorName} • ${p.campus || "University of Nairobi"} • ${p.timeAgo || "Active now"}`,
+        engagementLabel: `${(p.likes || 0) + (p.commentsCount || p.comments || 0)} Interactions`,
+        image: p.image || undefined,
+        sourceId: p.id,
+        tags: ["#Discussion", `#${(p.campus || "Campus").replace(/\s+/g, "")}`],
+        actionLabel: "Open Discussion",
+        authorName: p.authorName,
+        authorAvatar: p.authorAvatar,
+        campus: p.campus,
+      });
+    });
+
+    // 2. Hot Campus Events
+    const hotEvents = [
+      {
+        id: "evt_tech_fair_2026",
+        title: "Campus Tech & Innovation Fair 2026",
+        subtitle: "Main Campus Grounds • This Friday 9:00 AM – 4:00 PM",
+        engagementLabel: "184 Students Attending",
+        image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80",
+        tags: ["#TechFair", "#Innovation", "#Career"],
+      },
+      {
+        id: "evt_hackathon_ai",
+        title: "Inter-University AI & Robotics Challenge",
+        subtitle: "Innovation Hub Labs • Next Saturday 10:00 AM",
+        engagementLabel: "142 Hackers Registered",
+        image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&auto=format&fit=crop&q=80",
+        tags: ["#Hackathon", "#AI", "#Coding"],
+      },
+      {
+        id: "evt_campus_concert",
+        title: "Sunset Campus Acoustic Night & DJ Rave",
+        subtitle: "Great Court Amphitheater • Saturday 7:00 PM",
+        engagementLabel: "260 RSVPs",
+        image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
+        tags: ["#CampusVibes", "#Music", "#Concert"],
+      },
+    ];
+
+    hotEvents.forEach((ev) => {
+      list.push({
+        id: `trend_${ev.id}`,
+        rank: 0,
+        type: "event",
+        categoryLabel: "Popular Campus Event",
+        categoryIcon: Calendar,
+        title: ev.title,
+        subtitle: ev.subtitle,
+        engagementLabel: ev.engagementLabel,
+        image: ev.image,
+        sourceId: ev.id,
+        tags: ev.tags,
+        actionLabel: "View Event Details",
+      });
+    });
+
+    // 3. Top University Communities
+    const topInstitutions = INSTITUTIONS_DATA.slice(0, 3);
+    topInstitutions.forEach((inst) => {
+      list.push({
+        id: `trend_comm_${inst.id}`,
+        rank: 0,
+        type: "community",
+        categoryLabel: "Top University Community",
+        categoryIcon: Building2,
+        title: `${inst.name} Hub`,
+        subtitle: `${inst.location} • ${inst.clubsCount || 36} Active Student Clubs`,
+        engagementLabel: `${inst.verifiedStudentsCount.toLocaleString()} Students`,
+        image: inst.bannerUrl || inst.logoUrl,
+        sourceId: inst.id,
+        tags: ["#Community", `#${inst.shortName || "Uni"}`],
+        actionLabel: "Open Community Hub",
+      });
+    });
+
+    // 4. Rising Student Creators
+    const topCreators = [
+      {
+        id: "auth_brian_okoth",
+        name: "Brian Okoth",
+        course: "Electrical & Information Engineering",
+        campus: "University of Nairobi",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+        engagement: "Top Contributor • 1.4k Followers",
+      },
+      {
+        id: "auth_jane_wanjiku",
+        name: "Jane Wanjiku",
+        course: "Computer Science & AI",
+        campus: "UoN Main Campus",
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        engagement: "Campus Ambassador • 2.1k Followers",
+      },
+    ];
+
+    topCreators.forEach((cr) => {
+      list.push({
+        id: `trend_creator_${cr.id}`,
+        rank: 0,
+        type: "student",
+        categoryLabel: "Rising Student Creator",
+        categoryIcon: Users,
+        title: cr.name,
+        subtitle: `${cr.course} • ${cr.campus}`,
+        engagementLabel: cr.engagement,
+        image: cr.avatar,
+        sourceId: cr.id,
+        tags: ["#StudentLeader", "#CampusCreator"],
+        actionLabel: "View Student Profile",
+        authorName: cr.name,
+        authorAvatar: cr.avatar,
+        campus: cr.campus,
+      });
+    });
+
+    return list.map((item, i) => ({ ...item, rank: i + 1 }));
+  }, [posts, currentUserId]);
+
+  // Filtered Trending Items
+  const filteredTrendingItems = useMemo(() => {
+    if (trendingFilter === "discussions") {
+      return trendingItems.filter((i) => i.type === "post" || i.type === "following_post");
+    }
+    if (trendingFilter === "events") {
+      return trendingItems.filter((i) => i.type === "event");
+    }
+    if (trendingFilter === "communities") {
+      return trendingItems.filter((i) => i.type === "community");
+    }
+    if (trendingFilter === "students") {
+      return trendingItems.filter((i) => i.type === "student");
+    }
+    return trendingItems;
+  }, [trendingItems, trendingFilter]);
+
+  // Direct Deep Redirection Handler for Trending items
+  const handleTrendingItemClick = (item: TrendingItem) => {
+    if (item.type === "community") {
+      if (onNavigate) {
+        onNavigate({ tab: "communities", communityId: item.sourceId });
+      } else {
+        onNavigateToCommunity();
+      }
+      toast.success(`Redirecting to ${item.title}...`);
+    } else if (item.type === "event") {
+      if (onNavigate) {
+        onNavigate({ tab: "events", eventId: item.sourceId, eventView: "details" });
+      } else {
+        onNavigateToEvents();
+      }
+      toast.success(`Opening event: ${item.title}...`);
+    } else if (item.type === "post" || item.type === "following_post") {
+      const targetTab = item.type === "following_post" ? "following" : "feed";
+      setFeedTab(targetTab);
+      setActiveCommentPostId(item.sourceId);
+      toast.success("Redirected to trending discussion!");
+      setTimeout(() => {
+        const el = document.getElementById(item.sourceId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 200);
+    } else if (item.type === "student") {
+      if (onNavigate) {
+        onNavigate({ tab: "discover" });
+      } else {
+        onNavigateToDiscover();
+      }
+      toast.info(`Opening ${item.title}'s student profile...`);
+    }
+  };
+
   // Filtered posts based on active feed tab
   const displayedPosts = useMemo(() => {
     if (feedTab === "following") {
@@ -454,8 +670,9 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
   return (
     <div className="w-full space-y-3 pb-8">
-      {/* 1. X.COM STYLE TOP TAB BAR (FOR YOU / FOLLOWING) */}
+      {/* 1. X.COM STYLE TOP TAB BAR (FOR YOU / TRENDING / FOLLOWING) */}
       <div className="sticky top-0 z-20 bg-[#080C14]/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-around rounded-2xl mb-2">
+        {/* Tab 1: For You */}
         <button
           type="button"
           onClick={() => setFeedTab("feed")}
@@ -469,6 +686,22 @@ export const StudentHomeScreen: React.FC<Props> = ({
           )}
         </button>
 
+        {/* Tab 2: Trending with Distinct Fire Icon */}
+        <button
+          type="button"
+          onClick={() => setFeedTab("trending")}
+          className="flex-1 py-3.5 text-center text-sm font-bold relative transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <span className="text-orange-500 text-base leading-none animate-pulse">🔥</span>
+          <span className={feedTab === "trending" ? "text-white font-extrabold text-sm" : "text-slate-400 hover:text-slate-200"}>
+            Trending
+          </span>
+          {feedTab === "trending" && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-sm shadow-orange-500/50" />
+          )}
+        </button>
+
+        {/* Tab 3: Following */}
         <button
           type="button"
           onClick={() => setFeedTab("following")}
@@ -483,312 +716,486 @@ export const StudentHomeScreen: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* 2. X.COM STYLE CREATE POST CARD */}
-      <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="flex items-start gap-3">
-          <img
-            src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-            alt="User"
-            className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
-          />
-          <div className="flex-1 min-w-0">
-            <textarea
-              value={newPostContent}
-              onChange={(e) => setNewPostContent(e.target.value)}
-              placeholder="What's happening on campus?!"
-              rows={2}
-              className="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none resize-none pt-1.5"
-            />
-          </div>
-        </div>
-
-        {/* Optional selected image preview */}
-        {imagePreviewUrl && (
-          <div className="relative rounded-2xl overflow-hidden max-h-52 border border-white/10 bg-black/40">
-            <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-            <button
-              onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-black transition cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              setSelectedImage(file);
-              setImagePreviewUrl(URL.createObjectURL(file));
-            }
-          }}
-        />
-
-        <div className="flex items-center justify-between pt-2.5 border-t border-white/5">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 hover:from-indigo-500/25 hover:to-pink-500/25 border border-indigo-500/30 text-indigo-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
-              title="Upload Photo from Device"
-            >
-              <Camera className="w-3.5 h-3.5 text-pink-400" />
-              <span>Photo</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            disabled={(!newPostContent.trim() && !selectedImage) || isSubmittingPost}
-            onClick={handlePublishPost}
-            className="px-5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isSubmittingPost ? "Posting..." : "Post"}
-          </button>
-        </div>
-      </div>
-
-      {/* 3. FEED POSTS LIST */}
-      <div className="space-y-3">
-        {displayedPosts.length === 0 ? (
-          <div className="p-10 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
-            <p className="text-sm font-bold text-white">No posts in this feed yet</p>
-            <p className="text-xs text-slate-400">
-              {feedTab === "following"
-                ? "You haven't followed any creators yet. Switch to 'For you' to discover students!"
-                : "Be the first student to post what's happening on campus!"}
-            </p>
-          </div>
-        ) : (
-          displayedPosts.map((post) => {
-            const isLiked = post.userLiked;
-            const effectiveAuthorId = post.authorId || `author_${post.id}`;
-            const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
-            const isOwnPost = Boolean(
-              (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
-              (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase()))
-            );
-            const isCommentsOpen = activeCommentPostId === post.id;
-            const commentsList = postComments[post.id] || [];
-
-            return (
-              <div
-                key={post.id}
-                className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all hover:border-white/15"
-              >
-                {/* Post Author Header (X.COM STYLE) */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <img
-                      src={post.authorAvatar}
-                      alt={post.authorName}
-                      className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
-                          {post.authorName}
-                        </h4>
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="text-xs text-slate-400 truncate">
-                          • {post.timeAgo}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        {post.campus || "University of Nairobi"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Small Sleek Follow Button (X.COM STYLE) */}
-                  {isOwnPost ? (
-                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold shrink-0">
-                      You
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleFollow(effectiveAuthorId, post.authorName)}
-                      className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 ${
-                        isFollowingAuthor
-                          ? "bg-transparent border border-white/20 text-slate-300 hover:border-red-500/50 hover:text-red-400 hover:bg-red-500/10"
-                          : "bg-white text-black hover:bg-slate-200"
-                      }`}
-                    >
-                      {isFollowingAuthor ? "Following" : "Follow"}
-                    </button>
-                  )}
+      {/* 2. TRENDING LIVE DISCOVERY LAYER OR FEED CONTENT */}
+      {feedTab === "trending" ? (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Live Pulse Header Card */}
+          <div className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-orange-500/20 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-500/20 to-rose-500/0 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between gap-3 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 shrink-0">
+                  <Flame className="w-6 h-6 animate-pulse" />
                 </div>
-
-                {/* Post Content */}
-                <div className="pt-0.5">
-                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                    {post.content}
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-black text-white tracking-tight">
+                      Live Campus Trending
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-ping" />
+                      Live Radar
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                    Popular events, viral discussions, active communities & rising students across campus.
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
 
-                {/* Post Image Attachment */}
-                {post.image && (
-                  <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 max-h-[450px] flex items-center justify-center">
-                    <img
-                      src={post.image}
-                      alt="Post media"
-                      className="w-full max-h-[450px] object-contain rounded-2xl"
-                    />
-                  </div>
-                )}
+          {/* Trending Category Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: "all", label: "🔥 All Trends" },
+              { id: "discussions", label: "💬 Discussions" },
+              { id: "events", label: "🎉 Events" },
+              { id: "communities", label: "🏛️ Communities" },
+              { id: "students", label: "⚡ Rising Students" },
+            ].map((chip) => {
+              const isActive = trendingFilter === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setTrendingFilter(chip.id as any)}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                    isActive
+                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25 font-extrabold"
+                      : "bg-[#101726]/80 border border-white/10 text-slate-300 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
 
-                {/* Post Actions Footer */}
-                <div className="flex items-center gap-6 pt-2.5 border-t border-white/5 text-xs text-slate-400 font-medium">
-                  {/* Like */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleLike(post.id)}
-                    className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      isLiked ? "text-pink-500 font-bold" : "hover:text-white"
-                    }`}
+          {/* Trending Hashtags & Topics Bar */}
+          <div className="p-3 rounded-2xl bg-[#101726]/60 border border-white/5 flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+              <Hash className="w-3.5 h-3.5" /> Topics:
+            </span>
+            {[
+              "#KUCCPSDeadline",
+              "#TechFair2026",
+              "#EngineeringGrind",
+              "#LibraryVibes",
+              "#UniCircleMatch",
+              "#CampusRave",
+            ].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => {
+                  setTrendingFilter("discussions");
+                  toast.info(`Filtering discussions for ${tag}`);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-[11px] font-semibold text-slate-300 hover:text-white transition whitespace-nowrap cursor-pointer"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {/* Trending Items Ranked List */}
+          <div className="space-y-3">
+            {filteredTrendingItems.length === 0 ? (
+              <div className="p-10 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
+                <p className="text-sm font-bold text-white">No trending items in this category</p>
+                <p className="text-xs text-slate-400">Switch to 'All Trends' to see everything trending on campus!</p>
+              </div>
+            ) : (
+              filteredTrendingItems.map((item) => {
+                const rankBadgeStyle =
+                  item.rank === 1
+                    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-black shadow-md shadow-amber-500/30"
+                    : item.rank === 2
+                    ? "bg-gradient-to-r from-slate-200 to-slate-400 text-black font-black"
+                    : item.rank === 3
+                    ? "bg-gradient-to-r from-amber-600 to-orange-700 text-white font-black"
+                    : "bg-white/10 text-slate-300 font-bold border border-white/10";
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleTrendingItemClick(item)}
+                    className="bg-[#101726]/90 border border-white/10 hover:border-orange-500/40 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all cursor-pointer group hover:bg-[#131c2e] hover:shadow-2xl hover:shadow-orange-500/5 active:scale-[0.995]"
                   >
-                    <Heart className={`w-4 h-4 ${isLiked ? "fill-pink-500 text-pink-500" : ""}`} />
-                    <span>{post.likes}</span>
-                  </button>
+                    {/* Item Header (Rank + Category + Engagement Pill) */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 ${rankBadgeStyle}`}>
+                          #{item.rank}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[11px] font-bold flex items-center gap-1">
+                          <item.categoryIcon className="w-3 h-3 text-orange-400" />
+                          {item.categoryLabel}
+                        </span>
+                      </div>
 
-                  {/* Comments - Click opens/toggles inline comments drawer */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCommentPostId((prev) => (prev === post.id ? null : post.id))}
-                    className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      isCommentsOpen ? "text-indigo-400 font-bold" : "hover:text-white"
-                    }`}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{Math.max(commentsList.length, post.comments || post.commentsCount || 0)}</span>
-                  </button>
-
-                  {/* Share */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (navigator.share) {
-                        navigator.share({
-                          title: `${post.authorName} on UniCircle`,
-                          text: post.content,
-                          url: window.location.href,
-                        }).catch(() => {});
-                      } else {
-                        navigator.clipboard.writeText(`${post.authorName}: "${post.content}" - on UniCircle ${window.location.href}`);
-                        toast.success("Post link copied to clipboard!");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ml-auto"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span>Share</span>
-                  </button>
-                </div>
-
-                {/* Inline Comments Section (Open to Anyone on Home Feed) */}
-                {isCommentsOpen && (
-                  <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                        <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-                        Comments ({commentsList.length})
-                      </span>
-                      <span className="text-[11px] text-emerald-400 font-medium">Public Discussion</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[11px] font-extrabold">
+                        <Flame className="w-3 h-3 text-orange-400" />
+                        <span>{item.engagementLabel}</span>
+                      </div>
                     </div>
 
-                    {/* Comments List */}
-                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                      {commentsList.length === 0 ? (
-                        <p className="text-xs text-slate-400 text-center py-3 bg-white/[0.02] rounded-xl border border-white/5">
-                          No comments yet. Be the first to comment!
+                    {/* Item Content Preview */}
+                    <div className="flex items-start gap-3.5">
+                      {item.image && (
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-black/40 border border-white/10 shrink-0">
+                          <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-black text-white group-hover:text-orange-300 transition line-clamp-2">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                          {item.subtitle}
                         </p>
-                      ) : (
-                        commentsList.map((comm: any) => (
-                          <div
-                            key={comm.id}
-                            className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5"
-                          >
-                            <img
-                              src={comm.authorAvatar}
-                              alt={comm.authorName}
-                              className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="text-xs font-bold text-white truncate">{comm.authorName}</span>
-                                  {comm.campus && (
-                                    <span className="text-[10px] text-slate-400 truncate">• {comm.campus}</span>
-                                  )}
-                                </div>
-                                <span className="text-[10px] text-slate-500 shrink-0">{comm.timeAgo}</span>
-                              </div>
-                              <p className="text-xs text-slate-200 mt-1 leading-relaxed whitespace-pre-wrap">
-                                {comm.content}
-                              </p>
-                              <div className="flex items-center gap-3 mt-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleCommentLike(post.id, comm.id)}
-                                  className={`text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                    comm.userLiked ? "text-pink-400" : "text-slate-500 hover:text-slate-300"
-                                  }`}
-                                >
-                                  <Heart className={`w-3 h-3 ${comm.userLiked ? "fill-pink-400" : ""}`} />
-                                  <span>{comm.likes > 0 ? comm.likes : "Like"}</span>
-                                </button>
-                              </div>
-                            </div>
+                        {item.tags && item.tags.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            {item.tags.map((tg) => (
+                              <span key={tg} className="text-[10px] font-semibold text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/5">
+                                {tg}
+                              </span>
+                            ))}
                           </div>
-                        ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Callout Bar */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/5 text-xs">
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Tap to view original source
+                      </span>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 font-bold text-orange-400 group-hover:text-orange-300 transition cursor-pointer"
+                      >
+                        <span>{item.actionLabel}</span>
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 3. X.COM STYLE CREATE POST CARD */}
+          <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
+            <div className="flex items-start gap-3">
+              <img
+                src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                alt="User"
+                className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <textarea
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  placeholder="What's happening on campus?!"
+                  rows={2}
+                  className="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none resize-none pt-1.5"
+                />
+              </div>
+            </div>
+
+            {/* Optional selected image preview */}
+            {imagePreviewUrl && (
+              <div className="relative rounded-2xl overflow-hidden max-h-52 border border-white/10 bg-black/40">
+                <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-black transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setSelectedImage(file);
+                  setImagePreviewUrl(URL.createObjectURL(file));
+                }
+              }}
+            />
+
+            <div className="flex items-center justify-between pt-2.5 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 hover:from-indigo-500/25 hover:to-pink-500/25 border border-indigo-500/30 text-indigo-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                  title="Upload Photo from Device"
+                >
+                  <Camera className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Photo</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={(!newPostContent.trim() && !selectedImage) || isSubmittingPost}
+                onClick={handlePublishPost}
+                className="px-5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isSubmittingPost ? "Posting..." : "Post"}
+              </button>
+            </div>
+          </div>
+
+          {/* 4. FEED POSTS LIST */}
+          <div className="space-y-3">
+            {displayedPosts.length === 0 ? (
+              <div className="p-10 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
+                <p className="text-sm font-bold text-white">No posts in this feed yet</p>
+                <p className="text-xs text-slate-400">
+                  {feedTab === "following"
+                    ? "You haven't followed any creators yet. Switch to 'For you' to discover students!"
+                    : "Be the first student to post what's happening on campus!"}
+                </p>
+              </div>
+            ) : (
+              displayedPosts.map((post) => {
+                const isLiked = post.userLiked;
+                const effectiveAuthorId = post.authorId || `author_${post.id}`;
+                const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
+                const isOwnPost = Boolean(
+                  (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
+                  (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase()))
+                );
+                const isCommentsOpen = activeCommentPostId === post.id;
+                const commentsList = postComments[post.id] || [];
+
+                return (
+                  <div
+                    key={post.id}
+                    id={post.id}
+                    className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all hover:border-white/15"
+                  >
+                    {/* Post Author Header (X.COM STYLE) */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <img
+                          src={post.authorAvatar}
+                          alt={post.authorName}
+                          className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
+                              {post.authorName}
+                            </h4>
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-xs text-slate-400 truncate">
+                              • {post.timeAgo}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {post.campus || "University of Nairobi"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Small Sleek Follow Button (X.COM STYLE) */}
+                      {isOwnPost ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold shrink-0">
+                          You
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFollow(effectiveAuthorId, post.authorName)}
+                          className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 ${
+                            isFollowingAuthor
+                              ? "bg-transparent border border-white/20 text-slate-300 hover:border-red-500/50 hover:text-red-400 hover:bg-red-500/10"
+                              : "bg-white text-black hover:bg-slate-200"
+                          }`}
+                        >
+                          {isFollowingAuthor ? "Following" : "Follow"}
+                        </button>
                       )}
                     </div>
 
-                    {/* Add Comment Input Bar */}
-                    <div className="flex items-center gap-2 pt-1.5">
-                      <img
-                        src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-                        alt="You"
-                        className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-                      />
-                      <div className="flex-1 relative flex items-center">
-                        <input
-                          type="text"
-                          value={commentInputs[post.id] || ""}
-                          onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleAddComment(post.id);
-                            }
-                          }}
-                          placeholder="Write a comment..."
-                          className="w-full bg-slate-900/90 border border-white/10 rounded-full pl-3.5 pr-10 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddComment(post.id)}
-                          disabled={!commentInputs[post.id]?.trim()}
-                          className="absolute right-1.5 p-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-                          title="Send Comment"
-                        >
-                          <Send className="w-3 h-3" />
-                        </button>
-                      </div>
+                    {/* Post Content */}
+                    <div className="pt-0.5">
+                      <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                        {post.content}
+                      </p>
                     </div>
+
+                    {/* Post Image Attachment */}
+                    {post.image && (
+                      <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 max-h-[450px] flex items-center justify-center">
+                        <img
+                          src={post.image}
+                          alt="Post media"
+                          className="w-full max-h-[450px] object-contain rounded-2xl"
+                        />
+                      </div>
+                    )}
+
+                    {/* Post Actions Footer */}
+                    <div className="flex items-center gap-6 pt-2.5 border-t border-white/5 text-xs text-slate-400 font-medium">
+                      {/* Like */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLike(post.id)}
+                        className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                          isLiked ? "text-pink-500 font-bold" : "hover:text-white"
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${isLiked ? "fill-pink-500 text-pink-500" : ""}`} />
+                        <span>{post.likes}</span>
+                      </button>
+
+                      {/* Comments - Click opens/toggles inline comments drawer */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveCommentPostId((prev) => (prev === post.id ? null : post.id))}
+                        className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                          isCommentsOpen ? "text-indigo-400 font-bold" : "hover:text-white"
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>{Math.max(commentsList.length, post.comments || post.commentsCount || 0)}</span>
+                      </button>
+
+                      {/* Share */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (navigator.share) {
+                            navigator.share({
+                              title: `${post.authorName} on UniCircle`,
+                              text: post.content,
+                              url: window.location.href,
+                            }).catch(() => {});
+                          } else {
+                            navigator.clipboard.writeText(`${post.authorName}: "${post.content}" - on UniCircle ${window.location.href}`);
+                            toast.success("Post link copied to clipboard!");
+                          }
+                        }}
+                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ml-auto"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        <span>Share</span>
+                      </button>
+                    </div>
+
+                    {/* Inline Comments Section */}
+                    {isCommentsOpen && (
+                      <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                            Comments ({commentsList.length})
+                          </span>
+                        </div>
+
+                        {/* Comments List */}
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                          {commentsList.length === 0 ? (
+                            <p className="text-xs text-slate-400 text-center py-3 bg-white/[0.02] rounded-xl border border-white/5">
+                              No comments yet. Be the first to comment!
+                            </p>
+                          ) : (
+                            commentsList.map((comm: any) => (
+                              <div
+                                key={comm.id}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5"
+                              >
+                                <img
+                                  src={comm.authorAvatar}
+                                  alt={comm.authorName}
+                                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-xs font-bold text-white truncate">{comm.authorName}</span>
+                                      {comm.campus && (
+                                        <span className="text-[10px] text-slate-400 truncate">• {comm.campus}</span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 shrink-0">{comm.timeAgo}</span>
+                                  </div>
+                                  <p className="text-xs text-slate-200 mt-1 leading-relaxed whitespace-pre-wrap">
+                                    {comm.content}
+                                  </p>
+                                  <div className="flex items-center gap-3 mt-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleCommentLike(post.id, comm.id)}
+                                      className={`text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                        comm.userLiked ? "text-pink-400" : "text-slate-500 hover:text-slate-300"
+                                      }`}
+                                    >
+                                      <Heart className={`w-3 h-3 ${comm.userLiked ? "fill-pink-400" : ""}`} />
+                                      <span>{comm.likes > 0 ? comm.likes : "Like"}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Add Comment Input Bar */}
+                        <div className="flex items-center gap-2 pt-1.5">
+                          <img
+                            src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                            alt="You"
+                            className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                          />
+                          <div className="flex-1 relative flex items-center">
+                            <input
+                              type="text"
+                              value={commentInputs[post.id] || ""}
+                              onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleAddComment(post.id);
+                                }
+                              }}
+                              placeholder="Write a comment..."
+                              className="w-full bg-slate-900/90 border border-white/10 rounded-full pl-3.5 pr-10 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddComment(post.id)}
+                              disabled={!commentInputs[post.id]?.trim()}
+                              className="absolute right-1.5 p-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                              title="Send Comment"
+                            >
+                              <Send className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
