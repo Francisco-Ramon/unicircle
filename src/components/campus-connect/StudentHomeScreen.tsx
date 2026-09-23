@@ -22,6 +22,7 @@ import { INSTITUTIONS_DATA } from "./UniversityDatabase";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { SocialController } from "@/lib/social/socialController";
 import { AppNavState } from "@/lib/navigationHistory";
+import { StudentProfileModal, AuthorProfileData } from "./StudentProfileModal";
 
 export interface TrendingItem {
   id: string;
@@ -220,6 +221,13 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
   // Live Students pool
   const [liveStudents, setLiveStudents] = useState<any[]>([]);
+
+  // Student Profile Preview Modal State
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState<AuthorProfileData | null>(null);
+
+  const handleViewStudentProfile = (studentData: AuthorProfileData) => {
+    setSelectedStudentProfile(studentData);
+  };
 
   // Load posts & profiles on mount
   useEffect(() => {
@@ -648,11 +656,16 @@ export const StudentHomeScreen: React.FC<Props> = ({
         }
       }, 100);
     } else if (item.type === "student") {
-      if (onNavigate) {
-        onNavigate({ tab: "discover" });
-      } else {
-        onNavigateToDiscover();
-      }
+      handleViewStudentProfile({
+        id: item.sourceId,
+        name: item.authorName || item.title,
+        avatar: item.authorAvatar || item.image || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80",
+        campus: item.campus || "University of Nairobi",
+        course: item.subtitle,
+        bio: "Rising campus student creator on UniCircle.",
+        verified: true,
+        online: true,
+      });
     }
   };
 
@@ -715,31 +728,6 @@ export const StudentHomeScreen: React.FC<Props> = ({
       {/* 2. TRENDING LIVE DISCOVERY LAYER OR FEED CONTENT */}
       {feedTab === "trending" ? (
         <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Live Pulse Header Card */}
-          <div className="p-4 md:p-5 rounded-2xl bg-slate-900/90 border border-white/10 shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between gap-3 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-lg shadow-md shrink-0">
-                  <span className="leading-none animate-pulse">🔥</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base font-black text-white tracking-tight">
-                      Live Campus Trending
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping" />
-                      Live Radar
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    Popular events, viral discussions, active communities & rising students across campus.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Trending Category Filter Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {[
@@ -983,15 +971,29 @@ export const StudentHomeScreen: React.FC<Props> = ({
                   >
                     {/* Post Author Header (X.COM STYLE) */}
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div
+                        onClick={() => handleViewStudentProfile({
+                          id: effectiveAuthorId,
+                          name: post.authorName,
+                          avatar: post.authorAvatar,
+                          campus: post.campus || "University of Nairobi",
+                          course: "Computer Science",
+                          yearOfStudy: "3rd Year",
+                          bio: "Verified campus student sharing updates on UniCircle.",
+                          verified: true,
+                          online: true,
+                          interests: ["Tech", "Campus Life", "Events"],
+                        })}
+                        className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group/author"
+                      >
                         <img
                           src={post.authorAvatar}
                           alt={post.authorName}
-                          className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+                          className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 group-hover/author:border-indigo-400 transition"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
+                            <h4 className="text-sm font-bold text-white truncate group-hover/author:text-indigo-300 transition">
                               {post.authorName}
                             </h4>
                             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -1190,6 +1192,16 @@ export const StudentHomeScreen: React.FC<Props> = ({
           </div>
         </>
       )}
+
+      {/* Student Profile & Posts Preview Modal */}
+      <StudentProfileModal
+        isOpen={Boolean(selectedStudentProfile)}
+        onClose={() => setSelectedStudentProfile(null)}
+        student={selectedStudentProfile}
+        userProfile={userProfile}
+        allPosts={posts}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 };

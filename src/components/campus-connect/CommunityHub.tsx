@@ -29,6 +29,7 @@ import { SocialController } from "@/lib/social/socialController";
 import { SocialGraphService } from "@/lib/social/socialGraphService";
 import { RealtimeDistributionService } from "@/lib/social/realtimeService";
 import { PostVisibility } from "@/lib/social/types";
+import { StudentProfileModal, AuthorProfileData } from "./StudentProfileModal";
 
 interface PostComment {
   id: string;
@@ -1161,10 +1162,24 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               <div key={post.id} className="bg-slate-900/60 border border-white/[0.06] rounded-2xl overflow-hidden shadow-lg transition">
                 {/* Post header */}
                 <div className="flex items-center justify-between p-4 pb-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover" />
+                  <div
+                    onClick={() => setSelectedMemberProfile({
+                      id: effectiveAuthorId,
+                      name: post.authorName,
+                      avatar: post.authorAvatar,
+                      campus: post.campus || activeInst.name,
+                      course: post.authorCourse || "Student",
+                      yearOfStudy: "3rd Year",
+                      bio: `Verified student at ${post.campus || activeInst.name}. Active member of the campus community!`,
+                      verified: true,
+                      online: true,
+                      interests: ["Campus Life", "Events", "Clubs"],
+                    })}
+                    className="flex items-center gap-3 min-w-0 cursor-pointer group/author"
+                  >
+                    <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-xl object-cover group-hover/author:border-indigo-400 transition" />
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-1.5 truncate group-hover/author:text-indigo-300 transition">
                         {post.authorName}
                         <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
                         {post.visibility === "FOLLOWERS_ONLY" && (
@@ -1882,117 +1897,15 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
         </div>
       )}
 
-      {/* 4. INDIVIDUAL VERIFIED MEMBER PROFILE MODAL */}
-      {selectedMemberProfile && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl my-8 relative">
-            {/* Close Button */}
-            <button
-              onClick={() => setSelectedMemberProfile(null)}
-              className="absolute top-3.5 right-3.5 z-20 p-2 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black/80 transition cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* Profile Hero Photo */}
-            <div className="relative h-64 w-full overflow-hidden bg-slate-950">
-              <img
-                src={selectedMemberProfile.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"}
-                alt={selectedMemberProfile.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-black/30" />
-
-              <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-black text-white flex items-center gap-1.5">
-                    {selectedMemberProfile.name}{selectedMemberProfile.age ? `, ${selectedMemberProfile.age}` : ""}
-                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  </h3>
-                  <p className="text-xs text-indigo-300 font-semibold flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {selectedMemberProfile.campus}
-                  </p>
-                </div>
-
-                {selectedMemberProfile.online && (
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold">
-                    Online Now
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Profile Details Body */}
-            <div className="p-5 space-y-4 text-xs">
-              <div className="space-y-1 bg-slate-950/60 p-3 rounded-2xl border border-white/5">
-                <p className="text-slate-400 font-medium">
-                  📚 Course: <span className="text-slate-200 font-bold">{selectedMemberProfile.course}</span> ({selectedMemberProfile.yearOfStudy || "Undergraduate"})
-                </p>
-                {selectedMemberProfile.country && (
-                  <p className="text-slate-400 font-medium">
-                    🌍 Country: <span className="text-slate-200 font-bold">{selectedMemberProfile.country}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Bio */}
-              <div>
-                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">About</h4>
-                <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/40 p-3 rounded-2xl border border-white/5 whitespace-pre-wrap">
-                  {selectedMemberProfile.bio || `Verified student at ${activeInst.name}. Passionate about campus connections!`}
-                </p>
-              </div>
-
-              {/* Interests */}
-              {selectedMemberProfile.interests && selectedMemberProfile.interests.length > 0 && (
-                <div>
-                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Interests</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedMemberProfile.interests.map((interest: string, idx: number) => (
-                      <span
-                        key={idx}
-                        className="px-2.5 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] font-semibold"
-                      >
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setSelectedMemberProfile(null);
-                    if (onNavigate) {
-                      onNavigate({ tab: "chat" });
-                    }
-                  }}
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Say Hello / Chat
-                </button>
-
-                <button
-                  onClick={() => {
-                    const profId = selectedMemberProfile.id;
-                    setSelectedMemberProfile(null);
-                    if (onNavigate) {
-                      onNavigate({ tab: "discover", profileId: profId, profileView: "details" });
-                    }
-                  }}
-                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  Discovery
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Verified Student Profile & Posts Modal */}
+      <StudentProfileModal
+        isOpen={Boolean(selectedMemberProfile)}
+        onClose={() => setSelectedMemberProfile(null)}
+        student={selectedMemberProfile}
+        userProfile={userProfile}
+        allPosts={posts}
+        onNavigate={onNavigate}
+      />
 
       {/* Mobile Floating Action Button for Instant Post Creation */}
       <button
