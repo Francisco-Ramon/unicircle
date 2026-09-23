@@ -274,6 +274,35 @@ export const StudentHomeScreen: React.FC<Props> = ({
     } catch (e) {}
   };
 
+  // Handle Follow / Unfollow user on feed
+  const handleToggleFollow = async (authorId: string, authorName?: string) => {
+    if (!authorId || authorId === currentUserId) return;
+    const isCurrentlyFollowing = SocialGraphService.isFollowing(currentUserId, authorId);
+    
+    if (isCurrentlyFollowing) {
+      SocialGraphService.unfollowUser(currentUserId, authorId);
+      toast.info(`Unfollowed ${authorName || "student"}`);
+    } else {
+      await SocialController.followUser({
+        id: currentUserId,
+        email: userProfile?.email || "student@unicircle.app",
+        firstName: userProfile?.firstName || "Student",
+        lastName: userProfile?.lastName || "",
+        campus: userProfile?.campus || "University of Nairobi",
+        course: userProfile?.course || "Student",
+        yearOfStudy: userProfile?.yearOfStudy || "3rd Year",
+        bio: userProfile?.bio || "",
+        photos: userProfile?.photos || [],
+        interests: userProfile?.interests || [],
+        gender: userProfile?.gender || "Female",
+        verified: true,
+        isOnline: true,
+      }, authorId);
+      toast.success(`Following ${authorName || "student"}!`);
+    }
+    setPosts((prev) => [...prev]);
+  };
+
   // Filtered posts based on active feed tab
   const displayedPosts = useMemo(() => {
     if (feedTab === "following") {
@@ -283,347 +312,244 @@ export const StudentHomeScreen: React.FC<Props> = ({
   }, [posts, feedTab, currentUserId]);
 
   return (
-    <div className="w-full space-y-4">
-      {/* 1. CAMPUS HEADER CARD */}
-      <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl transition-all">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            {/* University Crest Emblem */}
-            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-md">
-              <img
-                src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/University_of_Nairobi_Coat_of_arms.png/300px-University_of_Nairobi_Coat_of_arms.png"
-                alt="University Crest"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=100&auto=format&fit=crop&q=80";
-                }}
-                className="w-full h-full object-contain"
-              />
-            </div>
+    <div className="w-full space-y-3 pb-8">
+      {/* 1. X.COM STYLE TOP TAB BAR (FOR YOU / FOLLOWING) */}
+      <div className="sticky top-0 z-20 bg-[#080C14]/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-around rounded-2xl mb-2">
+        <button
+          type="button"
+          onClick={() => setFeedTab("feed")}
+          className="flex-1 py-3.5 text-center text-sm font-bold relative transition-colors cursor-pointer"
+        >
+          <span className={feedTab === "feed" ? "text-white font-extrabold text-sm" : "text-slate-400 hover:text-slate-200"}>
+            For you
+          </span>
+          {feedTab === "feed" && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500" />
+          )}
+        </button>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-1.5 truncate">
-                  <span>General Campus Feed</span>
-                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 fill-blue-500 text-white" />
-                  </span>
-                </h1>
+        <button
+          type="button"
+          onClick={() => setFeedTab("following")}
+          className="flex-1 py-3.5 text-center text-sm font-bold relative transition-colors cursor-pointer"
+        >
+          <span className={feedTab === "following" ? "text-white font-extrabold text-sm" : "text-slate-400 hover:text-slate-200"}>
+            Following
+          </span>
+          {feedTab === "following" && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500" />
+          )}
+        </button>
+      </div>
 
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>All Campuses</span>
-                </div>
-              </div>
+      {/* 2. X.COM STYLE CREATE POST CARD */}
+      <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-start gap-3">
+          <img
+            src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+            alt="User"
+            className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
+          />
+          <div className="flex-1 min-w-0">
+            <textarea
+              value={newPostContent}
+              onChange={(e) => setNewPostContent(e.target.value)}
+              placeholder="What's happening on campus?!"
+              rows={2}
+              className="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none resize-none pt-1.5"
+            />
+          </div>
+        </div>
 
-              <p className="text-xs text-slate-400 mt-0.5">
-                General updates & student discussions across all universities
-              </p>
-            </div>
+        {/* Optional selected image preview */}
+        {imagePreviewUrl && (
+          <div className="relative rounded-2xl overflow-hidden max-h-52 border border-white/10 bg-black/40">
+            <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+            <button
+              onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-black transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setSelectedImage(file);
+              setImagePreviewUrl(URL.createObjectURL(file));
+            }
+          }}
+        />
+
+        <div className="flex items-center justify-between pt-2.5 border-t border-white/5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 hover:from-indigo-500/25 hover:to-pink-500/25 border border-indigo-500/30 text-indigo-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
+              title="Upload Photo from Device"
+            >
+              <Camera className="w-3.5 h-3.5 text-pink-400" />
+              <span>Photo</span>
+            </button>
           </div>
 
           <button
-            onClick={() => onNavigateToCommunity()}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-            title="Options"
+            type="button"
+            disabled={(!newPostContent.trim() && !selectedImage) || isSubmittingPost}
+            onClick={handlePublishPost}
+            className="px-5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Feed Navigation Tabs */}
-        <div className="flex items-center gap-6 mt-6 pt-4 border-t border-white/5 text-sm">
-          <button
-            onClick={() => setFeedTab("feed")}
-            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
-              feedTab === "feed"
-                ? "text-white border-b-2 border-indigo-500 font-bold"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            General Feed
-          </button>
-
-          <button
-            onClick={() => setFeedTab("following")}
-            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
-              feedTab === "following"
-                ? "text-white border-b-2 border-indigo-500"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Following
-          </button>
-
-          <button
-            onClick={() => {
-              if (feedTab === "students") {
-                onNavigateToDiscover();
-              } else {
-                setFeedTab("students");
-              }
-            }}
-            className={`pb-2 font-semibold transition-all relative cursor-pointer ${
-              feedTab === "students"
-                ? "text-white border-b-2 border-indigo-500"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Students
+            {isSubmittingPost ? "Posting..." : "Post"}
           </button>
         </div>
       </div>
 
-      {/* 2. CREATE POST CARD ("What's happening on campus?") */}
-      {feedTab !== "students" && (
-        <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
-          <div className="flex items-center gap-3">
-            <img
-              src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
-              alt="User"
-              className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
-            />
-            <div className="flex-1 min-w-0">
-              <input
-                type="text"
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handlePublishPost();
-                  }
-                }}
-                placeholder="What's happening on campus?"
-                className="w-full bg-[#162035]/60 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
-              />
-            </div>
+      {/* 3. FEED POSTS LIST */}
+      <div className="space-y-3">
+        {displayedPosts.length === 0 ? (
+          <div className="p-10 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
+            <p className="text-sm font-bold text-white">No posts in this feed yet</p>
+            <p className="text-xs text-slate-400">
+              {feedTab === "following"
+                ? "You haven't followed any creators yet. Switch to 'For you' to discover students!"
+                : "Be the first student to post what's happening on campus!"}
+            </p>
           </div>
+        ) : (
+          displayedPosts.map((post) => {
+            const isLiked = post.userLiked;
+            const effectiveAuthorId = post.authorId || `author_${post.id}`;
+            const isFollowingAuthor = SocialGraphService.isFollowing(currentUserId, effectiveAuthorId);
+            const isOwnPost = Boolean(
+              (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
+              (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase()))
+            );
 
-          {/* Optional selected image preview */}
-          {imagePreviewUrl && (
-            <div className="relative rounded-xl overflow-hidden max-h-48 border border-white/10 bg-black/40">
-              <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-              <button
-                onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }}
-                className="absolute top-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setSelectedImage(file);
-                setImagePreviewUrl(URL.createObjectURL(file));
-              }
-            }}
-          />
-
-          <div className="flex items-center justify-between pt-2 border-t border-white/5">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 hover:from-indigo-500/25 hover:to-pink-500/25 border border-indigo-500/30 text-indigo-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
-                title="Upload Photo from Device"
-              >
-                <Camera className="w-3.5 h-3.5 text-pink-400" />
-                <span>Upload Photo</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  toast.info("Video uploads supported up to 50MB via campus feed.");
-                  fileInputRef.current?.click();
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition cursor-pointer"
-              >
-                <Video className="w-4 h-4 text-pink-400" />
-                <span>Video</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateToCommunity()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition cursor-pointer"
-              >
-                <Edit3 className="w-4 h-4 text-emerald-400" />
-                <span>Post</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              disabled={isSubmittingPost}
-              onClick={handlePublishPost}
-              className="px-6 py-2 rounded-xl bg-[#5438DC] hover:bg-indigo-600 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-50"
-            >
-              {isSubmittingPost ? "Posting..." : "Post"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 3. STUDENTS TAB VIEW (If user clicked "Students") */}
-      {feedTab === "students" && (
-        <div className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-400" />
-              <span>Verified Students on {userCampus}</span>
-            </h3>
-            <button
-              onClick={onNavigateToDiscover}
-              className="text-xs text-indigo-400 font-semibold hover:underline"
-            >
-              Discover Mode
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {liveStudents.slice(0, 8).map((student) => (
+            return (
               <div
-                key={student.id}
-                onClick={() => onNavigate?.({ tab: "discover", profileId: student.id })}
-                className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer"
+                key={post.id}
+                className="bg-[#101726]/80 border border-white/10 rounded-2xl p-4 md:p-5 shadow-xl space-y-3 transition-all hover:border-white/15"
               >
-                <img
-                  src={student.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                  alt={student.first_name}
-                  className="w-11 h-11 rounded-xl object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-xs font-bold text-white truncate">
-                    {student.first_name} {student.last_name || ""}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 truncate">{student.course} • {student.year_of_study}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 4. FEED POSTS LIST */}
-      {feedTab !== "students" && (
-        <div className="space-y-4">
-          {displayedPosts.length === 0 ? (
-            <div className="p-8 rounded-2xl bg-[#101726]/80 border border-white/10 text-center space-y-2">
-              <p className="text-sm font-semibold text-white">No posts in this feed yet</p>
-              <p className="text-xs text-slate-400">Be the first to share what's happening on campus!</p>
-            </div>
-          ) : (
-            displayedPosts.map((post) => {
-              const isLiked = post.userLiked;
-
-              return (
-                <div
-                  key={post.id}
-                  className="bg-[#101726]/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-3 transition-all hover:border-white/15"
-                >
-                  {/* Post Author Header */}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={post.authorAvatar}
-                        alt={post.authorName}
-                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-white truncate">
+                {/* Post Author Header (X.COM STYLE) */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <img
+                      src={post.authorAvatar}
+                      alt={post.authorName}
+                      className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
                           {post.authorName}
                         </h4>
-                        <p className="text-xs text-slate-400 truncate">
-                          {post.timeAgo} • {post.campus}
-                        </p>
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-xs text-slate-400 truncate">
+                          • {post.timeAgo}
+                        </span>
                       </div>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {post.campus || "University of Nairobi"}
+                      </p>
                     </div>
-
-                    <button
-                      onClick={() => onNavigateToCommunity()}
-                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition"
-                    >
-                      <MoreHorizontal className="w-5 h-5" />
-                    </button>
                   </div>
 
-                  {/* Post Content */}
-                  <div className="pt-1">
-                    <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                      {post.content}
-                    </p>
-                  </div>
-
-                  {/* Post Image Attachment */}
-                  {post.image && (
-                    <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 max-h-[450px] flex items-center justify-center">
-                      <img
-                        src={post.image}
-                        alt="Post media"
-                        className="w-full max-h-[450px] object-cover rounded-2xl"
-                      />
-                    </div>
-                  )}
-
-                  {/* Post Actions Footer */}
-                  <div className="flex items-center gap-6 pt-3 border-t border-white/5 text-xs text-slate-400 font-medium">
-                    {/* Like */}
+                  {/* Small Sleek Follow Button (X.COM STYLE) */}
+                  {isOwnPost ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold shrink-0">
+                      You
+                    </span>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => handleToggleLike(post.id)}
-                      className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
-                        isLiked ? "text-pink-500 font-bold" : "hover:text-white"
+                      onClick={() => handleToggleFollow(effectiveAuthorId, post.authorName)}
+                      className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 ${
+                        isFollowingAuthor
+                          ? "bg-transparent border border-white/20 text-slate-300 hover:border-red-500/50 hover:text-red-400 hover:bg-red-500/10"
+                          : "bg-white text-black hover:bg-slate-200"
                       }`}
                     >
-                      <Heart className={`w-4 h-4 ${isLiked ? "fill-pink-500 text-pink-500" : ""}`} />
-                      <span>{post.likes}</span>
+                      {isFollowingAuthor ? "Following" : "Follow"}
                     </button>
-
-                    {/* Comments */}
-                    <button
-                      type="button"
-                      onClick={() => onNavigateToCommunity()}
-                      className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>{post.comments || post.commentsCount || 0}</span>
-                    </button>
-
-                    {/* Share */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (navigator.share) {
-                          navigator.share({
-                            title: `${post.authorName} on UniCircle`,
-                            text: post.content,
-                            url: window.location.href,
-                          }).catch(() => {});
-                        } else {
-                          navigator.clipboard.writeText(`${post.authorName}: "${post.content}" - on UniCircle ${window.location.href}`);
-                          toast.success("Post link copied to clipboard!");
-                        }
-                      }}
-                      className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ml-auto"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      <span>Share</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
-              );
-            })
-          )}
-        </div>
-      )}
+
+                {/* Post Content */}
+                <div className="pt-0.5">
+                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+
+                {/* Post Image Attachment */}
+                {post.image && (
+                  <div className="rounded-2xl overflow-hidden bg-black/40 border border-white/5 max-h-[450px] flex items-center justify-center">
+                    <img
+                      src={post.image}
+                      alt="Post media"
+                      className="w-full max-h-[450px] object-contain rounded-2xl"
+                    />
+                  </div>
+                )}
+
+                {/* Post Actions Footer */}
+                <div className="flex items-center gap-6 pt-2.5 border-t border-white/5 text-xs text-slate-400 font-medium">
+                  {/* Like */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleLike(post.id)}
+                    className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      isLiked ? "text-pink-500 font-bold" : "hover:text-white"
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${isLiked ? "fill-pink-500 text-pink-500" : ""}`} />
+                    <span>{post.likes}</span>
+                  </button>
+
+                  {/* Comments */}
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCommunity()}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{post.comments || post.commentsCount || 0}</span>
+                  </button>
+
+                  {/* Share */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: `${post.authorName} on UniCircle`,
+                          text: post.content,
+                          url: window.location.href,
+                        }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(`${post.authorName}: "${post.content}" - on UniCircle ${window.location.href}`);
+                        toast.success("Post link copied to clipboard!");
+                      }
+                    }}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ml-auto"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Share</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };
