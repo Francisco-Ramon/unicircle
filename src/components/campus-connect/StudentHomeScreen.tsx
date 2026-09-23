@@ -40,23 +40,31 @@ export const StudentHomeScreen: React.FC<Props> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const [liveStudents, setLiveStudents] = useState<any[]>(() => {
+  const initialLiveStudents = useMemo(() => {
     if (liveProfiles && liveProfiles.length > 0) {
       return liveProfiles.map((p) => ({
         id: p.id,
-        name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
+        name: p.name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.first_name || "Student",
         campus: p.campus || "University of Nairobi",
         course: p.course || "Student",
-        year: p.year_of_study || "3rd Year",
+        year: p.yearOfStudy || p.year_of_study || "3rd Year",
         photos: (p.photos && p.photos.length > 0) ? p.photos : ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"],
         interests: p.interests || ["Campus Life", "Tech"],
         bio: p.bio || "",
-        verified: true,
-        online: p.is_online || false,
+        verified: p.verified ?? true,
+        online: p.online ?? p.is_online ?? false,
       }));
     }
     return [];
-  });
+  }, [liveProfiles]);
+
+  const [liveStudents, setLiveStudents] = useState<any[]>(initialLiveStudents);
+
+  useEffect(() => {
+    if (initialLiveStudents.length > 0 && liveStudents.length === 0) {
+      setLiveStudents(initialLiveStudents);
+    }
+  }, [initialLiveStudents]);
 
   const activeFriends = liveStudents.slice(0, 5);
 
@@ -427,11 +435,11 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
           {activeFriends.map((friend) => (
-            <div key={friend.id} className="flex flex-col items-center gap-1.5 shrink-0 w-16 cursor-pointer group">
+            <div key={friend.id} onClick={onNavigateToDiscover} className="flex flex-col items-center gap-1.5 shrink-0 w-16 cursor-pointer group">
               <div className="relative w-14 h-14 rounded-2xl p-0.5 bg-gradient-to-tr from-indigo-500 to-pink-500">
                 <img
-                  src={friend.photos[0]}
-                  alt={friend.name}
+                  src={friend.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"}
+                  alt={friend.name || "Student"}
                   className="w-full h-full object-cover rounded-[14px] group-hover:scale-105 transition-transform"
                 />
                 {friend.online && (
@@ -439,7 +447,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
                 )}
               </div>
               <span className="text-[11px] font-semibold text-slate-300 truncate w-full text-center">
-                {friend.name.split(" ")[0]}
+                {(friend.name || "Student").split(" ")[0]}
               </span>
             </div>
           ))}

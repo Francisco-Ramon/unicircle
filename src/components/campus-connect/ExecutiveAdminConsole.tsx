@@ -69,6 +69,7 @@ export const ExecutiveAdminConsole: React.FC = () => {
       name: newName,
       shortName: newShortName || newName.substring(0, 4).toUpperCase(),
       country: newCountry,
+      city: newCounty || newCountry,
       stateCounty: newCounty,
       type: newType as any,
       domains: [newDomain.trim()],

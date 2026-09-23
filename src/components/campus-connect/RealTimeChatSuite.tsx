@@ -1,6 +1,6 @@
 import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft } from "lucide-react";
+import { Send, Mic, Image, Smile, ShieldCheck, CheckCheck, Trash2, MoreVertical, Search, Lock, Phone, Video, Play, Pause, Paperclip, ArrowLeft, MessageSquare } from "lucide-react";
 import { StudentProfile } from "./DiscoverDeck";
 import {
   dispatchAppNotification,

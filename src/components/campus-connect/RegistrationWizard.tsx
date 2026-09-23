@@ -579,9 +579,9 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
               onChange={(e) => handleCountryChange(e.target.value)}
               className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
             >
-              {SUPPORTED_COUNTRIES.map((country) => (
-                <option key={country} value={country} className="bg-slate-900">
-                  {country}
+              {SUPPORTED_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.name} className="bg-slate-900">
+                  {c.flag} {c.name}
                 </option>
               ))}
             </select>
@@ -612,7 +612,6 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
 
             {showUniDropdown && (
               <GlobalUniversitySearch
-                isOpen={showUniDropdown}
                 title="Search Universities Worldwide"
                 currentUniversityName={selectedInstitution.name}
                 onSelectInstitution={(inst) => {

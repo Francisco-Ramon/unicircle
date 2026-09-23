@@ -1,7 +1,8 @@
 import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
-  Building2, MessageSquare, ThumbsUp, PlusCircle, ShieldCheck,
+  Building2, MessageSquare, ThumbsUp, PlusCircle, Plus, ShieldCheck,
   Users, Calendar, Info, Search, X, Image, BarChart3, ChevronRight, Send, Heart, CornerDownRight, ExternalLink, Ticket, CheckCircle2, MapPin, ArrowLeft, ArrowRight, Link2, Upload, Trash2
 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
@@ -138,8 +139,24 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   });
 
   const selectedEventId = (navState?.tab === "communities") ? navState.eventId : undefined;
-  const selectedEvent = communityEvents.find((e) => e.id === selectedEventId) || null;
-  const showCreateEventModal = (navState?.tab === "communities" && navState.modal === "host-event");
+  const [localSelectedEvent, setLocalSelectedEvent] = useState<CampusEvent | null>(null);
+  const selectedEvent = localSelectedEvent || communityEvents.find((e) => e.id === selectedEventId) || null;
+  const setSelectedEvent = (val: CampusEvent | null | ((prev: CampusEvent | null) => CampusEvent | null)) => {
+    if (typeof val === "function") {
+      setLocalSelectedEvent(val(selectedEvent));
+    } else {
+      setLocalSelectedEvent(val);
+    }
+  };
+
+  const [localShowCreateEventModal, setLocalShowCreateEventModal] = useState<boolean>(false);
+  const showCreateEventModal = localShowCreateEventModal || (navState?.tab === "communities" && navState.modal === "host-event");
+  const setShowCreateEventModal = (val: boolean) => {
+    setLocalShowCreateEventModal(val);
+    if (onNavigate) {
+      onNavigate({ tab: "communities", modal: val ? "host-event" : undefined });
+    }
+  };
   const [eventCommentInput, setEventCommentInput] = useState("");
 
   // Verified Community Members & Profile Modal State

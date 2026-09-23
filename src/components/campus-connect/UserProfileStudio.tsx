@@ -514,7 +514,7 @@ export const UserProfileStudio: React.FC<Props> = ({
                   <label className="block text-slate-400 mb-1 font-semibold">Gender</label>
                   <select
                     value={gender}
-                    onChange={(e) => setGender(e.target.value)}
+                    onChange={(e) => setGender(e.target.value as any)}
                     className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="Male">Male</option>
@@ -529,7 +529,7 @@ export const UserProfileStudio: React.FC<Props> = ({
                 <label className="block text-slate-400 mb-1 font-semibold">Campus Goal</label>
                 <select
                   value={relationshipGoal}
-                  onChange={(e) => setRelationshipGoal(e.target.value)}
+                  onChange={(e) => setRelationshipGoal(e.target.value as any)}
                   className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="Friendship">Friendship & Study Buddies</option>

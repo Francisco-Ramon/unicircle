@@ -60,10 +60,34 @@ export const DiscoverDeck: React.FC<Props> = ({
   onNavigate,
 }) => {
   const selectedProfileId = (navState?.tab === "discover") ? navState.profileId : undefined;
-  const selectedProfile = profiles.find((p) => p.id === selectedProfileId) || null;
+  const [localSelectedProfile, setLocalSelectedProfile] = useState<StudentProfile | null>(null);
+  const selectedProfile = localSelectedProfile || profiles.find((p) => p.id === selectedProfileId) || null;
+  const setSelectedProfile = (val: StudentProfile | null) => {
+    setLocalSelectedProfile(val);
+    if (onNavigate) {
+      onNavigate({ tab: "discover", profileId: val ? val.id : undefined });
+    }
+  };
+
   const photoLightboxActive = (navState?.tab === "discover" && navState.profileView === "photos");
-  const showReportModal = (navState?.tab === "discover" && navState.modal === "report");
-  const showBlockConfirm = (navState?.tab === "discover" && navState.modal === "block");
+
+  const [localShowReportModal, setLocalShowReportModal] = useState<boolean>(false);
+  const showReportModal = localShowReportModal || (navState?.tab === "discover" && navState.modal === "report");
+  const setShowReportModal = (val: boolean) => {
+    setLocalShowReportModal(val);
+    if (onNavigate) {
+      onNavigate({ tab: "discover", profileId: selectedProfile?.id, modal: val ? "report" : undefined });
+    }
+  };
+
+  const [localShowBlockConfirm, setLocalShowBlockConfirm] = useState<boolean>(false);
+  const showBlockConfirm = localShowBlockConfirm || (navState?.tab === "discover" && navState.modal === "block");
+  const setShowBlockConfirm = (val: boolean) => {
+    setLocalShowBlockConfirm(val);
+    if (onNavigate) {
+      onNavigate({ tab: "discover", profileId: selectedProfile?.id, modal: val ? "block" : undefined });
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [savedProfiles, setSavedProfiles] = useState<Set<string>>(new Set());

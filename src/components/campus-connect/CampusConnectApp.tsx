@@ -38,6 +38,7 @@ import {
 } from "@/lib/navigationHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutUser } from "@/lib/auth";
+import { toast } from "sonner";
 import {
   getLiveProfile,
   upsertLiveProfile,
@@ -45,6 +46,7 @@ import {
   fetchUserConversations,
   recordLiveSwipe,
   getLocalUserId,
+  ensureAuthenticatedUser,
 } from "@/lib/supabaseLiveService";
 
 
@@ -74,6 +76,49 @@ const DEFAULT_FREE_PROFILE: StudentProfileData = {
   verified: true,
 };
 
+interface TabErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class CampusTabErrorBoundary extends React.Component<{ children: React.ReactNode; tabName: string; onReset?: () => void }, TabErrorBoundaryState> {
+  state: TabErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): TabErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error(`CampusTabErrorBoundary [${this.props.tabName}] error:`, error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full max-w-xl mx-auto my-12 p-8 rounded-3xl bg-slate-900/90 border border-white/10 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-white">Loading {this.props.tabName}</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            UniCircle live data is syncing. Tap below to reload this section.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false });
+              if (this.props.onReset) this.props.onReset();
+            }}
+            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer shadow-lg shadow-indigo-600/30"
+          >
+            Reload {this.props.tabName}
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const CampusConnectApp: React.FC = () => {
   // 100% Free Direct Access: No login/account creation required
   const [isRegistered, setIsRegistered] = useState<boolean>(true);
@@ -95,24 +140,6 @@ export const CampusConnectApp: React.FC = () => {
     }
     return DEFAULT_FREE_PROFILE;
   });
-
-  // Global Reset Handler: Keeps app active in free mode
-  const handleSignOut = async () => {
-    try {
-      await signOutUser();
-    } catch (e) {}
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("unicircle_user_profile");
-      safeSetItem("unicircle_user_profile", JSON.stringify(DEFAULT_FREE_PROFILE));
-    }
-    setUserProfile(DEFAULT_FREE_PROFILE);
-    setIsRegistered(true);
-    setIsBiometricVerified(true);
-    setShowVerificationStudio(false);
-    setActiveTab("home");
-    setShowUserDropdown(false);
-    toast.success("Feed refreshed in free access mode!");
-  };
 
   // Load and sync real logged-in user profile from Supabase
   useEffect(() => {
@@ -483,6 +510,23 @@ export const CampusConnectApp: React.FC = () => {
     handleNavigate(newState);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOutUser();
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("unicircle_user_profile");
+      safeSetItem("unicircle_user_profile", JSON.stringify(DEFAULT_FREE_PROFILE));
+    }
+    setUserProfile(DEFAULT_FREE_PROFILE);
+    setIsRegistered(true);
+    setIsBiometricVerified(true);
+    setShowVerificationStudio(false);
+    handleTabChange("home");
+    setShowUserDropdown(false);
+    toast.success("Feed refreshed in free access mode!");
+  };
+
   const handleSwipeLike = async (profile: StudentProfile) => {
     if (!matches.some((m) => m.id === profile.id)) {
       setMatches([profile, ...matches]);
@@ -701,6 +745,7 @@ export const CampusConnectApp: React.FC = () => {
         <main className="flex-1 p-3 md:p-6 max-w-3xl mx-auto w-full min-w-0 pb-24 lg:pb-6">
           <>
             {activeTab === "home" && (
+              <CampusTabErrorBoundary tabName="Home Feed" onReset={() => handleTabChange("home")}>
                 <StudentHomeScreen
                   userProfile={userProfile}
                   liveProfiles={liveProfiles}
@@ -709,9 +754,11 @@ export const CampusConnectApp: React.FC = () => {
                   onNavigateToCommunity={() => handleTabChange("communities")}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "discover" && (
+            {activeTab === "discover" && (
+              <CampusTabErrorBoundary tabName="Discover Students" onReset={() => handleTabChange("discover")}>
                 <DiscoverDeck
                   currentProfile={userProfile}
                   profiles={liveProfiles}
@@ -723,26 +770,32 @@ export const CampusConnectApp: React.FC = () => {
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "communities" && (
+            {activeTab === "communities" && (
+              <CampusTabErrorBoundary tabName="Campus Community" onReset={() => handleTabChange("communities")}>
                 <CommunityHub
                   userProfile={userProfile}
                   onUpdateProfile={handleUpdateProfile}
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "events" && (
+            {activeTab === "events" && (
+              <CampusTabErrorBoundary tabName="Campus Events" onReset={() => handleTabChange("events")}>
                 <CampusEventsHub
                   userProfile={userProfile}
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "chat" && (
+            {activeTab === "chat" && (
+              <CampusTabErrorBoundary tabName="Messages" onReset={() => handleTabChange("chat")}>
                 <RealTimeChatSuite
                   activeMatch={activeChatMatch}
                   matches={matches}
@@ -750,32 +803,40 @@ export const CampusConnectApp: React.FC = () => {
                   navState={navState}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {(activeTab === "notifications" || activeTab === "alerts") && (
+            {(activeTab === "notifications" || activeTab === "alerts") && (
+              <CampusTabErrorBoundary tabName="Notifications" onReset={() => handleTabChange("notifications")}>
                 <NotificationsScreen
                   userProfile={userProfile}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {(activeTab === "chart" || activeTab === "analytics") && (
+            {(activeTab === "chart" || activeTab === "analytics") && (
+              <CampusTabErrorBoundary tabName="Analytics" onReset={() => handleTabChange("chart")}>
                 <CampusAnalyticsChartScreen
                   userProfile={userProfile}
                   onNavigate={handleNavigate}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "profile" && (
+            {activeTab === "profile" && (
+              <CampusTabErrorBoundary tabName="Profile Studio" onReset={() => handleTabChange("profile")}>
                 <UserProfileStudio
                   profile={userProfile}
                   onUpdateProfile={handleUpdateProfile}
                   onLaunchLivenessScan={() => setShowVerificationStudio(true)}
                   onNavigateToSettings={() => handleTabChange("settings")}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
 
-              {activeTab === "settings" && (
+            {activeTab === "settings" && (
+              <CampusTabErrorBoundary tabName="Settings" onReset={() => handleTabChange("settings")}>
                 <SettingsScreen
                   userProfile={userProfile}
                   onUpdateProfile={handleUpdateProfile}
@@ -787,7 +848,8 @@ export const CampusConnectApp: React.FC = () => {
                   notificationPrefs={notifPrefs}
                   onUpdateNotificationPrefs={(p) => setNotifPrefs(p)}
                 />
-              )}
+              </CampusTabErrorBoundary>
+            )}
             </>
         </main>
 
