@@ -3,7 +3,7 @@ import {
   Settings, User, Shield, Bell, Eye, Moon, Sun, Monitor, Palette,
   Globe, Zap, HelpCircle, Info, LogOut, ChevronRight, Lock, Check,
   Sliders, ShieldCheck, Trash2, Smartphone, Volume2, AlertTriangle, RefreshCw, BarChart3,
-  ArrowLeft
+  ArrowLeft, UserPlus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,6 +32,7 @@ interface Props {
   userProfile?: any;
   onUpdateProfile?: (updated: any) => void;
   onNavigateToTab?: (tab: string) => void;
+  onOpenAuthModal?: () => void;
   accentTheme?: AccentTheme;
   onSelectAccentTheme?: (accent: AccentTheme) => void;
   themeMode?: ThemeMode;
@@ -44,6 +45,7 @@ export const SettingsScreen: React.FC<Props> = ({
   userProfile,
   onUpdateProfile,
   onNavigateToTab,
+  onOpenAuthModal,
   accentTheme = "blue",
   onSelectAccentTheme,
   themeMode = "dark",
@@ -257,11 +259,30 @@ export const SettingsScreen: React.FC<Props> = ({
                   </div>
                 </div>
 
+                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between flex-wrap sm:flex-nowrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="w-6 h-6 text-indigo-400 shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-indigo-300">Account Switcher & Authentication</h4>
+                      <p className="text-[11px] text-slate-400">Register a new real student account or sign into another account</p>
+                    </div>
+                  </div>
+                  {onOpenAuthModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenAuthModal}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition cursor-pointer whitespace-nowrap"
+                    >
+                      Sign In / Register
+                    </button>
+                  )}
+                </div>
+
                 <div className="pt-2 border-t border-white/10 flex gap-3">
-                  <button className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+                  <button className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer">
                     Change Password
                   </button>
-                  <button className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition">
+                  <button className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition cursor-pointer">
                     Update Phone Number
                   </button>
                 </div>

@@ -2,7 +2,8 @@ import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useEffect } from "react";
 import {
   Home, Search, Users, MessageSquare, Calendar, User, ShieldCheck,
-  Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles, BarChart3, Plus
+  Bell, Settings, Bookmark, LogOut, ChevronDown, HelpCircle, Palette, Sparkles, BarChart3, Plus,
+  LogIn, UserPlus
 } from "lucide-react";
 import { RegistrationWizard, StudentProfileData } from "./RegistrationWizard";
 import { LiveFaceVerification } from "./LiveFaceVerification";
@@ -124,6 +125,7 @@ export const CampusConnectApp: React.FC = () => {
   const [isRegistered, setIsRegistered] = useState<boolean>(true);
   const [isBiometricVerified, setIsBiometricVerified] = useState<boolean>(true);
   const [showVerificationStudio, setShowVerificationStudio] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // User Profile: Default to active verified student profile
   const [userProfile, setUserProfile] = useState<StudentProfileData | null>(() => {
@@ -685,6 +687,14 @@ export const CampusConnectApp: React.FC = () => {
                         <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
                       </button>
 
+                      <button
+                        type="button"
+                        onClick={() => { setShowAuthModal(true); setShowUserDropdown(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4 text-emerald-400" /> Create Account / Sign In
+                      </button>
+
                       <div className="pt-1 border-t border-white/10">
                         <button
                           type="button"
@@ -760,7 +770,7 @@ export const CampusConnectApp: React.FC = () => {
               {showUserDropdown && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowUserDropdown(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-[#101726] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                  <div className="absolute right-0 top-full mt-2 w-60 bg-[#101726] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
                     <div className="px-3 py-2 border-b border-white/10">
                       <p className="text-xs font-bold text-white truncate">{userProfile?.firstName || "Francisco"} {userProfile?.lastName || "Odhiambo"}</p>
                       <p className="text-[10px] text-slate-400 truncate">{userProfile?.campus || "University of Nairobi"}</p>
@@ -788,6 +798,14 @@ export const CampusConnectApp: React.FC = () => {
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition cursor-pointer"
                     >
                       <BarChart3 className="w-4 h-4 text-cyan-400" /> Campus Analytics
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setShowAuthModal(true); setShowUserDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4 text-emerald-400" /> Create Account / Sign In
                     </button>
 
                     <div className="pt-1 border-t border-white/10">
@@ -912,6 +930,7 @@ export const CampusConnectApp: React.FC = () => {
                   userProfile={userProfile}
                   onUpdateProfile={handleUpdateProfile}
                   onNavigateToTab={(tab) => handleTabChange(tab as any)}
+                  onOpenAuthModal={() => setShowAuthModal(true)}
                   accentTheme={accentTheme}
                   onSelectAccentTheme={(acc) => setAccentTheme(acc)}
                   themeMode={themeMode}
@@ -1003,6 +1022,23 @@ export const CampusConnectApp: React.FC = () => {
           handleTabChange("chat");
         }}
       />
+
+      {/* Real Account Registration & Sign-In Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-xl my-auto bg-slate-900/95 border border-white/15 rounded-3xl shadow-2xl overflow-hidden">
+            <RegistrationWizard
+              onComplete={(newProfile) => {
+                setUserProfile(newProfile);
+                setIsRegistered(true);
+                setShowAuthModal(false);
+                toast.success(`Active on UniCircle as ${newProfile.firstName}!`);
+              }}
+              onCancel={() => setShowAuthModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

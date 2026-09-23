@@ -1,6 +1,6 @@
 import { safeSetItem } from "@/lib/safeStorage";
 import React, { useState, useRef } from "react";
-import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, AlertCircle, LogIn, UserPlus } from "lucide-react";
+import { ShieldCheck, Mail, Key, User, GraduationCap, ArrowRight, Building2, Search, Globe, Camera, AlertCircle, LogIn, UserPlus, X } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +48,7 @@ const YEARS_OF_STUDY = [
   "Postgraduate / Master's / PhD"
 ];
 
-export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
+export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   // Auth Mode: Sign Up vs Sign In
   const [authMode, setAuthMode] = useState<"SIGN_UP" | "SIGN_IN">("SIGN_UP");
 
@@ -343,7 +343,18 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete }) => {
   const isSubmitting = authStatus === "SUBMITTING";
 
   return (
-    <div className="max-w-xl mx-auto py-6 px-4">
+    <div className="max-w-xl mx-auto py-6 px-4 relative">
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer z-10"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Header */}
       <div className="text-center mb-6">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-3">
