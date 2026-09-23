@@ -45,12 +45,14 @@ export const CampusDesktopSidebar: React.FC<Props> = ({
           onClick={() => onTabChange("home")}
           className="flex items-center gap-3 px-2 cursor-pointer group"
         >
-          {/* Logo with purple glow ring */}
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-lg shadow-indigo-600/30 flex items-center justify-center shrink-0">
-            <div className="w-full h-full bg-[#090D16] rounded-[14px] flex items-center justify-center">
-              <span className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-pink-400 animate-spin-slow" />
-            </div>
-          </div>
+          <img
+            src="/unicircle-icon.png"
+            alt="UniCircle Logo"
+            className="w-10 h-10 object-contain shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "/unicircle-splash-logo.png";
+            }}
+          />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-0.5">
               UniCircle

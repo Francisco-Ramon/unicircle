@@ -600,11 +600,14 @@ export const CampusConnectApp: React.FC = () => {
               onClick={() => handleTabChange("home")}
               className="flex items-center gap-2.5 cursor-pointer shrink-0"
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-0.5 flex items-center justify-center shadow-lg shadow-purple-600/30">
-                <div className="w-full h-full rounded-full bg-[#090D16] flex items-center justify-center p-1">
-                  <span className="w-3.5 h-3.5 rounded-full border-2 border-pink-400" />
-                </div>
-              </div>
+              <img
+                src="/unicircle-icon.png"
+                alt="UniCircle Logo"
+                className="w-9 h-9 object-contain shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/unicircle-splash-logo.png";
+                }}
+              />
               <div className="flex flex-col">
                 <div className="flex items-center gap-1 font-black text-base tracking-tight leading-none">
                   <span className="text-white">Uni</span>

@@ -30,6 +30,67 @@ interface Props {
   onNavigate?: (state: AppNavState) => void;
 }
 
+const DEFAULT_REFERENCE_COMMENTS: Record<string, any[]> = {
+  ref_post_1: [
+    {
+      id: "comm_1_1",
+      authorName: "Faith Njeri",
+      authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+      campus: "University of Nairobi",
+      timeAgo: "1h",
+      content: "I'll be at the career fair! Let's connect at the tech booth 🚀",
+      likes: 3,
+      userLiked: false,
+    },
+    {
+      id: "comm_1_2",
+      authorName: "Dennis Kiprop",
+      authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+      campus: "JKUAT",
+      timeAgo: "30m",
+      content: "Power systems companies usually set up near Hall 7. Good luck bro!",
+      likes: 1,
+      userLiked: false,
+    }
+  ],
+  ref_post_2: [
+    {
+      id: "comm_2_1",
+      authorName: "Mary Achieng",
+      authorAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
+      campus: "Kenyatta University",
+      timeAgo: "2h",
+      content: "Library grind never stops! What unit are you revising?",
+      likes: 5,
+      userLiked: false,
+    }
+  ],
+  ref_post_3: [
+    {
+      id: "comm_3_1",
+      authorName: "Samuel Ochieng",
+      authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+      campus: "University of Nairobi",
+      timeAgo: "4h",
+      content: "I have the PDF notes and past exam papers for state space. Let's study together!",
+      likes: 4,
+      userLiked: false,
+    }
+  ],
+  ref_post_4: [
+    {
+      id: "comm_4_1",
+      authorName: "Grace Wambui",
+      authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+      campus: "Strathmore University",
+      timeAgo: "5h",
+      content: "Thanks for the reminder Stella! Submitting mine today.",
+      likes: 2,
+      userLiked: false,
+    }
+  ]
+};
+
 const DEFAULT_REFERENCE_POSTS = [
   {
     id: "ref_post_1",
@@ -40,8 +101,8 @@ const DEFAULT_REFERENCE_POSTS = [
     timeAgo: "2h",
     content: "Anyone going to the Engineering Career Fair this Friday? I'm looking for opportunities in power systems and automation. Let's link up! 💯",
     likes: 24,
-    comments: 8,
-    commentsCount: 8,
+    comments: 2,
+    commentsCount: 2,
     userLiked: false,
   },
   {
@@ -53,8 +114,8 @@ const DEFAULT_REFERENCE_POSTS = [
     timeAgo: "3h",
     content: "The library at UoN is such a vibe at this time. Just finished my revision and feeling good. Keep pushing guys! 👊",
     likes: 56,
-    comments: 12,
-    commentsCount: 12,
+    comments: 1,
+    commentsCount: 1,
     userLiked: false,
   },
   {
@@ -66,8 +127,8 @@ const DEFAULT_REFERENCE_POSTS = [
     timeAgo: "5h",
     content: "Does anyone have the control systems 3 notes (especially the state space section)? I'm struggling with it. We can study together if you're also interested.",
     likes: 18,
-    comments: 6,
-    commentsCount: 6,
+    comments: 1,
+    commentsCount: 1,
     userLiked: false,
   },
   {
@@ -79,8 +140,8 @@ const DEFAULT_REFERENCE_POSTS = [
     timeAgo: "6h",
     content: "Good morning everyone! Don't forget the KUCCPS online application deadline is next week. Make sure you've submitted your documents. 🙏",
     likes: 42,
-    comments: 15,
-    commentsCount: 15,
+    comments: 1,
+    commentsCount: 1,
     userLiked: false,
   },
 ];
@@ -106,6 +167,19 @@ export const StudentHomeScreen: React.FC<Props> = ({
   // Active user data
   const currentUserId = userProfile?.id || getLocalUserId();
   const userCampus = userProfile?.campus || "University of Nairobi";
+
+  // Active comments drawer & inputs
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [postComments, setPostComments] = useState<Record<string, any[]>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("unicircle_home_post_comments");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_REFERENCE_COMMENTS;
+  });
 
   // Feed Posts
   const [posts, setPosts] = useState<any[]>(() => {
@@ -303,6 +377,73 @@ export const StudentHomeScreen: React.FC<Props> = ({
     setPosts((prev) => [...prev]);
   };
 
+  // Handle Add Comment on Home feed post (Public for all users)
+  const handleAddComment = (postId: string) => {
+    const text = commentInputs[postId]?.trim();
+    if (!text) return;
+
+    const newComment = {
+      id: `comm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      authorName: `${userProfile?.firstName || "Student"} ${userProfile?.lastName || ""}`.trim(),
+      authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+      campus: userProfile?.campus || userCampus || "Verified Student",
+      timeAgo: "Just now",
+      content: text,
+      likes: 0,
+      userLiked: false,
+    };
+
+    const currentComments = postComments[postId] || [];
+    const updatedComments = [...currentComments, newComment];
+    const nextPostComments = { ...postComments, [postId]: updatedComments };
+    
+    setPostComments(nextPostComments);
+    if (typeof window !== "undefined") {
+      try {
+        safeSetItem("unicircle_home_post_comments", JSON.stringify(nextPostComments));
+      } catch (e) {}
+    }
+
+    setPosts((prev) => {
+      const next = prev.map((p) => {
+        if (p.id === postId) {
+          const nextCount = (p.commentsCount || p.comments || 0) + 1;
+          return { ...p, comments: nextCount, commentsCount: nextCount };
+        }
+        return p;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          safeSetItem("unicircle_home_feed_posts", JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
+
+    setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
+    toast.success("Comment added!");
+  };
+
+  // Handle Comment Like
+  const handleToggleCommentLike = (postId: string, commentId: string) => {
+    const currentComments = postComments[postId] || [];
+    const updated = currentComments.map((c) => {
+      if (c.id === commentId) {
+        const nextLiked = !c.userLiked;
+        const nextLikes = nextLiked ? (c.likes || 0) + 1 : Math.max(0, (c.likes || 1) - 1);
+        return { ...c, userLiked: nextLiked, likes: nextLikes };
+      }
+      return c;
+    });
+    const nextPostComments = { ...postComments, [postId]: updated };
+    setPostComments(nextPostComments);
+    if (typeof window !== "undefined") {
+      try {
+        safeSetItem("unicircle_home_post_comments", JSON.stringify(nextPostComments));
+      } catch (e) {}
+    }
+  };
+
   // Filtered posts based on active feed tab
   const displayedPosts = useMemo(() => {
     if (feedTab === "following") {
@@ -432,6 +573,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
               (post.authorId && (post.authorId === currentUserId || (userProfile?.id && post.authorId === userProfile.id))) ||
               (userProfile?.firstName && post.authorName?.toLowerCase().includes(userProfile.firstName.toLowerCase()))
             );
+            const isCommentsOpen = activeCommentPostId === post.id;
+            const commentsList = postComments[post.id] || [];
 
             return (
               <div
@@ -514,14 +657,16 @@ export const StudentHomeScreen: React.FC<Props> = ({
                     <span>{post.likes}</span>
                   </button>
 
-                  {/* Comments */}
+                  {/* Comments - Click opens/toggles inline comments drawer */}
                   <button
                     type="button"
-                    onClick={() => onNavigateToCommunity()}
-                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                    onClick={() => setActiveCommentPostId((prev) => (prev === post.id ? null : post.id))}
+                    className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      isCommentsOpen ? "text-indigo-400 font-bold" : "hover:text-white"
+                    }`}
                   >
                     <MessageSquare className="w-4 h-4" />
-                    <span>{post.comments || post.commentsCount || 0}</span>
+                    <span>{Math.max(commentsList.length, post.comments || post.commentsCount || 0)}</span>
                   </button>
 
                   {/* Share */}
@@ -545,6 +690,100 @@ export const StudentHomeScreen: React.FC<Props> = ({
                     <span>Share</span>
                   </button>
                 </div>
+
+                {/* Inline Comments Section (Open to Anyone on Home Feed) */}
+                {isCommentsOpen && (
+                  <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                        Comments ({commentsList.length})
+                      </span>
+                      <span className="text-[11px] text-emerald-400 font-medium">Public Discussion</span>
+                    </div>
+
+                    {/* Comments List */}
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                      {commentsList.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-3 bg-white/[0.02] rounded-xl border border-white/5">
+                          No comments yet. Be the first to comment!
+                        </p>
+                      ) : (
+                        commentsList.map((comm: any) => (
+                          <div
+                            key={comm.id}
+                            className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5"
+                          >
+                            <img
+                              src={comm.authorAvatar}
+                              alt={comm.authorName}
+                              className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/10 mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-xs font-bold text-white truncate">{comm.authorName}</span>
+                                  {comm.campus && (
+                                    <span className="text-[10px] text-slate-400 truncate">• {comm.campus}</span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 shrink-0">{comm.timeAgo}</span>
+                              </div>
+                              <p className="text-xs text-slate-200 mt-1 leading-relaxed whitespace-pre-wrap">
+                                {comm.content}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCommentLike(post.id, comm.id)}
+                                  className={`text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                    comm.userLiked ? "text-pink-400" : "text-slate-500 hover:text-slate-300"
+                                  }`}
+                                >
+                                  <Heart className={`w-3 h-3 ${comm.userLiked ? "fill-pink-400" : ""}`} />
+                                  <span>{comm.likes > 0 ? comm.likes : "Like"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add Comment Input Bar */}
+                    <div className="flex items-center gap-2 pt-1.5">
+                      <img
+                        src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
+                        alt="You"
+                        className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                      />
+                      <div className="flex-1 relative flex items-center">
+                        <input
+                          type="text"
+                          value={commentInputs[post.id] || ""}
+                          onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddComment(post.id);
+                            }
+                          }}
+                          placeholder="Write a comment..."
+                          className="w-full bg-slate-900/90 border border-white/10 rounded-full pl-3.5 pr-10 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddComment(post.id)}
+                          disabled={!commentInputs[post.id]?.trim()}
+                          className="absolute right-1.5 p-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                          title="Send Comment"
+                        >
+                          <Send className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })

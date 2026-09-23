@@ -110,6 +110,19 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     ? (findInst(navState.communityId) || userInst)
     : userInst);
 
+  // Strict School Membership Check
+  const isSchoolMember = Boolean(
+    userProfile?.campus &&
+    activeInst?.name &&
+    (userProfile.campus.toLowerCase().trim() === activeInst.name.toLowerCase().trim() ||
+     userProfile.campus.toLowerCase().includes(activeInst.name.toLowerCase()) ||
+     activeInst.name.toLowerCase().includes(userProfile.campus.toLowerCase()) ||
+     (activeInst.shortName && (
+       userProfile.campus.toLowerCase().includes(activeInst.shortName.toLowerCase()) ||
+       activeInst.shortName.toLowerCase().includes(userProfile.campus.toLowerCase())
+     )))
+  );
+
   const [activeTab, setActiveTab] = useState<"feed" | "following" | "events" | "members" | "about">("feed");
 
   // Posts state with localStorage initialization
@@ -457,6 +470,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   const handleAddComment = (postId: string) => {
+    if (!isSchoolMember) {
+      toast.error(`Only verified students of ${activeInst?.name || "this university"} can comment in this community.`);
+      return;
+    }
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
@@ -488,6 +505,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   const [postVisibility, setPostVisibility] = useState<PostVisibility>("PUBLIC");
 
   const handleCreatePost = async () => {
+    if (!isSchoolMember) {
+      toast.error(`Only verified students of ${activeInst?.name || "this university"} can post in this community.`);
+      return;
+    }
     if (!newPostContent.trim() || isSubmittingPost) return;
     setIsSubmittingPost(true);
     const postTitle = newPostContent.substring(0, 45);
@@ -789,37 +810,45 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             </div>
           </div>
 
-          {/* 4. CROSS-CAMPUS SCOPE SELECTOR PILLS */}
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setCampusScopeFilter("all")}
-              className={`py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md ${
-                campusScopeFilter === "all"
-                  ? "bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white shadow-purple-600/25"
-                  : "bg-[#0D1424] border border-white/5 text-slate-300 hover:text-white"
-              }`}
-            >
-              <span>🌐 All Campuses Feed</span>
-              <span className="text-xs">▾</span>
-            </button>
+          {/* 4. SCHOOL MEMBER ACCESS GATE OR COMMUNITY FEED */}
+          {!isSchoolMember ? (
+            <div className="text-center py-12 px-6 bg-[#0D1322]/90 rounded-3xl border border-white/10 space-y-5 my-4 shadow-2xl backdrop-blur-xl">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 via-indigo-500/20 to-pink-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-inner">
+                <ShieldCheck className="w-8 h-8 text-amber-400" />
+              </div>
+              <div className="space-y-2">
+                <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider">
+                  Members Only Community Hub
+                </span>
+                <h3 className="text-lg font-black text-white">
+                  Exclusive to {activeInst.name} Students
+                </h3>
+                <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                  Discussions, campus posts, and student threads inside this community hub are private to verified students enrolled at {activeInst.name}. Only members can see or comment on community posts.
+                </p>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setCampusScopeFilter("local")}
-              className={`py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                campusScopeFilter === "local"
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-600/25"
-                  : "bg-[#0D1424] border border-white/5 text-slate-300 hover:text-white"
-              }`}
-            >
-              <span>🏛️ {activeInst.shortName || "UoN"} Only</span>
-              <span className="text-xs">▾</span>
-            </button>
-          </div>
-
-          {/* 5. CREATE POST QUICK-BAR */}
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#0D1424] border border-white/10 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInst(userInst)}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                >
+                  Go to {userInst.shortName || userInst.name} Hub
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate({ tab: "home" })}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white text-xs font-bold border border-white/10 transition cursor-pointer"
+                >
+                  Explore Public Home Feed
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 5. CREATE POST QUICK-BAR */}
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#0D1424] border border-white/10 shadow-lg">
             <div className="relative shrink-0">
               <img
                 src={userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"}
@@ -1327,6 +1356,8 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
             );
           });
         })()}
+            </>
+          )}
       </div>
     )}
 
