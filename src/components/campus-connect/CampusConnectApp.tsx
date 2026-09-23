@@ -155,7 +155,8 @@ export const CampusConnectApp: React.FC = () => {
             setUserProfile((prev) => {
               const updatedPhotos = (liveProf.photos && liveProf.photos.length > 0)
                 ? liveProf.photos
-                : (prev?.photos || ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"]);
+                : (prev?.photos || []);
+
 
               const merged: StudentProfileData = {
                 email: authData.user.email || liveProf.email || prev?.email || "student@unicircle.app",

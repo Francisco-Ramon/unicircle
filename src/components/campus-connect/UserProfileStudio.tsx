@@ -204,12 +204,6 @@ export const UserProfileStudio: React.FC<Props> = ({
                   <p className="text-xs text-indigo-300 font-semibold">
                     {profile.campus} ({profile.country || "Kenya"})
                   </p>
-                  <button
-                    onClick={() => setShowUniSearch(true)}
-                    className="px-2 py-0.5 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold hover:bg-indigo-600/30 transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Globe className="w-3 h-3 text-indigo-400" /> Change
-                  </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">{profile.course} • {profile.yearOfStudy}</p>
               </div>
@@ -460,41 +454,72 @@ export const UserProfileStudio: React.FC<Props> = ({
               </button>
             </div>
 
+            {/* Verified Student Notice */}
+            <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-2.5 text-xs text-indigo-300">
+              <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white">Verified Academic Record</p>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  Your Name, University, and Course are locked to your verified student identity. To request changes or re-verification, please contact UniCircle Admin.
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-3 text-xs">
-              {/* First Name & Last Name */}
+              {/* First Name & Last Name (Locked) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">First Name</label>
+                  <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>First Name</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">🔒 Verified</span>
+                  </label>
                   <input
                     type="text"
+                    disabled
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="e.g. Jomba"
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-slate-300 opacity-80 cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Last Name</label>
+                  <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>Last Name</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">🔒 Verified</span>
+                  </label>
                   <input
                     type="text"
+                    disabled
                     value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="e.g. Otieno"
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-slate-300 opacity-80 cursor-not-allowed"
                   />
                 </div>
               </div>
 
-              {/* Course / Degree */}
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Major / Course</label>
-                <input
-                  type="text"
-                  value={course}
-                  onChange={(e) => setCourse(e.target.value)}
-                  placeholder="e.g. Computer Science, Law, Medicine"
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                />
+              {/* University & Course (Locked) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>University</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">🔒 Verified</span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={profile.campus || "University of Nairobi"}
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-slate-300 opacity-80 cursor-not-allowed truncate"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>Major / Course</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">🔒 Verified</span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={course}
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-slate-300 opacity-80 cursor-not-allowed truncate"
+                  />
+                </div>
               </div>
 
               {/* Year of Study & Gender */}
@@ -515,16 +540,16 @@ export const UserProfileStudio: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Gender</label>
-                  <select
+                  <label className="block text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>Gender</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">🔒 Verified</span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
                     value={gender}
-                    onChange={(e) => setGender(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Non-Binary">Non-Binary</option>
-                  </select>
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-slate-300 opacity-80 cursor-not-allowed"
+                  />
                 </div>
               </div>
 
