@@ -8,7 +8,7 @@ import {
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { supabase } from "@/integrations/supabase/client";
-import { uploadToStorage, upsertLiveProfile, getLiveProfile } from "@/lib/supabaseLiveService";
+import { uploadToStorage, upsertLiveProfile, getLiveProfile, getLocalUserId } from "@/lib/supabaseLiveService";
 import { getSafeErrorMessage } from "@/lib/errorHandler";
 import { toast } from "sonner";
 
@@ -355,7 +355,11 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
 
       // Fallback: If network / email confirmation delayed, generate resilient student UUID
       if (!authUserId) {
-        authUserId = getLocalUserId();
+        try {
+          authUserId = typeof getLocalUserId === "function" ? getLocalUserId() : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "00000000-0000-4000-a000-000000000000");
+        } catch (e) {
+          authUserId = "00000000-0000-4000-a000-000000000000";
+        }
       }
 
 
