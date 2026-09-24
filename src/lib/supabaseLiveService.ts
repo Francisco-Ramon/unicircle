@@ -296,7 +296,7 @@ export async function getLiveProfile(userId: string): Promise<LiveProfile | null
 
 export async function upsertLiveProfile(profile: any): Promise<boolean> {
   try {
-    const userId = await ensureAuthenticatedUser();
+    const userId = profile.id || profile.userId || (await ensureAuthenticatedUser());
     const payload = {
       id: userId,
       first_name: profile.first_name || profile.firstName || "Student",
@@ -527,6 +527,20 @@ export async function createLivePost(params: {
       }
     };
 
+    // Broadcast new post across all active connected clients in real-time
+    try {
+      const bc = supabase.channel("unicircle-global-live-feed");
+      bc.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          bc.send({
+            type: "broadcast",
+            event: "new_post",
+            payload: resultPost,
+          });
+        }
+      });
+    } catch (e) {}
+
     return resultPost;
   } catch (err) {
     console.error("createLivePost fatal error:", err);
@@ -547,9 +561,13 @@ export function subscribeToLiveCommunity(callbacks: {
   onNewPost?: (post: LivePost) => void;
   onNewEvent?: (event: LiveEvent) => void;
 }) {
-  const channelName = `unicircle-live-feed-${Date.now()}`;
   const channel = supabase
-    .channel(channelName)
+    .channel("unicircle-global-live-feed")
+    .on("broadcast", { event: "new_post" }, (payload) => {
+      if (payload?.payload && callbacks.onNewPost) {
+        callbacks.onNewPost(payload.payload);
+      }
+    })
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "posts" },

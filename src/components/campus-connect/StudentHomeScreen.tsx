@@ -234,36 +234,43 @@ export const StudentHomeScreen: React.FC<Props> = ({
     let isMounted = true;
     let unsubscribePosts: (() => void) | undefined;
 
-    // 1. Fetch live posts
-    fetchLivePosts().then((dbPosts) => {
-      if (!isMounted) return;
-      if (dbPosts && dbPosts.length > 0) {
-        const formatted = dbPosts.map((lp) => ({
-          id: lp.id,
-          authorId: lp.author_id,
-          authorName: lp.profiles?.first_name
-            ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
-            : "Verified Student",
-          authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-          campus: lp.campus || userCampus,
-          timeAgo: formatTimeAgo(lp.created_at),
-          content: lp.content,
-          image: lp.image_url,
-          likes: lp.likes_count || 0,
-          comments: lp.comments_count || 0,
-          commentsCount: lp.comments_count || 0,
-          userLiked: false,
-        }));
+    const loadPosts = () => {
+      fetchLivePosts().then((dbPosts) => {
+        if (!isMounted) return;
+        if (dbPosts && dbPosts.length > 0) {
+          const formatted = dbPosts.map((lp) => ({
+            id: lp.id,
+            authorId: lp.author_id,
+            authorName: lp.profiles?.first_name
+              ? `${lp.profiles.first_name} ${lp.profiles.last_name || ""}`.trim()
+              : "Verified Student",
+            authorAvatar: lp.profiles?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+            campus: lp.campus || userCampus,
+            timeAgo: formatTimeAgo(lp.created_at),
+            content: lp.content,
+            image: lp.image_url,
+            likes: lp.likes_count || 0,
+            comments: lp.comments_count || 0,
+            commentsCount: lp.comments_count || 0,
+            userLiked: false,
+          }));
 
-        // Merge DB posts with default reference posts (avoid duplicates)
-        const dbIds = new Set(formatted.map((p) => p.id));
-        const merged = [...formatted, ...DEFAULT_REFERENCE_POSTS.filter((p) => !dbIds.has(p.id))];
-        setPosts(merged);
-        if (typeof window !== "undefined") {
-          safeSetItem("unicircle_home_feed_posts", JSON.stringify(merged));
+          setPosts((prev) => {
+            const incomingIds = new Set(formatted.map((f) => f.id));
+            const localOnly = prev.filter((p) => !incomingIds.has(p.id) && p.id.startsWith("post_"));
+            const merged = [...formatted, ...localOnly, ...DEFAULT_REFERENCE_POSTS.filter((p) => !incomingIds.has(p.id))];
+            if (typeof window !== "undefined") {
+              safeSetItem("unicircle_home_feed_posts", JSON.stringify(merged));
+            }
+            return merged;
+          });
         }
-      }
-    }).catch((err) => console.warn("HomeScreen posts load:", err));
+      }).catch((err) => console.warn("HomeScreen posts load:", err));
+    };
+
+    // 1. Fetch initial live posts & start 8s polling
+    loadPosts();
+    const pollTimer = setInterval(loadPosts, 8000);
 
     // 2. Fetch live profiles
     fetchLiveDiscoverProfiles().then((profs) => {
@@ -273,7 +280,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
       }
     }).catch(() => {});
 
-    // 3. Subscribe to realtime new posts
+    // 3. Subscribe to realtime new posts & broadcast events
     unsubscribePosts = subscribeToLiveCommunity({
       onNewPost: (incoming) => {
         if (!isMounted) return;
@@ -307,8 +314,10 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
     return () => {
       isMounted = false;
+      clearInterval(pollTimer);
       if (unsubscribePosts) unsubscribePosts();
     };
+  }, [userCampus]);
   }, [userCampus]);
 
   // Handle Create Post
