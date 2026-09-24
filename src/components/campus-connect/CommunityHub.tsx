@@ -17,6 +17,8 @@ import {
   createLivePost,
   toggleLiveLike,
   addLivePostComment,
+  broadcastPostLike,
+  broadcastPostComment,
   fetchLiveEvents,
   createLiveEvent,
   uploadToStorage,
@@ -327,6 +329,26 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               return next;
             });
           },
+          onPostLike: ({ postId, likesCount }) => {
+            setPosts((prev) =>
+              prev.map((p) => (p.id === postId ? { ...p, likes: likesCount } : p))
+            );
+          },
+          onPostComment: ({ postId, comment, commentsCount }) => {
+            setPosts((prev) =>
+              prev.map((p) => {
+                if (p.id !== postId) return p;
+                const existing = p.comments || [];
+                const dedupe = comment?.id ? existing.filter((c) => c.id !== comment.id) : existing;
+                const updatedComments = comment ? [...dedupe, comment] : existing;
+                return {
+                  ...p,
+                  commentsCount: commentsCount || updatedComments.length,
+                  comments: updatedComments,
+                };
+              })
+            );
+          },
           onNewEvent: (newLiveEvent) => {
             const incomingEvt: CampusEvent = {
               id: newLiveEvent.id,
@@ -446,13 +468,20 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     }
   };
 
-  const handleToggleLike = (postId: string) => {
-    const nextPosts = posts.map((p) =>
-      p.id === postId
-        ? { ...p, userLiked: !p.userLiked, likes: p.userLiked ? p.likes - 1 : p.likes + 1 }
-        : p
-    );
+  const handleToggleLike = async (postId: string) => {
+    let nextCount = 0;
+    const nextPosts = posts.map((p) => {
+      if (p.id === postId) {
+        const nextLiked = !p.userLiked;
+        nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+        return { ...p, userLiked: nextLiked, likes: nextCount };
+      }
+      return p;
+    });
     updatePosts(nextPosts);
+    try {
+      await broadcastPostLike(postId, nextCount);
+    } catch (e) {}
   };
 
   const handleToggleCommentLike = (postId: string, commentId: string) => {
@@ -470,7 +499,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     updatePosts(nextPosts);
   };
 
-  const handleAddComment = (postId: string) => {
+  const handleAddComment = async (postId: string) => {
     if (!isSchoolMember) {
       toast.error(`Only verified students of ${activeInst?.name || "this university"} can comment in this community.`);
       return;
@@ -478,6 +507,7 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
+    let nextCommentsCount = 0;
     const newComment: PostComment = {
       id: `comm-${Date.now()}`,
       authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
@@ -491,15 +521,20 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
 
     const nextPosts = posts.map((p) => {
       if (p.id !== postId) return p;
+      nextCommentsCount = p.commentsCount + 1;
       return {
         ...p,
-        commentsCount: p.commentsCount + 1,
+        commentsCount: nextCommentsCount,
         comments: [...p.comments, newComment],
       };
     });
 
     updatePosts(nextPosts);
     setCommentInputs({ ...commentInputs, [postId]: "" });
+
+    try {
+      await broadcastPostComment(postId, newComment, nextCommentsCount);
+    } catch (e) {}
   };
 
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);

@@ -13,6 +13,8 @@ import {
   fetchLiveDiscoverProfiles,
   createLivePost,
   likeLivePost,
+  broadcastPostLike,
+  broadcastPostComment,
   uploadToStorage,
   getLocalUserId,
   subscribeToLiveCommunity
@@ -280,7 +282,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
       }
     }).catch(() => {});
 
-    // 3. Subscribe to realtime new posts & broadcast events
+    // 3. Subscribe to realtime new posts, likes & comments
     unsubscribePosts = subscribeToLiveCommunity({
       onNewPost: (incoming) => {
         if (!isMounted) return;
@@ -295,9 +297,9 @@ export const StudentHomeScreen: React.FC<Props> = ({
           timeAgo: "Just now",
           content: incoming.content,
           image: incoming.image_url,
-          likes: 0,
-          comments: 0,
-          commentsCount: 0,
+          likes: incoming.likes_count || 0,
+          comments: incoming.comments_count || 0,
+          commentsCount: incoming.comments_count || 0,
           userLiked: false,
         };
 
@@ -309,6 +311,18 @@ export const StudentHomeScreen: React.FC<Props> = ({
           }
           return next;
         });
+      },
+      onPostLike: ({ postId, likesCount }) => {
+        if (!isMounted) return;
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, likes: likesCount } : p))
+        );
+      },
+      onPostComment: ({ postId, commentsCount }) => {
+        if (!isMounted) return;
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, comments: commentsCount, commentsCount } : p))
+        );
       },
     });
 
@@ -376,13 +390,14 @@ export const StudentHomeScreen: React.FC<Props> = ({
     }
   };
 
-  // Handle Like
+  // Handle Like with real-time broadcast
   const handleToggleLike = async (postId: string) => {
+    let nextCount = 0;
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
           const nextLiked = !p.userLiked;
-          const nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+          nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
           return { ...p, userLiked: nextLiked, likes: nextCount };
         }
         return p;
@@ -390,7 +405,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
     );
 
     try {
-      await likeLivePost(postId, currentUserId);
+      await broadcastPostLike(postId, nextCount);
     } catch (e) {}
   };
 

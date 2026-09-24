@@ -557,15 +557,85 @@ export async function createLivePost(params: {
   }
 }
 
+export async function broadcastPostLike(postId: string, newLikesCount: number): Promise<void> {
+  try {
+    await (supabase
+      .from("posts" as any)
+      .update({ likes_count: newLikesCount })
+      .eq("id", postId) as any);
+  } catch (e) {
+    console.warn("broadcastPostLike DB notice:", e);
+  }
+
+  try {
+    const bc = supabase.channel("unicircle-global-live-feed");
+    bc.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        bc.send({
+          type: "broadcast",
+          event: "post_like",
+          payload: { postId, likesCount: newLikesCount },
+        });
+      }
+    });
+  } catch (e) {}
+}
+
+export async function broadcastPostComment(postId: string, comment: any, newCommentsCount: number): Promise<void> {
+  try {
+    await (supabase
+      .from("posts" as any)
+      .update({ comments_count: newCommentsCount })
+      .eq("id", postId) as any);
+
+    if (comment && comment.content) {
+      await (supabase
+        .from("post_comments" as any)
+        .insert({
+          post_id: postId,
+          author_id: comment.authorId || comment.author_id || "usr_anon",
+          content: comment.content,
+        }) as any);
+    }
+  } catch (e) {
+    console.warn("broadcastPostComment DB notice:", e);
+  }
+
+  try {
+    const bc = supabase.channel("unicircle-global-live-feed");
+    bc.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        bc.send({
+          type: "broadcast",
+          event: "post_comment",
+          payload: { postId, comment, commentsCount: newCommentsCount },
+        });
+      }
+    });
+  } catch (e) {}
+}
+
 export function subscribeToLiveCommunity(callbacks: {
   onNewPost?: (post: LivePost) => void;
   onNewEvent?: (event: LiveEvent) => void;
+  onPostLike?: (data: { postId: string; likesCount: number }) => void;
+  onPostComment?: (data: { postId: string; comment: any; commentsCount: number }) => void;
 }) {
   const channel = supabase
     .channel("unicircle-global-live-feed")
     .on("broadcast", { event: "new_post" }, (payload) => {
       if (payload?.payload && callbacks.onNewPost) {
         callbacks.onNewPost(payload.payload);
+      }
+    })
+    .on("broadcast", { event: "post_like" }, (payload) => {
+      if (payload?.payload && callbacks.onPostLike) {
+        callbacks.onPostLike(payload.payload);
+      }
+    })
+    .on("broadcast", { event: "post_comment" }, (payload) => {
+      if (payload?.payload && callbacks.onPostComment) {
+        callbacks.onPostComment(payload.payload);
       }
     })
     .on(
