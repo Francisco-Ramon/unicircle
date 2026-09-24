@@ -318,7 +318,6 @@ export const StudentHomeScreen: React.FC<Props> = ({
       if (unsubscribePosts) unsubscribePosts();
     };
   }, [userCampus]);
-  }, [userCampus]);
 
   // Handle Create Post
   const handlePublishPost = async () => {
