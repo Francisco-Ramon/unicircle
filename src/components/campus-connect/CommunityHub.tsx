@@ -384,8 +384,10 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
       }
     }
     loadLiveData();
+    const pollTimer = setInterval(loadLiveData, 7000);
     return () => {
       isMounted = false;
+      clearInterval(pollTimer);
       if (unsubscribe) unsubscribe();
     };
   }, [activeInst.name]);
@@ -469,18 +471,22 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
   };
 
   const handleToggleLike = async (postId: string) => {
-    let nextCount = 0;
+    const postItem = posts.find((p) => p.id === postId);
+    const isCurrentlyLiked = Boolean(postItem?.userLiked);
+    const currentUserId = userProfile?.id || getLocalUserId();
+
     const nextPosts = posts.map((p) => {
       if (p.id === postId) {
         const nextLiked = !p.userLiked;
-        nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+        const nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
         return { ...p, userLiked: nextLiked, likes: nextCount };
       }
       return p;
     });
     updatePosts(nextPosts);
+
     try {
-      await broadcastPostLike(postId, nextCount);
+      await toggleLiveLike(postId, currentUserId, isCurrentlyLiked);
     } catch (e) {}
   };
 
@@ -507,12 +513,13 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
+    const currentUserId = userProfile?.id || getLocalUserId();
     let nextCommentsCount = 0;
     const newComment: PostComment = {
       id: `comm-${Date.now()}`,
-      authorName: `${userProfile?.firstName || "Alex"} ${userProfile?.lastName || "Chen"}`,
+      authorName: `${userProfile?.firstName || "Student"} ${userProfile?.lastName || ""}`.trim(),
       authorAvatar: userProfile?.photos?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-      authorCourse: `${userProfile?.course || "Computer Science"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
+      authorCourse: `${userProfile?.course || "Student"} • ${userProfile?.yearOfStudy || "3rd Year"}`,
       timeAgo: "Just now",
       content: text,
       likes: 0,
@@ -533,8 +540,15 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
     setCommentInputs({ ...commentInputs, [postId]: "" });
 
     try {
-      await broadcastPostComment(postId, newComment, nextCommentsCount);
-    } catch (e) {}
+      await addLivePostComment({
+        postId,
+        authorId: currentUserId,
+        content: text,
+        authorProfile: userProfile,
+      });
+    } catch (e) {
+      console.warn("Community comment sync notice:", e);
+    }
   };
 
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);

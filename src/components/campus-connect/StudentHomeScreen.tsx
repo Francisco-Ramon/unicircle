@@ -13,6 +13,9 @@ import {
   fetchLiveDiscoverProfiles,
   createLivePost,
   likeLivePost,
+  toggleLiveLike,
+  addLivePostComment,
+  fetchLivePostComments,
   broadcastPostLike,
   broadcastPostComment,
   uploadToStorage,
@@ -390,14 +393,16 @@ export const StudentHomeScreen: React.FC<Props> = ({
     }
   };
 
-  // Handle Like with real-time broadcast
+  // Handle Like with real-time cloud broadcast & DB persistence
   const handleToggleLike = async (postId: string) => {
-    let nextCount = 0;
+    const postItem = posts.find((p) => p.id === postId);
+    const isCurrentlyLiked = Boolean(postItem?.userLiked);
+
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
           const nextLiked = !p.userLiked;
-          nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
+          const nextCount = nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1);
           return { ...p, userLiked: nextLiked, likes: nextCount };
         }
         return p;
@@ -405,8 +410,22 @@ export const StudentHomeScreen: React.FC<Props> = ({
     );
 
     try {
-      await broadcastPostLike(postId, nextCount);
+      await toggleLiveLike(postId, currentUserId, isCurrentlyLiked);
     } catch (e) {}
+  };
+
+  // Handle Toggle Comments Drawer and fetch comments from Supabase
+  const handleToggleCommentsDrawer = async (postId: string) => {
+    const nextActive = activeCommentPostId === postId ? null : postId;
+    setActiveCommentPostId(nextActive);
+    if (nextActive) {
+      try {
+        const liveComments = await fetchLivePostComments(nextActive);
+        if (liveComments && liveComments.length > 0) {
+          setPostComments((prev) => ({ ...prev, [nextActive]: liveComments }));
+        }
+      } catch (e) {}
+    }
   };
 
   // Handle Follow / Unfollow user on feed
@@ -438,8 +457,8 @@ export const StudentHomeScreen: React.FC<Props> = ({
     setPosts((prev) => [...prev]);
   };
 
-  // Handle Add Comment on Home feed post (Public for all users)
-  const handleAddComment = (postId: string) => {
+  // Handle Add Comment on Home feed post (Public for all users with Supabase persistence)
+  const handleAddComment = async (postId: string) => {
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
@@ -483,6 +502,17 @@ export const StudentHomeScreen: React.FC<Props> = ({
 
     setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
     toast.success("Comment added!");
+
+    try {
+      await addLivePostComment({
+        postId,
+        authorId: currentUserId,
+        content: text,
+        authorProfile: userProfile,
+      });
+    } catch (e) {
+      console.warn("Comment cloud sync notice:", e);
+    }
   };
 
   // Handle Comment Like
@@ -1092,7 +1122,7 @@ export const StudentHomeScreen: React.FC<Props> = ({
                       {/* Comments - Click opens/toggles inline comments drawer */}
                       <button
                         type="button"
-                        onClick={() => setActiveCommentPostId((prev) => (prev === post.id ? null : post.id))}
+                        onClick={() => handleToggleCommentsDrawer(post.id)}
                         className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
                           isCommentsOpen ? "text-indigo-400 font-bold" : "hover:text-white"
                         }`}

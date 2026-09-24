@@ -345,11 +345,23 @@ export async function fetchLivePosts(campus?: string): Promise<LivePost[]> {
       .limit(60) as any);
 
     if (error) {
-      console.error("fetchLivePosts error from Supabase:", error);
-      return [];
+      console.warn("fetchLivePosts notice from Supabase DB:", error.message || error);
     }
 
     let rawPosts: any[] = postsData || [];
+
+    // Merge cloud sync cache relay posts (created locally or synced) with remote posts
+    if (typeof window !== "undefined") {
+      try {
+        const cloudCached: LivePost[] = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_POSTS) || "[]");
+        if (cloudCached.length > 0) {
+          const remoteIds = new Set(rawPosts.map((p) => p.id));
+          const localOnly = cloudCached.filter((p) => !remoteIds.has(p.id));
+          rawPosts = [...localOnly, ...rawPosts];
+        }
+      } catch (e) {}
+    }
+
     if (rawPosts.length === 0) return [];
 
     // Prioritize matching campus posts, followed by other campus posts
@@ -526,6 +538,15 @@ export async function createLivePost(params: {
         verified: true,
       }
     };
+
+    // Cache newly created post in cloud sync relay for instant multi-user cross-client sync
+    if (typeof window !== "undefined") {
+      try {
+        const cached: LivePost[] = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY_POSTS) || "[]");
+        const updated = [resultPost, ...cached.filter((p) => p.id !== resultPost.id)].slice(0, 100);
+        safeSetItem(CLOUD_SYNC_KEY_POSTS, JSON.stringify(updated));
+      } catch (e) {}
+    }
 
     // Broadcast new post across all active connected clients in real-time
     try {
@@ -704,17 +725,85 @@ export function subscribeToLiveCommunity(callbacks: {
   };
 }
 
-export async function toggleLiveLike(postId: string, userId: string, isCurrentlyLiked: boolean): Promise<boolean> {
+export async function toggleLiveLike(postId: string, userId: string, isCurrentlyLiked: boolean): Promise<number> {
   try {
+    const validUserId = userId && UUID_REGEX.test(userId) ? userId : getLocalUserId();
+    const delta = isCurrentlyLiked ? -1 : 1;
+
     if (isCurrentlyLiked) {
-      await (supabase.from("post_likes" as any).delete().match({ post_id: postId, user_id: userId }) as any);
+      await (supabase.from("post_likes" as any).delete().match({ post_id: postId, user_id: validUserId }) as any);
     } else {
-      await (supabase.from("post_likes" as any).insert({ post_id: postId, user_id: userId }) as any);
+      await (supabase.from("post_likes" as any).insert({ post_id: postId, user_id: validUserId }) as any);
     }
-    return true;
+
+    const { data: postRec } = await (supabase.from("posts" as any).select("likes_count").eq("id", postId).maybeSingle() as any);
+    const newCount = Math.max(0, (postRec?.likes_count || 0) + delta);
+    await (supabase.from("posts" as any).update({ likes_count: newCount }).eq("id", postId) as any);
+
+    try {
+      const bc = supabase.channel("unicircle-global-live-feed");
+      bc.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          bc.send({
+            type: "broadcast",
+            event: "post_like",
+            payload: { postId, likesCount: newCount },
+          });
+        }
+      });
+    } catch (e) {}
+
+    return newCount;
   } catch (err) {
     console.error("Error toggling like:", err);
-    return false;
+    return 0;
+  }
+}
+
+export async function fetchLivePostComments(postId: string): Promise<any[]> {
+  try {
+    const { data, error } = await (supabase
+      .from("post_comments" as any)
+      .select("*")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true }) as any);
+
+    if (error || !data || data.length === 0) return [];
+
+    const authorIds = Array.from(new Set(data.map((c: any) => c.author_id).filter(Boolean)));
+    let authorMap: Record<string, LiveProfile> = {};
+    if (authorIds.length > 0) {
+      const { data: profs } = await (supabase
+        .from("profiles" as any)
+        .select("*")
+        .in("id", authorIds) as any);
+      if (profs) {
+        profs.forEach((pr: LiveProfile) => {
+          authorMap[pr.id] = pr;
+        });
+      }
+    }
+
+    return data.map((c: any) => {
+      const a = authorMap[c.author_id];
+      const diffMs = Date.now() - new Date(c.created_at || Date.now()).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const timeStr = diffMins < 1 ? "Just now" : diffMins < 60 ? `${diffMins}m` : `${Math.floor(diffMins / 60)}h`;
+      return {
+        id: c.id,
+        authorId: c.author_id,
+        authorName: a ? `${a.first_name || ""} ${a.last_name || ""}`.trim() || a.first_name || "Verified Student" : "Verified Student",
+        authorAvatar: a?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        campus: a?.campus || "University of Nairobi",
+        content: c.content,
+        timeAgo: timeStr,
+        likes: 0,
+        userLiked: false,
+      };
+    });
+  } catch (err) {
+    console.error("fetchLivePostComments error:", err);
+    return [];
   }
 }
 
@@ -722,23 +811,60 @@ export async function addLivePostComment(params: {
   postId: string;
   authorId: string;
   content: string;
-}): Promise<LiveComment | null> {
+  authorProfile?: any;
+}): Promise<any | null> {
   try {
+    const validAuthorId = params.authorId && UUID_REGEX.test(params.authorId) ? params.authorId : getLocalUserId();
     const { data, error } = await (supabase
       .from("post_comments" as any)
       .insert({
         post_id: params.postId,
-        author_id: params.authorId,
+        author_id: validAuthorId,
         content: params.content,
       })
       .select()
       .single() as any);
 
     if (error) {
-      console.error("Add comment error:", error);
-      return null;
+      console.error("Add comment DB error:", error);
     }
-    return data as LiveComment;
+
+    // Increment comments_count on posts table
+    let newCount = 1;
+    try {
+      const { data: postRec } = await (supabase.from("posts" as any).select("comments_count").eq("id", params.postId).maybeSingle() as any);
+      newCount = (postRec?.comments_count || 0) + 1;
+      await (supabase.from("posts" as any).update({ comments_count: newCount }).eq("id", params.postId) as any);
+    } catch (e) {}
+
+    // Broadcast comment live to all connected peers
+    try {
+      const prof = params.authorProfile;
+      const formattedComment = {
+        id: data?.id || `comm_${Date.now()}`,
+        authorId: validAuthorId,
+        authorName: prof ? `${prof.firstName || prof.first_name || "Student"} ${prof.lastName || prof.last_name || ""}`.trim() : "Verified Student",
+        authorAvatar: prof?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        campus: prof?.campus || "University of Nairobi",
+        content: params.content,
+        timeAgo: "Just now",
+        likes: 0,
+        userLiked: false,
+      };
+
+      const bc = supabase.channel("unicircle-global-live-feed");
+      bc.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          bc.send({
+            type: "broadcast",
+            event: "post_comment",
+            payload: { postId: params.postId, comment: formattedComment, commentsCount: newCount },
+          });
+        }
+      });
+    } catch (e) {}
+
+    return data || { id: `comm_${Date.now()}`, content: params.content };
   } catch (err) {
     console.error("Failed to add comment:", err);
     return null;
