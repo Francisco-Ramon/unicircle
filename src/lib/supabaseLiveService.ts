@@ -67,22 +67,35 @@ const CLOUD_SYNC_KEY_POSTS = "unicircle_cloud_posts_cache";
 const CLOUD_SYNC_KEY_PROFILES = "unicircle_cloud_profiles_cache";
 const CLOUD_SYNC_KEY_EVENTS = "unicircle_cloud_events_cache";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {}
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function getLocalUserId(): string {
-  if (typeof window === "undefined") return "usr_anon";
+  if (typeof window === "undefined") return "00000000-0000-4000-a000-000000000000";
   let id = localStorage.getItem("unicircle_user_id");
-  if (!id) {
+  if (!id || !UUID_REGEX.test(id)) {
     try {
       const storedProf = localStorage.getItem("unicircle_user_profile");
       if (storedProf) {
         const parsed = JSON.parse(storedProf);
-        if (parsed.id) id = parsed.id;
+        if (parsed?.id && UUID_REGEX.test(parsed.id)) id = parsed.id;
       }
     } catch (e) {}
   }
-  if (!id) {
-    id = typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  if (!id || !UUID_REGEX.test(id)) {
+    id = generateUUID();
     safeSetItem("unicircle_user_id", id);
   }
   return id;

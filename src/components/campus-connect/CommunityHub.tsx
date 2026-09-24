@@ -832,17 +832,31 @@ export const CommunityHub: React.FC<Props> = ({ userProfile, onUpdateProfile, na
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
+                  onClick={() => {
+                    if (userProfile && onUpdateProfile) {
+                      onUpdateProfile({ ...userProfile, campus: activeInst.name });
+                      toast.success(`Campus switched to ${activeInst.name}! You now have full member access.`);
+                    } else {
+                      setSelectedInst(activeInst);
+                    }
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-600/30 transition cursor-pointer"
+                >
+                  Join {activeInst.shortName || activeInst.name} Hub
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelectedInst(userInst)}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
                 >
-                  Go to {userInst.shortName || userInst.name} Hub
+                  My School ({userInst.shortName || userInst.name})
                 </button>
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate({ tab: "home" })}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white text-xs font-bold border border-white/10 transition cursor-pointer"
                 >
-                  Explore Public Home Feed
+                  Public Feed
                 </button>
               </div>
             </div>
