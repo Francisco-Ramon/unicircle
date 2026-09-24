@@ -38,11 +38,108 @@ export interface CampusEvent {
   redirectUrl?: string;
 }
 
-export const SAMPLE_EVENTS: CampusEvent[] = [];
+export const SAMPLE_EVENTS: CampusEvent[] = [
+  {
+    id: "evt-neon-night-2026",
+    title: "Campus Neon Night & DJ Rave",
+    category: "Party",
+    date: "This Friday, 8:00 PM",
+    time: "20:00 - 02:00",
+    location: "Student Center Quad",
+    campus: "University of Nairobi",
+    organizer: "Campus Events Committee",
+    rsvpCount: 142,
+    maxCapacity: 300,
+    userRsvpd: false,
+    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop&q=80",
+    description: "The biggest semester opening night with live student DJs, neon glow sticks, mocktail bars, and music across 3 stages. Free entry with valid student ID.",
+    attendees: [
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80"
+    ],
+    comments: [
+      {
+        id: "c-1",
+        authorName: "Kevin Otieno",
+        authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+        content: "Who is playing the 11 PM techno set? So hyped! 🔥",
+        timeAgo: "2h ago",
+        likes: 12,
+        userLiked: false
+      }
+    ]
+  },
+  {
+    id: "evt-hackathon-2026",
+    title: "UniCircle Campus AI Hackathon",
+    category: "Hackathon",
+    date: "Saturday, 9:00 AM",
+    time: "09:00 - 18:00",
+    location: "Innovation Hub & Computing Lab 3",
+    campus: "University of Nairobi",
+    organizer: "Google Developer Student Clubs",
+    rsvpCount: 88,
+    maxCapacity: 120,
+    userRsvpd: false,
+    image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
+    description: "24-hour sprint building real-world AI applications for student life, healthcare, and African commerce. Prizes include $2,500 in cloud credits and internship interviews.",
+    attendees: [
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80"
+    ],
+    comments: []
+  },
+  {
+    id: "evt-tech-career-summit",
+    title: "Engineering & Tech Career Fair 2026",
+    category: "Concert",
+    date: "Next Wednesday, 10:00 AM",
+    time: "10:00 - 16:00",
+    location: "Main Auditorium Hall A",
+    campus: "University of Nairobi",
+    organizer: "Engineering Student Guild",
+    rsvpCount: 215,
+    maxCapacity: 500,
+    userRsvpd: false,
+    image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&auto=format&fit=crop&q=80",
+    description: "Meet talent recruiters from top engineering firms, tech startups, and design studios. Bring your CV and digital portfolio for on-the-spot interviews.",
+    attendees: [
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
+    ],
+    comments: []
+  },
+  {
+    id: "evt-sunset-acoustic",
+    title: "Sunset Acoustic Music & Poetry Jam",
+    category: "Concert",
+    date: "Sunday, 5:30 PM",
+    time: "17:30 - 20:30",
+    location: "Botanical Garden Amphitheater",
+    campus: "University of Nairobi",
+    organizer: "Arts & Culture Society",
+    rsvpCount: 64,
+    maxCapacity: 100,
+    userRsvpd: false,
+    image: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&auto=format&fit=crop&q=80",
+    description: "Chill outdoor acoustic session with guitars, spoken word poetry, and campus singers as the sun sets. Bring a picnic blanket!",
+    attendees: [
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80"
+    ],
+    comments: []
+  }
+];
 
 import { AppNavState } from "@/lib/navigationHistory";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchLiveEvents, createLiveEvent, uploadToStorage, getLocalUserId } from "@/lib/supabaseLiveService";
+import {
+  fetchLiveEvents,
+  createLiveEvent,
+  recordLiveEventRsvp,
+  compressImageFile,
+  uploadToStorage,
+  getLocalUserId
+} from "@/lib/supabaseLiveService";
 
 interface Props {
   userProfile?: any;
@@ -187,15 +284,20 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
   const [eventPoster, setEventPoster] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleImageFileUpload = (file: File) => {
+  const handleImageFileUpload = async (file: File) => {
     if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setEventPoster(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { base64 } = await compressImageFile(file, 1200, 0.82);
+      setEventPoster(base64 || URL.createObjectURL(file));
+    } catch (e) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          setEventPoster(ev.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -225,7 +327,7 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
         return {
           ...e,
           userRsvpd: nextState,
-          rsvpCount: nextState ? e.rsvpCount + 1 : e.rsvpCount - 1,
+          rsvpCount: nextState ? e.rsvpCount + 1 : Math.max(0, e.rsvpCount - 1),
         };
       }
       return e;
@@ -236,9 +338,19 @@ export const CampusEventsHub: React.FC<Props> = ({ userProfile, navState, onNavi
       setSelectedEvent((prev) => prev ? {
         ...prev,
         userRsvpd: !prev.userRsvpd,
-        rsvpCount: prev.userRsvpd ? prev.rsvpCount - 1 : prev.rsvpCount + 1,
+        rsvpCount: prev.userRsvpd ? Math.max(0, prev.rsvpCount - 1) : prev.rsvpCount + 1,
       } : null);
     }
+
+    // Sync RSVP to Supabase
+    try {
+      const userId = userProfile?.id || getLocalUserId();
+      await recordLiveEventRsvp({
+        eventId: id,
+        userId,
+        status: isNowAttending ? "going" : "cancelled",
+      });
+    } catch (err) {}
 
     if (isNowAttending && target) {
       const prefs = await fetchNotificationPreferences();

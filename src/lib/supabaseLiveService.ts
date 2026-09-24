@@ -755,6 +755,36 @@ export async function createLiveEvent(eventData: {
   }
 }
 
+export async function recordLiveEventRsvp(params: {
+  eventId: string;
+  userId: string;
+  status: "going" | "interested" | "cancelled";
+}): Promise<boolean> {
+  try {
+    const userId = params.userId || getLocalUserId();
+    if (params.status === "cancelled") {
+      await (supabase
+        .from("event_rsvps" as any)
+        .delete()
+        .eq("event_id", params.eventId)
+        .eq("user_id", userId) as any);
+      return true;
+    }
+
+    await (supabase
+      .from("event_rsvps" as any)
+      .upsert({
+        event_id: params.eventId,
+        user_id: userId,
+        status: params.status,
+      }) as any);
+    return true;
+  } catch (err) {
+    console.warn("Event RSVP sync notice:", err);
+    return false;
+  }
+}
+
 // --------------------------------------------------------------------------
 // 5. DISCOVER: Fetch Real Students for Swiping
 // --------------------------------------------------------------------------
