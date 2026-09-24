@@ -348,7 +348,14 @@ export const StudentHomeScreen: React.FC<Props> = ({
         userLiked: false,
       };
 
-      setPosts((prev) => [newPostEntry, ...prev]);
+      setPosts((prev) => {
+        const dedupe = prev.filter((p) => p.id !== newPostEntry.id);
+        const next = [newPostEntry, ...dedupe];
+        if (typeof window !== "undefined") {
+          safeSetItem("unicircle_home_feed_posts", JSON.stringify(next));
+        }
+        return next;
+      });
       setNewPostContent("");
       setSelectedImage(null);
       setImagePreviewUrl(null);
