@@ -7,9 +7,7 @@ import {
 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
-import { supabase } from "@/integrations/supabase/client";
-import { uploadToStorage, upsertLiveProfile, getLiveProfile, getLocalUserId } from "@/lib/supabaseLiveService";
-import { getSafeErrorMessage } from "@/lib/errorHandler";
+import { signUpWithEmail, signInWithEmail, getFirebaseAuthErrorMessage } from "@/lib/firebaseAuth";
 import { toast } from "sonner";
 
 export interface StudentProfileData {
@@ -173,7 +171,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
   };
 
   // --------------------------------------------------------------------------
-  // HANDLE SIGN IN
+  // HANDLE SIGN IN (Firebase Authentication)
   // --------------------------------------------------------------------------
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,60 +192,51 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
     setErrorMessage(null);
 
     try {
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const credential = await signInWithEmail(email.trim(), password);
+      const user = credential.user;
+      const userId = user.uid;
 
-      if (signInErr || !signInData?.user) {
-        const errMsg = getSafeErrorMessage(signInErr).toLowerCase();
-        if (errMsg.includes("confirm") || errMsg.includes("email not confirmed")) {
-          const localStr = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
+      // Restore profile metadata from display name and local cache or default
+      const displayNameParts = (user.displayName || "Student").split(" ");
+      const resolvedFirstName = displayNameParts[0] || "Student";
+      const resolvedLastName = displayNameParts.slice(1).join(" ") || "";
+
+      let cachedProfile: Partial<StudentProfileData> = {};
+      if (typeof window !== "undefined") {
+        try {
+          const localStr = localStorage.getItem("unicircle_user_profile");
           if (localStr) {
-            try {
-              const localProf = JSON.parse(localStr);
-              if (localProf && localProf.email === email.trim()) {
-                toast.success(`Welcome back, ${localProf.firstName}!`);
-                onComplete(localProf);
-                return;
-              }
-            } catch (e) {}
+            const parsed = JSON.parse(localStr);
+            if (parsed && (parsed.id === userId || parsed.email === email.trim())) {
+              cachedProfile = parsed;
+            }
           }
-        }
-        setAuthStatus("ERROR");
-        const msg = getSafeErrorMessage(signInErr) || "Invalid email or password. Please try again.";
-        setErrorMessage(msg);
-        toast.error(msg);
-        return;
+        } catch (e) {}
       }
-
-
-      const userId = signInData.user.id;
-      const liveProf = await getLiveProfile(userId);
 
       const resolvedProfile: StudentProfileData = {
         id: userId,
-        email: signInData.user.email || email.trim(),
-        firstName: liveProf?.first_name || signInData.user.user_metadata?.first_name || "Student",
-        lastName: liveProf?.last_name || signInData.user.user_metadata?.last_name || "",
-        nickname: liveProf?.first_name || "Student",
-        dob: "2003-01-01",
-        gender: (liveProf?.gender as any) || "Female",
-        orientation: "Straight",
-        interestedIn: (liveProf?.interested_in as any) || "Everyone",
-        relationshipGoal: "Friendship",
-        country: liveProf?.country || "Kenya",
+        email: user.email || email.trim(),
+        firstName: cachedProfile.firstName || resolvedFirstName,
+        lastName: cachedProfile.lastName || resolvedLastName,
+        nickname: cachedProfile.nickname || resolvedFirstName,
+        dob: cachedProfile.dob || "2003-01-01",
+        gender: cachedProfile.gender || "Male",
+        orientation: cachedProfile.orientation || "Straight",
+        interestedIn: cachedProfile.interestedIn || "Everyone",
+        relationshipGoal: cachedProfile.relationshipGoal || "Friendship",
+        country: cachedProfile.country || "Kenya",
         institutionType: "University",
-        campus: liveProf?.campus || "University of Nairobi",
-        institutionId: "uon",
-        faculty: "General Studies",
-        course: liveProf?.course || "Undergraduate",
-        yearOfStudy: liveProf?.year_of_study || "1st Year",
-        height: "170 cm",
-        lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
-        interests: liveProf?.interests || ["Campus Events", "Networking"],
-        bio: liveProf?.bio || "Verified Student on UniCircle",
-        photos: liveProf?.photos && liveProf.photos.length > 0 ? liveProf.photos : [],
+        campus: cachedProfile.campus || "University of Nairobi",
+        institutionId: cachedProfile.institutionId || "uon",
+        faculty: cachedProfile.faculty || "General Studies",
+        course: cachedProfile.course || "Undergraduate",
+        yearOfStudy: cachedProfile.yearOfStudy || "1st Year (Freshman)",
+        height: cachedProfile.height || "170 cm",
+        lifestyle: cachedProfile.lifestyle || { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
+        interests: cachedProfile.interests || ["Campus Events", "Networking"],
+        bio: cachedProfile.bio || "Verified Student on UniCircle",
+        photos: cachedProfile.photos && cachedProfile.photos.length > 0 ? cachedProfile.photos : (user.photoURL ? [user.photoURL] : []),
         verified: true,
       };
 
@@ -262,14 +251,14 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       onComplete(resolvedProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = getSafeErrorMessage(err) || "An unexpected error occurred during sign-in. Please try again.";
+      const msg = getFirebaseAuthErrorMessage(err);
       setErrorMessage(msg);
       toast.error(msg);
     }
   };
 
   // --------------------------------------------------------------------------
-  // HANDLE SIGN UP (Full 3-Photo Student Registration)
+  // HANDLE SIGN UP (Firebase Authentication + Profile Setup)
   // --------------------------------------------------------------------------
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,57 +302,11 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       .filter((i) => i.length > 0);
 
     try {
-      let authUserId = "";
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const credential = await signUpWithEmail(email.trim(), password, fullName);
+      const authUserId = credential.user.uid;
 
-      // 1. Sign up with Supabase Auth
-      try {
-        const { data: authData, error: signUpErr } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              first_name: firstName.trim(),
-              last_name: lastName.trim(),
-              gender,
-              interested_in: interestedIn,
-              university_name: selectedInstitution.name,
-              course: course.trim(),
-              year_of_study: yearOfStudy,
-              campus_goal: campusGoal,
-              bio: bio.trim(),
-            },
-          },
-        });
-
-        if (authData?.user?.id) {
-          authUserId = authData.user.id;
-        } else if (signUpErr) {
-          const errString = getSafeErrorMessage(signUpErr).toLowerCase();
-          if (errString.includes("already registered") || errString.includes("exists") || errString.includes("already exists")) {
-            const { data: signInData } = await supabase.auth.signInWithPassword({
-              email: email.trim(),
-              password,
-            });
-            if (signInData?.user?.id) {
-              authUserId = signInData.user.id;
-            }
-          }
-        }
-      } catch (e: any) {
-        console.warn("Supabase signup attempt notice:", e.message || e);
-      }
-
-      // Resilient student UUID guarantee
-      if (!authUserId) {
-        try {
-          authUserId = typeof getLocalUserId === "function" ? getLocalUserId() : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "00000000-0000-4000-a000-000000000000");
-        } catch (e) {
-          authUserId = "00000000-0000-4000-a000-000000000000";
-        }
-      }
-
-
-      // 2. Persist Full Complete Profile to Supabase database
+      // Construct canonical verified student profile
       const fullProfile: StudentProfileData = {
         id: authUserId,
         email: email.trim(),
@@ -390,23 +333,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
         verified: true,
       };
 
-      await upsertLiveProfile({
-        id: authUserId,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        email: email.trim(),
-        campus: selectedInstitution.name,
-        country: selectedInstitution.country || "Kenya",
-        gender,
-        course: course.trim(),
-        year_of_study: yearOfStudy,
-        photos: validPhotos,
-        verified: true,
-        bio: fullProfile.bio,
-        interests: fullProfile.interests,
-      });
-
-      // 3. Save to localStorage
+      // Save to localStorage for instant client state
       if (typeof window !== "undefined") {
         safeSetItem("unicircle_user_id", authUserId);
         safeSetItem("unicircle_user_profile", JSON.stringify(fullProfile));
@@ -414,11 +341,11 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       }
 
       setAuthStatus("SUCCESS");
-      toast.success(`Welcome to UniCircle, ${firstName.trim()}! Your profile is verified.`);
+      toast.success(`Welcome to UniCircle, ${firstName.trim()}! Your account is created.`);
       onComplete(fullProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = getSafeErrorMessage(err) || "Registration failed due to a connection issue. Please try again.";
+      const msg = getFirebaseAuthErrorMessage(err);
       setErrorMessage(msg);
       toast.error(msg);
     }

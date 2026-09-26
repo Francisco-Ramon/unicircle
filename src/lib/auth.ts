@@ -1,42 +1,48 @@
 import { useEffect, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import type { User as FirebaseUser } from "firebase/auth";
+import { onAuthChange, signOutStudent, getCurrentUser } from "./firebaseAuth";
 
-export function useAuth() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-    });
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      setLoading(false);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  return { session, user, loading };
+export interface AuthState {
+  user: FirebaseUser | null;
+  uid: string | null;
+  email: string | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  // Session object for compatibility
+  session: { user: FirebaseUser } | null;
 }
 
-export async function signOutUser() {
-  try {
-    await supabase.auth.signOut({ scope: "global" });
-  } catch (e) {}
+/**
+ * Universal React Hook for Firebase Authentication State
+ */
+export function useAuth(): AuthState {
+  const [user, setUser] = useState<FirebaseUser | null>(() => getCurrentUser());
+  const [loading, setLoading] = useState<boolean>(true);
 
-  if (typeof window !== "undefined") {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith("sb-") || k.startsWith("unicircle_"))) {
-        keysToRemove.push(k);
-      }
-    }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
-    sessionStorage.clear();
-  }
+  useEffect(() => {
+    const unsubscribe = onAuthChange((firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  return {
+    user,
+    uid: user?.uid ?? null,
+    email: user?.email ?? null,
+    loading,
+    isAuthenticated: Boolean(user),
+    session: user ? { user } : null,
+  };
+}
+
+/**
+ * Global Student Sign-Out
+ */
+export async function signOutUser(): Promise<void> {
+  await signOutStudent();
 }
