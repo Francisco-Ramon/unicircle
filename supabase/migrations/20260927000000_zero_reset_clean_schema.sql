@@ -1,31 +1,26 @@
 -- ==============================================================================
--- UNICIRCLE PLATFORM: ZERO-RESET & MASTER FRESH SCHEMA (100% IDEMPOTENT)
+-- UNICIRCLE PLATFORM: COMPLETE NUCLEAR RESET TO ZERO (WIPES EVERYTHING)
 -- ==============================================================================
 -- Run this in your Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/yztsnjnogiiblezrxqox/sql/new
+--
+-- This nukes the entire public schema (all tables, all policies, all triggers),
+-- recreates a clean public schema, and builds the tables without policy conflicts.
 -- ==============================================================================
 
--- 1. DROP ALL EXISTING TABLES & OBJECTS (CASCADE RESET TO ZERO)
-DROP TABLE IF EXISTS public.post_likes CASCADE;
-DROP TABLE IF EXISTS public.post_comments CASCADE;
-DROP TABLE IF EXISTS public.event_rsvps CASCADE;
-DROP TABLE IF EXISTS public.messages CASCADE;
-DROP TABLE IF EXISTS public.swipes CASCADE;
-DROP TABLE IF EXISTS public.matches CASCADE;
-DROP TABLE IF EXISTS public.conversations CASCADE;
-DROP TABLE IF EXISTS public.posts CASCADE;
-DROP TABLE IF EXISTS public.events CASCADE;
-DROP TABLE IF EXISTS public.discovery_preferences CASCADE;
-DROP TABLE IF EXISTS public.post_reactions CASCADE;
-DROP TABLE IF EXISTS public.community_posts CASCADE;
-DROP TABLE IF EXISTS public.universities CASCADE;
-DROP TABLE IF EXISTS public.activity_logs CASCADE;
-DROP TABLE IF EXISTS public.books CASCADE;
-DROP TABLE IF EXISTS public.chat_messages CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
+-- 1. NUCLEAR WIPE OF ALL OLD TABLES, POLICIES, AND CONSTRAINTS
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+
+-- Grant standard Supabase permissions to the fresh schema
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+GRANT ALL ON SCHEMA public TO service_role;
 
 -- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
 
 -- ------------------------------------------------------------------------------
 -- 2. CREATE PROFILES TABLE (Verified Students)
@@ -59,20 +54,6 @@ CREATE TABLE public.profiles (
   updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Profiles Read Access" ON public.profiles;
-DROP POLICY IF EXISTS "Public Profiles Insert Access" ON public.profiles;
-DROP POLICY IF EXISTS "Public Profiles Update Access" ON public.profiles;
-DROP POLICY IF EXISTS "Public Profiles Delete Access" ON public.profiles;
-DROP POLICY IF EXISTS "Allow public read access to verified student profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Allow users to insert their own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Allow users to update their own profile" ON public.profiles;
-
-CREATE POLICY "Public Profiles Read Access" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Public Profiles Insert Access" ON public.profiles FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Profiles Update Access" ON public.profiles FOR UPDATE USING (true);
-CREATE POLICY "Public Profiles Delete Access" ON public.profiles FOR DELETE USING (true);
-
 -- ------------------------------------------------------------------------------
 -- 3. CREATE CAMPUS POSTS TABLE (Home Feed & Community Hub)
 -- ------------------------------------------------------------------------------
@@ -88,20 +69,6 @@ CREATE TABLE public.posts (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 
-ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Posts Read Access" ON public.posts;
-DROP POLICY IF EXISTS "Public Posts Insert Access" ON public.posts;
-DROP POLICY IF EXISTS "Public Posts Update Access" ON public.posts;
-DROP POLICY IF EXISTS "Public Posts Delete Access" ON public.posts;
-DROP POLICY IF EXISTS "Users can create their own posts" ON public.posts;
-DROP POLICY IF EXISTS "Allow public read access to posts" ON public.posts;
-DROP POLICY IF EXISTS "Allow authenticated users to create posts" ON public.posts;
-
-CREATE POLICY "Public Posts Read Access" ON public.posts FOR SELECT USING (true);
-CREATE POLICY "Public Posts Insert Access" ON public.posts FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Posts Update Access" ON public.posts FOR UPDATE USING (true);
-CREATE POLICY "Public Posts Delete Access" ON public.posts FOR DELETE USING (true);
-
 -- ------------------------------------------------------------------------------
 -- 4. CREATE POST LIKES & POST COMMENTS TABLES
 -- ------------------------------------------------------------------------------
@@ -113,16 +80,6 @@ CREATE TABLE public.post_likes (
   UNIQUE(post_id, user_id)
 );
 
-ALTER TABLE public.post_likes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Likes Read Access" ON public.post_likes;
-DROP POLICY IF EXISTS "Public Likes Insert Access" ON public.post_likes;
-DROP POLICY IF EXISTS "Public Likes Delete Access" ON public.post_likes;
-DROP POLICY IF EXISTS "Users can like posts" ON public.post_likes;
-
-CREATE POLICY "Public Likes Read Access" ON public.post_likes FOR SELECT USING (true);
-CREATE POLICY "Public Likes Insert Access" ON public.post_likes FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Likes Delete Access" ON public.post_likes FOR DELETE USING (true);
-
 CREATE TABLE public.post_comments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
@@ -130,16 +87,6 @@ CREATE TABLE public.post_comments (
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
-
-ALTER TABLE public.post_comments ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Comments Read Access" ON public.post_comments;
-DROP POLICY IF EXISTS "Public Comments Insert Access" ON public.post_comments;
-DROP POLICY IF EXISTS "Public Comments Delete Access" ON public.post_comments;
-DROP POLICY IF EXISTS "Users can comment on posts" ON public.post_comments;
-
-CREATE POLICY "Public Comments Read Access" ON public.post_comments FOR SELECT USING (true);
-CREATE POLICY "Public Comments Insert Access" ON public.post_comments FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Comments Delete Access" ON public.post_comments FOR DELETE USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 5. CREATE CONVERSATIONS & LIVE MESSAGES TABLES
@@ -151,15 +98,6 @@ CREATE TABLE public.conversations (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
   updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
-
-ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Conversations Read Access" ON public.conversations;
-DROP POLICY IF EXISTS "Public Conversations Insert Access" ON public.conversations;
-DROP POLICY IF EXISTS "Public Conversations Update Access" ON public.conversations;
-
-CREATE POLICY "Public Conversations Read Access" ON public.conversations FOR SELECT USING (true);
-CREATE POLICY "Public Conversations Insert Access" ON public.conversations FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Conversations Update Access" ON public.conversations FOR UPDATE USING (true);
 
 CREATE TABLE public.messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -173,17 +111,6 @@ CREATE TABLE public.messages (
   is_read BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
-
-ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Messages Read Access" ON public.messages;
-DROP POLICY IF EXISTS "Public Messages Insert Access" ON public.messages;
-DROP POLICY IF EXISTS "Public Messages Update Access" ON public.messages;
-DROP POLICY IF EXISTS "Allow users to read their own messages" ON public.messages;
-DROP POLICY IF EXISTS "Allow users to send messages" ON public.messages;
-
-CREATE POLICY "Public Messages Read Access" ON public.messages FOR SELECT USING (true);
-CREATE POLICY "Public Messages Insert Access" ON public.messages FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Messages Update Access" ON public.messages FOR UPDATE USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 6. CREATE EVENTS & RSVPS TABLES
@@ -204,19 +131,6 @@ CREATE TABLE public.events (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Events Read Access" ON public.events;
-DROP POLICY IF EXISTS "Public Events Insert Access" ON public.events;
-DROP POLICY IF EXISTS "Public Events Update Access" ON public.events;
-DROP POLICY IF EXISTS "Public Events Delete Access" ON public.events;
-DROP POLICY IF EXISTS "Allow public read access to events" ON public.events;
-DROP POLICY IF EXISTS "Allow verified users to create events" ON public.events;
-
-CREATE POLICY "Public Events Read Access" ON public.events FOR SELECT USING (true);
-CREATE POLICY "Public Events Insert Access" ON public.events FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public Events Update Access" ON public.events FOR UPDATE USING (true);
-CREATE POLICY "Public Events Delete Access" ON public.events FOR DELETE USING (true);
-
 CREATE TABLE public.event_rsvps (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id UUID REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
@@ -225,17 +139,6 @@ CREATE TABLE public.event_rsvps (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
   UNIQUE(event_id, user_id)
 );
-
-ALTER TABLE public.event_rsvps ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public RSVPs Read Access" ON public.event_rsvps;
-DROP POLICY IF EXISTS "Public RSVPs Insert Access" ON public.event_rsvps;
-DROP POLICY IF EXISTS "Public RSVPs Delete Access" ON public.event_rsvps;
-DROP POLICY IF EXISTS "Allow public read access to RSVPs" ON public.event_rsvps;
-DROP POLICY IF EXISTS "Allow users to manage their RSVPs" ON public.event_rsvps;
-
-CREATE POLICY "Public RSVPs Read Access" ON public.event_rsvps FOR SELECT USING (true);
-CREATE POLICY "Public RSVPs Insert Access" ON public.event_rsvps FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public RSVPs Delete Access" ON public.event_rsvps FOR DELETE USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 7. CREATE SWIPES & MATCHES TABLES (Campus Discovery Deck)
@@ -250,12 +153,6 @@ CREATE TABLE public.swipes (
   UNIQUE(swiper_id, target_id, mode)
 );
 
-ALTER TABLE public.swipes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Swipes All Access" ON public.swipes;
-DROP POLICY IF EXISTS "Allow users to insert swipes" ON public.swipes;
-DROP POLICY IF EXISTS "Allow users to view their own swipes" ON public.swipes;
-CREATE POLICY "Public Swipes All Access" ON public.swipes FOR ALL USING (true);
-
 CREATE TABLE public.matches (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user1_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -265,31 +162,27 @@ CREATE TABLE public.matches (
   UNIQUE(user1_id, user2_id, match_mode)
 );
 
-ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Matches All Access" ON public.matches;
-DROP POLICY IF EXISTS "Allow users to view their matches" ON public.matches;
-CREATE POLICY "Public Matches All Access" ON public.matches FOR ALL USING (true);
+-- ------------------------------------------------------------------------------
+-- 8. GRANT FULL PERMISSIONS (ZERO Restrictive Policies / Zero Blockers)
+-- ------------------------------------------------------------------------------
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, anon, authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
--- 8. ENABLE SUPABASE REALTIME REPLICATION (Instant Peer Sync)
+-- 9. ENABLE REALTIME BROADCASTING ON ALL TABLES
 -- ------------------------------------------------------------------------------
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
-  CREATE PUBLICATION supabase_realtime FOR TABLE 
-    public.profiles, 
-    public.posts, 
-    public.post_likes, 
-    public.post_comments, 
-    public.messages, 
-    public.conversations, 
-    public.events, 
-    public.event_rsvps,
-    public.swipes,
-    public.matches;
+  CREATE PUBLICATION supabase_realtime FOR ALL TABLES;
 COMMIT;
 
 -- ------------------------------------------------------------------------------
--- 9. PROVISION STORAGE BUCKETS (Public Read & Write)
+-- 10. PROVISION STORAGE BUCKETS (Public Read & Write)
 -- ------------------------------------------------------------------------------
 INSERT INTO storage.buckets (id, name, public) 
 VALUES 
@@ -299,13 +192,17 @@ VALUES
   ('chat_media', 'chat_media', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- Drop old storage policies if existing
-DROP POLICY IF EXISTS "Public Avatar Storage" ON storage.objects;
-DROP POLICY IF EXISTS "Public Post Images Storage" ON storage.objects;
-DROP POLICY IF EXISTS "Public Event Posters Storage" ON storage.objects;
-DROP POLICY IF EXISTS "Public Chat Media Storage" ON storage.objects;
-DROP POLICY IF EXISTS "Public Storage All Access" ON storage.objects;
+-- Remove any old storage policies entirely & grant full public access
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Public Storage All Access" ON storage.objects;
+  DROP POLICY IF EXISTS "Public Avatar Storage" ON storage.objects;
+  DROP POLICY IF EXISTS "Public Post Images Storage" ON storage.objects;
+  DROP POLICY IF EXISTS "Public Event Posters Storage" ON storage.objects;
+  DROP POLICY IF EXISTS "Public Chat Media Storage" ON storage.objects;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
 
--- Create open storage policies
 CREATE POLICY "Public Storage All Access" ON storage.objects
   FOR ALL USING (true) WITH CHECK (true);
