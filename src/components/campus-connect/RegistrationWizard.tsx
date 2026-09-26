@@ -8,6 +8,7 @@ import {
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
 import { signUpWithEmail, signInWithEmail, getFirebaseAuthErrorMessage } from "@/lib/firebaseAuth";
+import { createUserProfile, getUserProfile, ensureUserProfile } from "@/lib/userService";
 import { toast } from "sonner";
 
 export interface StudentProfileData {
@@ -196,49 +197,11 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       const user = credential.user;
       const userId = user.uid;
 
-      // Restore profile metadata from display name and local cache or default
-      const displayNameParts = (user.displayName || "Student").split(" ");
-      const resolvedFirstName = displayNameParts[0] || "Student";
-      const resolvedLastName = displayNameParts.slice(1).join(" ") || "";
-
-      let cachedProfile: Partial<StudentProfileData> = {};
-      if (typeof window !== "undefined") {
-        try {
-          const localStr = localStorage.getItem("unicircle_user_profile");
-          if (localStr) {
-            const parsed = JSON.parse(localStr);
-            if (parsed && (parsed.id === userId || parsed.email === email.trim())) {
-              cachedProfile = parsed;
-            }
-          }
-        } catch (e) {}
+      // Fetch persistent profile from Firestore users/{uid} with ensure fallback
+      let resolvedProfile = await getUserProfile(userId);
+      if (!resolvedProfile) {
+        resolvedProfile = await ensureUserProfile(user);
       }
-
-      const resolvedProfile: StudentProfileData = {
-        id: userId,
-        email: user.email || email.trim(),
-        firstName: cachedProfile.firstName || resolvedFirstName,
-        lastName: cachedProfile.lastName || resolvedLastName,
-        nickname: cachedProfile.nickname || resolvedFirstName,
-        dob: cachedProfile.dob || "2003-01-01",
-        gender: cachedProfile.gender || "Male",
-        orientation: cachedProfile.orientation || "Straight",
-        interestedIn: cachedProfile.interestedIn || "Everyone",
-        relationshipGoal: cachedProfile.relationshipGoal || "Friendship",
-        country: cachedProfile.country || "Kenya",
-        institutionType: "University",
-        campus: cachedProfile.campus || "University of Nairobi",
-        institutionId: cachedProfile.institutionId || "uon",
-        faculty: cachedProfile.faculty || "General Studies",
-        course: cachedProfile.course || "Undergraduate",
-        yearOfStudy: cachedProfile.yearOfStudy || "1st Year (Freshman)",
-        height: cachedProfile.height || "170 cm",
-        lifestyle: cachedProfile.lifestyle || { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
-        interests: cachedProfile.interests || ["Campus Events", "Networking"],
-        bio: cachedProfile.bio || "Verified Student on UniCircle",
-        photos: cachedProfile.photos && cachedProfile.photos.length > 0 ? cachedProfile.photos : (user.photoURL ? [user.photoURL] : []),
-        verified: true,
-      };
 
       if (typeof window !== "undefined") {
         safeSetItem("unicircle_user_id", userId);
@@ -258,7 +221,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
   };
 
   // --------------------------------------------------------------------------
-  // HANDLE SIGN UP (Firebase Authentication + Profile Setup)
+  // HANDLE SIGN UP (Firebase Authentication + Firestore Profile Setup)
   // --------------------------------------------------------------------------
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,9 +269,8 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       const credential = await signUpWithEmail(email.trim(), password, fullName);
       const authUserId = credential.user.uid;
 
-      // Construct canonical verified student profile
-      const fullProfile: StudentProfileData = {
-        id: authUserId,
+      // Persist student profile directly to Firestore users/{uid}
+      const savedProfile = await createUserProfile(authUserId, {
         email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -330,19 +292,19 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
         interests: parsedInterests.length > 0 ? parsedInterests : ["Campus Life", "Tech"],
         bio: bio.trim() || `Verified student at ${selectedInstitution.name}`,
         photos: validPhotos,
-        verified: true,
-      };
+        verified: false,
+      });
 
-      // Save to localStorage for instant client state
+      // Save to localStorage for instant fast local state
       if (typeof window !== "undefined") {
         safeSetItem("unicircle_user_id", authUserId);
-        safeSetItem("unicircle_user_profile", JSON.stringify(fullProfile));
+        safeSetItem("unicircle_user_profile", JSON.stringify(savedProfile));
         safeSetItem("unicircle_registered", "true");
       }
 
       setAuthStatus("SUCCESS");
       toast.success(`Welcome to UniCircle, ${firstName.trim()}! Your account is created.`);
-      onComplete(fullProfile);
+      onComplete(savedProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
       const msg = getFirebaseAuthErrorMessage(err);

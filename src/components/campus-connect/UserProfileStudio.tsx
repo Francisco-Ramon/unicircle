@@ -2,8 +2,7 @@ import React, { useState, useRef } from "react";
 import { User, Camera, ShieldCheck, Sparkles, Plus, Trash2, CheckCircle2, AlertCircle, Edit3, Save, Upload, Settings, Globe, Share2 } from "lucide-react";
 import { StudentProfileData } from "./RegistrationWizard";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
-import { uploadToStorage, upsertLiveProfile } from "@/lib/supabaseLiveService";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadToFirebase } from "@/lib/firebaseSuite";
 import { toast } from "sonner";
 
 interface Props {
@@ -90,24 +89,28 @@ export const UserProfileStudio: React.FC<Props> = ({
     if (files && files.length > 0) {
       const file = files[0];
       setIsUploadingPhoto(true);
-      
-      // Upload to Supabase Storage Bucket 'avatars' with Base64 fallback
-      const finalUrl = await uploadToStorage(file, "avatars");
-      
-      const updated = [...photos, finalUrl];
-      setPhotos(updated);
-      setIsUploadingPhoto(false);
-      
-      const updatedProfile = { ...profile, photos: updated };
-      onUpdateProfile(updatedProfile);
 
-      // Save to Supabase profiles table if logged in
-      const { data: authUser } = await supabase.auth.getUser();
-      if (authUser?.user) {
-        await upsertLiveProfile({
-          id: authUser.user.id,
-          photos: updated,
-        });
+      try {
+        // Upload to Firebase Storage or compress to dataUrl fallback
+        const fbUrl = await uploadToFirebase(file, "avatars");
+        const finalUrl = fbUrl || (await new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result as string);
+          reader.readAsDataURL(file);
+        }));
+
+        if (finalUrl) {
+          const updated = [...photos, finalUrl];
+          setPhotos(updated);
+          const updatedProfile = { ...profile, photos: updated };
+          onUpdateProfile(updatedProfile);
+          toast.success("Profile photo uploaded!");
+        }
+      } catch (err) {
+        console.warn("Photo upload warning:", err);
+        toast.error("Could not upload photo. Please try again.");
+      } finally {
+        setIsUploadingPhoto(false);
       }
     }
   };

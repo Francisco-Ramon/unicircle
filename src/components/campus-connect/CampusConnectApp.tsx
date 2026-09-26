@@ -38,7 +38,8 @@ import {
   encodeNavState,
 } from "@/lib/navigationHistory";
 import { signOutUser } from "@/lib/auth";
-import { onAuthChange, getCurrentUser } from "@/lib/firebaseAuth";
+import { onAuthChange, getCurrentUser, getCurrentUid } from "@/lib/firebaseAuth";
+import { getUserProfile, updateUserProfile, subscribeToUserProfile, ensureUserProfile } from "@/lib/userService";
 import { toast } from "sonner";
 import {
   getLiveProfile,
@@ -142,66 +143,44 @@ export const CampusConnectApp: React.FC = () => {
     return DEFAULT_FREE_PROFILE;
   });
 
-  // Load and sync real logged-in student profile from Firebase Authentication
+  // Load and sync real logged-in student profile from Firebase Authentication & Firestore
   useEffect(() => {
     let isMounted = true;
+    let profileUnsub: (() => void) | null = null;
 
-    function handleStudentSync(firebaseUser: any) {
+    const authUnsub = onAuthChange((firebaseUser) => {
       if (!isMounted) return;
+
+      if (profileUnsub) {
+        profileUnsub();
+        profileUnsub = null;
+      }
 
       if (firebaseUser) {
         setIsRegistered(true);
-        const displayNameParts = (firebaseUser.displayName || "Student").split(" ");
-        const defaultFirstName = displayNameParts[0] || "Student";
-        const defaultLastName = displayNameParts.slice(1).join(" ") || "";
-
-        setUserProfile((prev) => {
-          let cached: Partial<StudentProfileData> = {};
-          if (typeof window !== "undefined") {
-            try {
-              const localProfStr = localStorage.getItem("unicircle_user_profile");
-              if (localProfStr) {
-                const parsed = JSON.parse(localProfStr);
-                if (parsed && (parsed.id === firebaseUser.uid || parsed.email === firebaseUser.email)) {
-                  cached = parsed;
-                }
+        // Subscribe to real-time updates from Firestore users/{uid}
+        profileUnsub = subscribeToUserProfile(
+          firebaseUser.uid,
+          (remoteProfile) => {
+            if (!isMounted) return;
+            if (remoteProfile) {
+              setUserProfile(remoteProfile);
+              if (typeof window !== "undefined") {
+                safeSetItem("unicircle_user_id", firebaseUser.uid);
+                safeSetItem("unicircle_user_profile", JSON.stringify(remoteProfile));
+                safeSetItem("unicircle_registered", "true");
               }
-            } catch (e) {}
+            } else {
+              // Ensure user profile document exists in Firestore
+              ensureUserProfile(firebaseUser).then((created) => {
+                if (isMounted) setUserProfile(created);
+              }).catch((e) => console.warn("ensureUserProfile notice:", e));
+            }
+          },
+          (err) => {
+            console.warn("Firestore profile listener notice:", err);
           }
-
-          const merged: StudentProfileData = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email || cached.email || prev?.email || "student@unicircle.app",
-            firstName: cached.firstName || prev?.firstName || defaultFirstName,
-            lastName: cached.lastName || prev?.lastName || defaultLastName,
-            nickname: cached.nickname || prev?.nickname || defaultFirstName,
-            dob: cached.dob || prev?.dob || "2003-01-01",
-            gender: (cached.gender as any) || prev?.gender || "Male",
-            orientation: (cached.orientation as any) || prev?.orientation || "Straight",
-            interestedIn: (cached.interestedIn as any) || prev?.interestedIn || "Everyone",
-            relationshipGoal: (cached.relationshipGoal as any) || prev?.relationshipGoal || "Friendship",
-            country: cached.country || prev?.country || "Kenya",
-            institutionType: "University",
-            campus: cached.campus || prev?.campus || "University of Nairobi",
-            institutionId: cached.institutionId || prev?.institutionId || "uon",
-            faculty: cached.faculty || prev?.faculty || "General Studies",
-            course: cached.course || prev?.course || "Undergraduate",
-            yearOfStudy: cached.yearOfStudy || prev?.yearOfStudy || "1st Year (Freshman)",
-            height: cached.height || prev?.height || "170 cm",
-            lifestyle: cached.lifestyle || prev?.lifestyle || { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
-            bio: cached.bio || prev?.bio || "Student on UniCircle looking to connect with peers!",
-            interests: cached.interests || prev?.interests || ["Campus Events", "Networking"],
-            photos: (cached.photos && cached.photos.length > 0) ? cached.photos : (firebaseUser.photoURL ? [firebaseUser.photoURL] : (prev?.photos || [])),
-            verified: cached.verified ?? prev?.verified ?? true,
-          };
-
-          if (typeof window !== "undefined") {
-            safeSetItem("unicircle_user_id", firebaseUser.uid);
-            safeSetItem("unicircle_user_profile", JSON.stringify(merged));
-            safeSetItem("unicircle_registered", "true");
-          }
-          return merged;
-        });
+        );
       } else {
         // Fallback to local profile session if available
         const localProfStr = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
@@ -218,22 +197,12 @@ export const CampusConnectApp: React.FC = () => {
         setIsRegistered(false);
         setUserProfile(null);
       }
-    }
-
-    // Initial check
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      handleStudentSync(currentUser);
-    }
-
-    // Reactive Firebase Auth listener
-    const unsubscribe = onAuthChange((firebaseUser) => {
-      handleStudentSync(firebaseUser);
     });
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      authUnsub();
+      if (profileUnsub) profileUnsub();
     };
   }, []);
 
@@ -247,33 +216,14 @@ export const CampusConnectApp: React.FC = () => {
       }
     }
 
-    try {
-      const syncUserId = await ensureAuthenticatedUser();
-      const syncId = (typeof syncUserId === "string" && syncUserId.includes("-"))
-        ? syncUserId
-        : ((syncUserId as any)?.id || (updated as any).id || userProfile?.id || getLocalUserId());
-      await upsertLiveProfile({
-        id: syncId,
-        first_name: updated.firstName,
-        last_name: updated.lastName,
-        campus: updated.campus,
-        country: updated.country,
-        course: updated.course,
-        year_of_study: updated.yearOfStudy,
-        bio: updated.bio,
-        photos: updated.photos,
-        interests: updated.interests,
-        gender: updated.gender,
-        interested_in: updated.interestedIn,
-        verified: updated.verified ?? true,
-      });
-
-      const refreshed = await fetchLiveDiscoverProfiles(syncId);
-      if (refreshed && refreshed.length > 0) {
-        setLiveProfiles(refreshed);
+    const currentUid = getCurrentUid() || updated.id;
+    if (currentUid) {
+      try {
+        await updateUserProfile(currentUid, updated);
+      } catch (err: any) {
+        console.warn("Could not push profile updates to Firestore:", err);
+        toast.error(err?.message || "Failed to save profile changes to cloud.");
       }
-    } catch (err) {
-      console.warn("Could not push profile updates to Supabase:", err);
     }
   };
 
