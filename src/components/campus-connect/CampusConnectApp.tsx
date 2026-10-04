@@ -38,17 +38,13 @@ import {
   encodeNavState,
 } from "@/lib/navigationHistory";
 import { signOutUser } from "@/lib/auth";
-import { onAuthChange, getCurrentUser, getCurrentUid } from "@/lib/firebaseAuth";
-import { getUserProfile, updateUserProfile, subscribeToUserProfile, ensureUserProfile } from "@/lib/userService";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  getLiveProfile,
-  upsertLiveProfile,
+  getLocalUserId,
   fetchLiveDiscoverProfiles,
   fetchUserConversations,
   recordLiveSwipe,
-  getLocalUserId,
-  ensureAuthenticatedUser,
 } from "@/lib/supabaseLiveService";
 
 
@@ -143,88 +139,37 @@ export const CampusConnectApp: React.FC = () => {
     return DEFAULT_FREE_PROFILE;
   });
 
-  // Load and sync real logged-in student profile from Firebase Authentication & Firestore
+  // Load student profile from localStorage / client state
   useEffect(() => {
-    let isMounted = true;
-    let profileUnsub: (() => void) | null = null;
-
-    const authUnsub = onAuthChange((firebaseUser) => {
-      if (!isMounted) return;
-
-      if (profileUnsub) {
-        profileUnsub();
-        profileUnsub = null;
-      }
-
-      if (firebaseUser) {
-        setIsRegistered(true);
-        // Subscribe to real-time updates from Firestore users/{uid}
-        profileUnsub = subscribeToUserProfile(
-          firebaseUser.uid,
-          (remoteProfile) => {
-            if (!isMounted) return;
-            if (remoteProfile) {
-              setUserProfile(remoteProfile);
-              if (typeof window !== "undefined") {
-                safeSetItem("unicircle_user_id", firebaseUser.uid);
-                safeSetItem("unicircle_user_profile", JSON.stringify(remoteProfile));
-                safeSetItem("unicircle_registered", "true");
-              }
-            } else {
-              // Ensure user profile document exists in Firestore
-              ensureUserProfile(firebaseUser).then((created) => {
-                if (isMounted) setUserProfile(created);
-              }).catch((e) => console.warn("ensureUserProfile notice:", e));
-            }
-          },
-          (err) => {
-            console.warn("Firestore profile listener notice:", err);
-          }
-        );
-      } else {
-        // Fallback to local profile session if available
-        const localProfStr = typeof window !== "undefined" ? localStorage.getItem("unicircle_user_profile") : null;
+    if (typeof window !== "undefined") {
+      try {
+        const localProfStr = localStorage.getItem("unicircle_user_profile");
         if (localProfStr) {
-          try {
-            const localProf = JSON.parse(localProfStr);
-            if (localProf && (localProf.firstName || localProf.first_name)) {
-              setIsRegistered(true);
-              setUserProfile(localProf);
-              return;
-            }
-          } catch (e) {}
+          const localProf = JSON.parse(localProfStr);
+          if (localProf && (localProf.firstName || localProf.first_name)) {
+            setIsRegistered(true);
+            setUserProfile(localProf);
+            return;
+          }
         }
-        setIsRegistered(false);
-        setUserProfile(null);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      authUnsub();
-      if (profileUnsub) profileUnsub();
-    };
+      } catch (e) {}
+    }
   }, []);
 
-  const handleUpdateProfile = async (updated: StudentProfileData) => {
+  const handleUpdateProfile = (updated: StudentProfileData) => {
     setUserProfile(updated);
     if (typeof window !== "undefined") {
       try {
         safeSetItem("unicircle_user_profile", JSON.stringify(updated));
+        safeSetItem("unicircle_registered", "true");
+        if (updated.id) {
+          safeSetItem("unicircle_user_id", updated.id);
+        }
       } catch (err) {
         console.warn("Failed to save user profile to localStorage:", err);
       }
     }
-
-    const currentUid = getCurrentUid() || updated.id;
-    if (currentUid) {
-      try {
-        await updateUserProfile(currentUid, updated);
-      } catch (err: any) {
-        console.warn("Could not push profile updates to Firestore:", err);
-        toast.error(err?.message || "Failed to save profile changes to cloud.");
-      }
-    }
+    toast.success("Profile details saved successfully!");
   };
 
   // Centralized Navigation History State with Refresh Persistence
@@ -258,8 +203,9 @@ export const CampusConnectApp: React.FC = () => {
     return getStoredNotifications().filter((n) => !n.read).length;
   });
 
-  // User Profile Avatar "More" Dropdown State
+  // User Profile Avatar "More" Dropdown & Auth Modal State
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Theme & Personalization State (persisted to localStorage)
   const [accentTheme, setAccentThemeState] = useState<AccentTheme>(() => {

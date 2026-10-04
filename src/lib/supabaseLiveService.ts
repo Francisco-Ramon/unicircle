@@ -570,7 +570,7 @@ export async function createLivePost(params: {
       author_id: params.authorId || params.author_id || "usr_anon",
       campus: params.campus || "University of Nairobi",
       content: params.content,
-      image_url: params.imageUrl || params.image_url || null,
+      image_url: params.imageUrl || params.image_url || undefined,
       likes_count: 0,
       comments_count: 0,
       created_at: new Date().toISOString(),

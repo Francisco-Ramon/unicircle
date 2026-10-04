@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import { User, Camera, ShieldCheck, Sparkles, Plus, Trash2, CheckCircle2, AlertCircle, Edit3, Save, Upload, Settings, Globe, Share2 } from "lucide-react";
 import { StudentProfileData } from "./RegistrationWizard";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
-import { uploadToFirebase } from "@/lib/firebaseSuite";
 import { toast } from "sonner";
 
 interface Props {
@@ -42,7 +41,7 @@ export const UserProfileStudio: React.FC<Props> = ({
   const [relationshipGoal, setRelationshipGoal] = useState(profile.relationshipGoal || "Friendship");
   const [interestsInput, setInterestsInput] = useState(profile.interests ? profile.interests.join(", ") : "Campus Events, Tech");
 
-  // Sync state whenever parent profile updates (e.g. from Supabase)
+  // Sync state whenever parent profile updates
   React.useEffect(() => {
     if (profile.photos && profile.photos.length > 0) {
       setPhotos(profile.photos);
@@ -81,7 +80,7 @@ export const UserProfileStudio: React.FC<Props> = ({
 
     onUpdateProfile(updatedProfile);
     setShowEditDetailsModal(false);
-    toast.success("Profile details updated and broadcasted to campus network!");
+    toast.success("Profile details updated successfully!");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,25 +90,50 @@ export const UserProfileStudio: React.FC<Props> = ({
       setIsUploadingPhoto(true);
 
       try {
-        // Upload to Firebase Storage or compress to dataUrl fallback
-        const fbUrl = await uploadToFirebase(file, "avatars");
-        const finalUrl = fbUrl || (await new Promise<string>((res) => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result as string);
-          reader.readAsDataURL(file);
-        }));
-
-        if (finalUrl) {
-          const updated = [...photos, finalUrl];
-          setPhotos(updated);
-          const updatedProfile = { ...profile, photos: updated };
-          onUpdateProfile(updatedProfile);
-          toast.success("Profile photo uploaded!");
-        }
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 800;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+              const updated = [...photos, dataUrl];
+              setPhotos(updated);
+              onUpdateProfile({ ...profile, photos: updated });
+              toast.success("Profile photo uploaded!");
+            }
+            setIsUploadingPhoto(false);
+          };
+          img.onerror = () => {
+            const dataUrl = (readerEvent.target?.result as string) || "";
+            if (dataUrl) {
+              const updated = [...photos, dataUrl];
+              setPhotos(updated);
+              onUpdateProfile({ ...profile, photos: updated });
+            }
+            setIsUploadingPhoto(false);
+          };
+          img.src = readerEvent.target?.result as string;
+        };
+        reader.readAsDataURL(file);
       } catch (err) {
         console.warn("Photo upload warning:", err);
-        toast.error("Could not upload photo. Please try again.");
-      } finally {
         setIsUploadingPhoto(false);
       }
     }

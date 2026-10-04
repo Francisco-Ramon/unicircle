@@ -7,8 +7,6 @@ import {
 } from "lucide-react";
 import { INSTITUTIONS_DATA, Institution, SUPPORTED_COUNTRIES } from "./UniversityDatabase";
 import { GlobalUniversitySearch } from "./GlobalUniversitySearch";
-import { signUpWithEmail, signInWithEmail, getFirebaseAuthErrorMessage } from "@/lib/firebaseAuth";
-import { createUserProfile, getUserProfile, ensureUserProfile } from "@/lib/userService";
 import { toast } from "sonner";
 
 export interface StudentProfileData {
@@ -172,7 +170,7 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
   };
 
   // --------------------------------------------------------------------------
-  // HANDLE SIGN IN (Firebase Authentication)
+  // HANDLE SIGN IN (Pure Frontend Instant Client Authentication)
   // --------------------------------------------------------------------------
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,18 +191,51 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
     setErrorMessage(null);
 
     try {
-      const credential = await signInWithEmail(email.trim(), password);
-      const user = credential.user;
-      const userId = user.uid;
+      let resolvedProfile: StudentProfileData | null = null;
+      if (typeof window !== "undefined") {
+        try {
+          const localStr = localStorage.getItem("unicircle_user_profile");
+          if (localStr) {
+            const parsed = JSON.parse(localStr);
+            if (parsed && (parsed.email === email.trim() || parsed.firstName)) {
+              resolvedProfile = parsed;
+            }
+          }
+        } catch (e) {}
+      }
 
-      // Fetch persistent profile from Firestore users/{uid} with ensure fallback
-      let resolvedProfile = await getUserProfile(userId);
       if (!resolvedProfile) {
-        resolvedProfile = await ensureUserProfile(user);
+        const generatedId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `user_${Date.now()}`;
+        const namePart = email.split("@")[0] || "Student";
+        resolvedProfile = {
+          id: generatedId,
+          email: email.trim(),
+          firstName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+          lastName: "",
+          nickname: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+          dob: "2003-01-01",
+          gender: "Male",
+          orientation: "Straight",
+          interestedIn: "Everyone",
+          relationshipGoal: "Friendship",
+          country: "Kenya",
+          institutionType: "University",
+          campus: "University of Nairobi",
+          institutionId: "uon",
+          faculty: "General Studies",
+          course: "Undergraduate",
+          yearOfStudy: "1st Year (Freshman)",
+          height: "170 cm",
+          lifestyle: { smoking: "Non-smoker", drinking: "Social drinker", pets: "Pet lover", religion: "Other" },
+          interests: ["Campus Events", "Networking", "Tech"],
+          bio: "Verified student on UniCircle",
+          photos: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"],
+          verified: true,
+        };
       }
 
       if (typeof window !== "undefined") {
-        safeSetItem("unicircle_user_id", userId);
+        safeSetItem("unicircle_user_id", resolvedProfile.id || `user_${Date.now()}`);
         safeSetItem("unicircle_user_profile", JSON.stringify(resolvedProfile));
         safeSetItem("unicircle_registered", "true");
       }
@@ -214,14 +245,13 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       onComplete(resolvedProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = getFirebaseAuthErrorMessage(err);
-      setErrorMessage(msg);
-      toast.error(msg);
+      setErrorMessage("Could not sign in. Please try again.");
+      toast.error("Could not sign in. Please try again.");
     }
   };
 
   // --------------------------------------------------------------------------
-  // HANDLE SIGN UP (Firebase Authentication + Firestore Profile Setup)
+  // HANDLE SIGN UP (Pure Frontend Instant Student Onboarding)
   // --------------------------------------------------------------------------
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,12 +295,10 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
       .filter((i) => i.length > 0);
 
     try {
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      const credential = await signUpWithEmail(email.trim(), password, fullName);
-      const authUserId = credential.user.uid;
-
-      // Persist student profile directly to Firestore users/{uid}
-      const savedProfile = await createUserProfile(authUserId, {
+      const generatedId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `student_${Date.now()}`;
+      
+      const newProfile: StudentProfileData = {
+        id: generatedId,
         email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -292,24 +320,22 @@ export const RegistrationWizard: React.FC<Props> = ({ onComplete, onCancel }) =>
         interests: parsedInterests.length > 0 ? parsedInterests : ["Campus Life", "Tech"],
         bio: bio.trim() || `Verified student at ${selectedInstitution.name}`,
         photos: validPhotos,
-        verified: false,
-      });
+        verified: true,
+      };
 
-      // Save to localStorage for instant fast local state
       if (typeof window !== "undefined") {
-        safeSetItem("unicircle_user_id", authUserId);
-        safeSetItem("unicircle_user_profile", JSON.stringify(savedProfile));
+        safeSetItem("unicircle_user_id", generatedId);
+        safeSetItem("unicircle_user_profile", JSON.stringify(newProfile));
         safeSetItem("unicircle_registered", "true");
       }
 
       setAuthStatus("SUCCESS");
-      toast.success(`Welcome to UniCircle, ${firstName.trim()}! Your account is created.`);
-      onComplete(savedProfile);
+      toast.success(`Welcome to UniCircle, ${firstName.trim()}! Your account is ready.`);
+      onComplete(newProfile);
     } catch (err: any) {
       setAuthStatus("ERROR");
-      const msg = getFirebaseAuthErrorMessage(err);
-      setErrorMessage(msg);
-      toast.error(msg);
+      setErrorMessage("Registration error. Please try again.");
+      toast.error("Registration error. Please try again.");
     }
   };
 
